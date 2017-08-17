@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,21 +24,19 @@
  */
 
 #include <QtCore/QSettings>
-#include "lib/framework/wzapp.h"
 #include "lib/framework/wzconfig.h"
 #include "lib/framework/input.h"
 #include "lib/netplay/netplay.h"
 #include "lib/sound/mixer.h"
 #include "lib/ivis_opengl/screen.h"
 #include "lib/framework/opengl.h"
+#include "lib/ivis_opengl/pieclip.h"
 
-#include "advvis.h"
 #include "ai.h"
 #include "component.h"
 #include "configuration.h"
 #include "difficulty.h"
 #include "display3d.h"
-#include "hci.h"
 #include "multiint.h"
 #include "multiplay.h"
 #include "radar.h"
@@ -94,7 +92,6 @@ bool loadConfig()
 	}
 	showFPS = ini.value("showFPS", false).toBool();
 	scroll_speed_accel = ini.value("scroll", DEFAULTSCROLL).toInt();
-	setShakeStatus(ini.value("shake", false).toBool());
 	setDrawShadows(ini.value("shadows", true).toBool());
 	war_setSoundEnabled(ini.value("sound", true).toBool());
 	setInvertMouseStatus(ini.value("mouseflip", true).toBool());
@@ -143,9 +140,9 @@ bool loadConfig()
 		setTextureSize(ini.value("textureSize").toInt());
 	}
 	NetPlay.isUPNP = ini.value("UPnP", true).toBool();
-	if (ini.contains("FSAA"))
+	if (ini.contains("antialiasing"))
 	{
-		war_setFSAA(ini.value("FSAA").toInt());
+		war_setAntialiasing(ini.value("antialiasing").toInt());
 	}
 	// Leave this to false, some system will fail and they can't see the system popup dialog!
 	war_setFullscreen(ini.value("fullscreen", false).toBool());
@@ -153,9 +150,9 @@ bool loadConfig()
 	war_SetColouredCursor(ini.value("coloredCursor", true).toBool());
 	// this should be enabled on all systems by default
 	war_SetVsync(ini.value("vsync", true).toBool());
-	// 640x480 is minimum that we will support
-	int width = ini.value("width", 640).toInt();
-	int height = ini.value("height", 480).toInt();
+	// 640x480 is minimum that we will support, but default to something more sensible
+	int width = ini.value("width", war_GetWidth()).toInt();
+	int height = ini.value("height", war_GetHeight()).toInt();
 	int screen = ini.value("screen", 0).toInt();
 	if (width < 640 || height < 480)	// sanity check
 	{
@@ -205,7 +202,6 @@ bool saveConfig()
 	}
 	ini.setValue("showFPS", (SDWORD)showFPS);
 	ini.setValue("scroll", (SDWORD)scroll_speed_accel);		// scroll
-	ini.setValue("shake", (SDWORD)(getShakeStatus()));		// screenshake
 	ini.setValue("mouseflip", (SDWORD)(getInvertMouseStatus()));	// flipmouse
 	ini.setValue("nomousewarp", (SDWORD)getMouseWarp()); 		// mouse warp
 	ini.setValue("coloredCursor", (SDWORD)war_GetColouredCursor());
@@ -222,7 +218,7 @@ bool saveConfig()
 	ini.setValue("trapCursor", war_GetTrapCursor());
 	ini.setValue("vsync", war_GetVsync());
 	ini.setValue("textureSize", getTextureSize());
-	ini.setValue("FSAA", war_getFSAA());
+	ini.setValue("antialiasing", war_getAntialiasing());
 	ini.setValue("UPnP", (SDWORD)NetPlay.isUPNP);
 	ini.setValue("rotateRadar", rotateRadar);
 	ini.setValue("PauseOnFocusLoss", war_GetPauseOnFocusLoss());
@@ -258,7 +254,7 @@ bool saveConfig()
 
 // Saves and loads the relevant part of the config files for MP games
 // Ensures that others' games don't change our own configuration settings
-bool reloadMPConfig(void)
+bool reloadMPConfig()
 {
 	QSettings ini(PHYSFS_getWriteDir() + QString("/") + fileName, QSettings::IniFormat);
 	if (ini.status() != QSettings::NoError)

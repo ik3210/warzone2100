@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -62,17 +62,17 @@ void MersenneTwister::generate()
 	// Loop tripled, to avoid using %624 everywhere.
 	for (unsigned i = 0; i != 227; ++i)
 	{
-		int v = (state[i] & 0x80000000) | (state[i + 1      ] & 0x7FFFFFFF);
+		unsigned v = (state[i] & 0x80000000) | (state[i + 1      ] & 0x7FFFFFFF);
 		state[i] = state[i + 397     ] ^ v >> 1 ^ ((v & 0x00000001) * 0x9908B0DF);
 	}
 	for (unsigned i = 227; i != 623; ++i)
 	{
-		int v = (state[i] & 0x80000000) | (state[i + 1      ] & 0x7FFFFFFF);
+		unsigned v = (state[i] & 0x80000000) | (state[i + 1      ] & 0x7FFFFFFF);
 		state[i] = state[i + 397 - 624] ^ v >> 1 ^ ((v & 0x00000001) * 0x9908B0DF);
 	}
 	for (unsigned i = 623; i != 624; ++i)  // Very short loop.
 	{
-		int v = (state[i] & 0x80000000) | (state[i + 1 - 624] & 0x7FFFFFFF);
+		unsigned v = (state[i] & 0x80000000) | (state[i + 1 - 624] & 0x7FFFFFFF);
 		state[i] = state[i + 397 - 624] ^ v >> 1 ^ ((v & 0x00000001) * 0x9908B0DF);
 	}
 }

@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2008-2015  Warzone 2100 Project
+	Copyright (C) 2008-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -88,21 +88,21 @@ void Timer_Init(void)
 void Timer_start(void)
 {
 	stopped = false; // reset stop flag
-	gettimeofday(&startCount, NULL);
+	gettimeofday(&startCount, nullptr);
 }
 
 void Timer_stop(void)
 {
 	stopped = true; // set timer stopped flag
 
-	gettimeofday(&endCount, NULL);
+	gettimeofday(&endCount, nullptr);
 }
 
 double Timer_getElapsedMicroSecs(void)
 {
 	if (!stopped)
 	{
-		gettimeofday(&endCount, NULL);
+		gettimeofday(&endCount, nullptr);
 	}
 	startTimeInMicroSec = (startCount.tv_sec * 1000000.0) + startCount.tv_usec;
 	endTimeInMicroSec = (endCount.tv_sec * 1000000.0) + endCount.tv_usec;

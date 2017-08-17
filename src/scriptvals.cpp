@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -47,20 +47,20 @@ struct SCRV_STORE
 };
 
 // The list of script contexts
-static SCRV_STORE	*psContextStore = NULL;
+static SCRV_STORE	*psContextStore = nullptr;
 
 // Copy of all references to game objects, so that we can NULL them on death...
 static std::list<INTERP_VAL *>basePointers;
 
 // Initialise the script value module
-bool scrvInitialise(void)
+bool scrvInitialise()
 {
-	psContextStore = NULL;
+	psContextStore = nullptr;
 	return true;
 }
 
 // Shut down the script value module
-void scrvShutDown(void)
+void scrvShutDown()
 {
 	SCRV_STORE	*psCurr;
 	while (psContextStore)
@@ -74,7 +74,7 @@ void scrvShutDown(void)
 }
 
 // reset the script value module
-void scrvReset(void)
+void scrvReset()
 {
 	SCRV_STORE	*psCurr;
 	while (psContextStore)
@@ -86,7 +86,7 @@ void scrvReset(void)
 		free(psCurr);
 	}
 
-	psContextStore = NULL;
+	psContextStore = nullptr;
 	basePointers.clear();
 }
 
@@ -138,14 +138,14 @@ static bool baseObjDead(INTERP_VAL *psVal)
 	if (psObj && isDead(psObj))
 	{
 		debug(LOG_DEATH, "Removing %p (%s) from the wzscript system", psObj, objInfo(psObj));
-		psVal->v.oval = NULL;
+		psVal->v.oval = nullptr;
 		return true;
 	}
 	return false;
 }
 
 // Check all the base pointers to see if they have died
-void scrvUpdateBasePointers(void)
+void scrvUpdateBasePointers()
 {
 	std::for_each(basePointers.begin(), basePointers.end(), baseObjDead);
 }
@@ -158,7 +158,7 @@ bool scrvNewGroup(INTERP_VAL *psVal)
 	psGroup = grpCreate();
 
 	// increment the refcount so the group doesn't get automatically freed when empty
-	psGroup->add(NULL);
+	psGroup->add(nullptr);
 
 	psVal->v.oval = psGroup;
 
@@ -177,7 +177,7 @@ void scrvReleaseGroup(INTERP_VAL *psVal)
 	       "scrvReleaseGroup: ref count is wrong");
 
 	// do a final Remove to free the group
-	psGroup->remove(NULL);
+	psGroup->remove(nullptr);
 }
 
 // Get a context from the list

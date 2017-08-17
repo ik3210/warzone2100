@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -78,19 +78,19 @@
 static void displayStructureBar(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset);
 
 // ////////////////////////////////////////////////////////////////////////////
-static inline void freeLimitSet(void)
+static inline void freeLimitSet()
 {
 	// Free the old set if required
 	if (ingame.numStructureLimits)
 	{
 		free(ingame.pStructureLimits);
 		ingame.numStructureLimits = 0;
-		ingame.pStructureLimits = NULL;
+		ingame.pStructureLimits = nullptr;
 	}
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-bool startLimitScreen(void)
+bool startLimitScreen()
 {
 	addBackdrop();//background
 
@@ -181,7 +181,7 @@ bool startLimitScreen(void)
 
 // ////////////////////////////////////////////////////////////////////////////
 
-void runLimitScreen(void)
+void runLimitScreen()
 {
 	frontendMultiMessages();							// network stuff.
 
@@ -244,7 +244,7 @@ void runLimitScreen(void)
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-void createLimitSet(void)
+void createLimitSet()
 {
 	UDWORD			i, numchanges = 0, bufSize, idx = 0;
 	MULTISTRUCTLIMITS	*pEntry;
@@ -296,7 +296,7 @@ void createLimitSet(void)
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-void applyLimitSet(void)
+void applyLimitSet()
 {
 	MULTISTRUCTLIMITS *pEntry = ingame.pStructureLimits;
 
@@ -313,9 +313,9 @@ void applyLimitSet(void)
 		// So long as the ID is valid
 		if (id < numStructureStats)
 		{
-			for (int j = 0; j < MAX_PLAYERS; ++j)
+			for (auto &asStructLimit : asStructLimits)
 			{
-				asStructLimits[j][id].limit = pEntry[i].limit;
+				asStructLimit[id].limit = pEntry[i].limit;
 			}
 		}
 	}
@@ -368,13 +368,12 @@ static void displayStructureBar(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset
 	pie_SetDepthBufferStatus(DEPTH_CMP_ALWAYS_WRT_ON);
 
 	// draw name
-	iV_SetFont(font_regular);											// font
 	iV_SetTextColour(WZCOL_TEXT_BRIGHT);
-	iV_DrawText(_(getName(stat)), x + 80, y + psWidget->height() / 2 + 3);
+	iV_DrawText(_(getName(stat)), x + 80, y + psWidget->height() / 2 + 3, font_regular);
 
 	// draw limit
 	ssprintf(str, "%d", ((W_SLIDER *)widgGetFromID(psWScreen, psWidget->id + 1))->pos);
-	iV_DrawText(str, x + 270, y + psWidget->height() / 2 + 3);
+	iV_DrawText(str, x + 270, y + psWidget->height() / 2 + 3, font_regular);
 
 	return;
 }

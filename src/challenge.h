@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -23,10 +23,10 @@
 
 #define CHALLENGE_SCORES "scores.json"
 
-bool addChallenges(void);
-bool closeChallenges(void);
-bool runChallenges(void);
-bool displayChallenges(void);
+bool addChallenges();
+bool closeChallenges();
+bool runChallenges();
+bool displayChallenges();
 void updateChallenge(bool gameWon);
 
 extern bool challengesUp;

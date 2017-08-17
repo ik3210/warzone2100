@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,8 +28,6 @@ enum RENDER_TYPE
 	RENDER_FEATURE,
 	RENDER_PROXMSG,
 	RENDER_PROJECTILE,
-	RENDER_SHADOW,
-	RENDER_ANIMATION,
 	RENDER_EFFECT,
 	RENDER_DELIVPOINT,
 	RENDER_PARTICLE
@@ -38,9 +36,9 @@ enum RENDER_TYPE
 //function prototypes
 
 /* add an object to the current render list */
-void bucketAddTypeToList(RENDER_TYPE objectType, void *object);
+void bucketAddTypeToList(RENDER_TYPE objectType, void *object, const glm::mat4 &viewMatrix);
 
 /* render Objects in list */
-void bucketRenderCurrentList(void);
+void bucketRenderCurrentList(const glm::mat4 &viewMatrix);
 
 #endif // __INCLUDED_SRC_BUCKET3D_H__

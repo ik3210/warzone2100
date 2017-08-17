@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -26,7 +26,6 @@
 #include <string.h>
 #include "objectdef.h"
 #include "power.h"
-#include "hci.h"
 #include "lib/gamelib/gtime.h"
 #include "lib/sound/audio.h"
 #include "objmem.h"
@@ -34,16 +33,10 @@
 #include "lib/netplay/netplay.h"
 #include "multiplay.h"
 #include "multiint.h"
-
 #include "feature.h"
 #include "structure.h"
 #include "mission.h"
-#include "research.h"
 #include "intdisplay.h"
-#include "action.h"
-#include "difficulty.h"
-#include "random.h"
-
 
 #define EXTRACT_POINTS      1
 #define MAX_POWER           1000000
@@ -259,7 +252,7 @@ static int64_t updateExtractedPower(STRUCTURE *psBuilding)
 //returns the relevant list based on OffWorld or OnWorld
 STRUCTURE *powerStructList(int player)
 {
-	ASSERT_OR_RETURN(NULL, player < MAX_PLAYERS, "Invalid player %d", player);
+	ASSERT_OR_RETURN(nullptr, player < MAX_PLAYERS, "Invalid player %d", player);
 	if (offWorldKeepLists)
 	{
 		return (mission.apsStructLists[player]);
@@ -280,7 +273,7 @@ void updatePlayerPower(int player, int ticks)
 
 	syncDebugEconomy(player, '<');
 
-	for (psStruct = powerStructList(player); psStruct != NULL; psStruct = psStruct->psNext)
+	for (psStruct = powerStructList(player); psStruct != nullptr; psStruct = psStruct->psNext)
 	{
 		if (psStruct->pStructureType->type == REF_POWER_GEN && psStruct->status == SS_BUILT)
 		{
@@ -310,7 +303,7 @@ static void updateCurrentPower(STRUCTURE *psStruct, UDWORD player, int ticks)
 			//check not died
 			if (psPowerGen->apResExtractors[i]->died)
 			{
-				psPowerGen->apResExtractors[i] = NULL;
+				psPowerGen->apResExtractors[i] = nullptr;
 			}
 			else
 			{

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -23,8 +23,6 @@
  *
  * Initialisation and shutdown for the framework library.
  *
- * Includes a basic windows message loop.
- *
  */
 #include "frame.h"
 #include "file.h"
@@ -34,11 +32,6 @@
 
 #include "frameresource.h"
 #include "input.h"
-#include "physfs_ext.h"
-
-#include "cursors.h"
-
-/* Linux specific stuff */
 
 /************************************************************************************
  *
@@ -60,7 +53,7 @@ static uint32_t lastTicks = 0;
 /* InitFrameStuff - needs to be called once before frame loop commences */
 static void InitFrameStuff()
 {
-	frameCount = 0.0;
+	frameCount = 0;
 	curFrames = 0;
 	lastFrames = 0;
 	curTicks = 0;
@@ -203,7 +196,7 @@ static bool loadFile2(const char *pFileName, char **ppFileData, UDWORD *pFileSiz
 			assert(false);
 			return false;
 		}
-		assert(*ppFileData != NULL);
+		assert(*ppFileData != nullptr);
 	}
 
 	/* Load the file data */
@@ -213,7 +206,7 @@ static bool loadFile2(const char *pFileName, char **ppFileData, UDWORD *pFileSiz
 		if (AllocateMem)
 		{
 			free(*ppFileData);
-			*ppFileData = NULL;
+			*ppFileData = nullptr;
 		}
 
 		debug(LOG_ERROR, "Reading %s short: %s", pFileName, PHYSFS_getLastError());
@@ -226,7 +219,7 @@ static bool loadFile2(const char *pFileName, char **ppFileData, UDWORD *pFileSiz
 		if (AllocateMem)
 		{
 			free(*ppFileData);
-			*ppFileData = NULL;
+			*ppFileData = nullptr;
 		}
 
 		debug(LOG_ERROR, "Error closing %s: %s", pFileName, PHYSFS_getLastError());
@@ -257,7 +250,7 @@ PHYSFS_file *openSaveFile(const char *fileName)
 		}
 
 		assert(!"openSaveFile: couldn't open file for writing");
-		return NULL;
+		return nullptr;
 	}
 
 	return fileHandle;
@@ -292,14 +285,14 @@ bool saveFile(const char *pFileName, const char *pFileData, UDWORD fileSize)
 		return false;
 	}
 
-	if (PHYSFS_getRealDir(pFileName) == NULL)
+	if (PHYSFS_getRealDir(pFileName) == nullptr)
 	{
 		// weird
 		debug(LOG_ERROR, "PHYSFS_getRealDir(%s) returns NULL (%s)?!", pFileName, PHYSFS_getLastError());
 	}
 	else
 	{
-		debug(LOG_WZ, "Successfully wrote to %s%s%s with %d bytes", PHYSFS_getRealDir(pFileName), PHYSFS_getDirSeparator(), pFileName, size);
+		debug(LOG_WZ, "Successfully wrote to %s%s with %d bytes", PHYSFS_getRealDir(pFileName), pFileName, size);
 	}
 	return true;
 }
@@ -325,12 +318,17 @@ bool loadFileToBufferNoError(const char *pFileName, char *pFileBuffer, UDWORD bu
 
 Sha256 findHashOfFile(char const *realFileName)
 {
-	char *realFileData = NULL;
+	char *realFileData = nullptr;
 	uint32_t realFileSize = 0;
-	loadFile(realFileName, &realFileData, &realFileSize);
-	Sha256 realFileHash = sha256Sum(realFileData, realFileSize);
-	free(realFileData);
-	return realFileHash;
+	if (loadFile(realFileName, &realFileData, &realFileSize))
+	{
+		Sha256 realFileHash = sha256Sum(realFileData, realFileSize);
+		free(realFileData);
+		return realFileHash;
+	}
+	Sha256 zero;
+	zero.setZero();
+	return zero;
 }
 
 bool PHYSFS_printf(PHYSFS_file *file, const char *format, ...)

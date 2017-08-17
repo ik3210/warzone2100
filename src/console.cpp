@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,14 +24,12 @@
 
 #include "lib/framework/frame.h"
 #include "lib/framework/input.h"
-#include "lib/framework/wzapp.h"
 #include "lib/gamelib/gtime.h"
 #include "lib/ivis_opengl/pieblitfunc.h"
 #include "lib/ivis_opengl/piestate.h"
 #include "lib/ivis_opengl/textdraw.h"
 #include "lib/sound/audio.h"
 #include "lib/sound/audio_id.h"
-#include "lib/netplay/netplay.h"
 #include "loadsave.h"
 #include "ai.h"
 #include "console.h"
@@ -40,6 +38,7 @@
 #include "hci.h"
 #include <string>
 #include <istream>
+#include <sstream>
 #include <deque>
 
 // FIXME: When we switch over to full JS, use class version of this file
@@ -63,18 +62,18 @@ struct CONSOLE
 
 struct CONSOLE_MESSAGE
 {
-	std::string text;
+	WzText display;
 	UDWORD	timeAdded;		// When was it added to our list?
-	int		JustifyType;	// text justification
+	CONSOLE_TEXT_JUSTIFICATION JustifyType;	// text justification
 	int		player;			// Player who sent this message or SYSTEM_MESSAGE
-	bool	team;			// team message or not
-	CONSOLE_MESSAGE() : timeAdded(0), JustifyType(0), player(0), team(false) {}
+	CONSOLE_MESSAGE(const std::string &text, iV_fonts fontID, UDWORD time, CONSOLE_TEXT_JUSTIFICATION justify, int plr)
+	                : display(text, fontID), timeAdded(time), JustifyType(justify), player(plr) {}
 };
-WZ_MUTEX *mtx = wzMutexCreate();                        // prevent adding messages when we are not expecting them
-std::deque<CONSOLE_MESSAGE> ActiveMessages;		// we add all messages to this container
-std::deque<CONSOLE_MESSAGE> TeamMessages;		// history of team/private communications
-std::deque<CONSOLE_MESSAGE> HistoryMessages;	// history of all other communications
-std::deque<CONSOLE_MESSAGE> InfoMessages;
+
+static std::deque<CONSOLE_MESSAGE> ActiveMessages;		// we add all messages to this container
+static std::deque<CONSOLE_MESSAGE> TeamMessages;		// history of team/private communications
+static std::deque<CONSOLE_MESSAGE> HistoryMessages;	// history of all other communications
+static std::deque<CONSOLE_MESSAGE> InfoMessages;
 static bool	bConsoleDropped = false;			// Is the console history on or off?
 static bool HistoryMode = false;				// toggle between team & global history
 static int updatepos = 0;						// if user wants to scroll back the history log
@@ -99,10 +98,9 @@ static void	setConsoleMessageDuration(UDWORD time)
 }
 
 /** Sets the system up */
-void	initConsoleMessages(void)
+void	initConsoleMessages()
 {
-	iV_SetFont(font_regular);
-	linePitch = iV_GetTextLineSize();						// NOTE: if font changes, this must also be changed!
+	linePitch = iV_GetTextLineSize(font_regular);
 	bConsoleDropped = false;
 	setConsoleMessageDuration(DEFAULT_MESSAGE_DURATION);	// Setup how long messages are displayed for
 	setConsoleBackdropStatus(true);							// No box under the text
@@ -125,7 +123,7 @@ void setHistoryMode(bool mode)
 }
 
 /** Open the console when it's closed and close it when it's open. */
-void	toggleConsoleDrop(void)
+void	toggleConsoleDrop()
 {
 	if (!bConsoleDropped)
 	{	// it was closed, so play open sound
@@ -143,16 +141,13 @@ void	toggleConsoleDrop(void)
 /** Add a string to the console. */
 bool addConsoleMessage(const char *Text, CONSOLE_TEXT_JUSTIFICATION jusType, SDWORD player, bool team)
 {
-	CONSOLE_MESSAGE	consoleStorage;
-
 	if (!allowNewMessages)
 	{
-		return false ;	// Don't allow it to be added if we've disabled adding of new messages
+		return false;	// Don't allow it to be added if we've disabled adding of new messages
 	}
 
 	std::istringstream stream(Text);
 	std::string lines;
-	char messageText[MAX_CONSOLE_STRING_LENGTH];
 
 	while (std::getline(stream, lines))
 	{
@@ -162,7 +157,7 @@ bool addConsoleMessage(const char *Text, CONSOLE_TEXT_JUSTIFICATION jusType, SDW
 		std::string FitText(lines);
 		while (!FitText.empty())
 		{
-			int pixelWidth = iV_GetTextWidth(FitText.c_str());
+			int pixelWidth = iV_GetTextWidth(FitText.c_str(), font_regular);
 			if (pixelWidth <= mainConsole.width)
 			{
 				break;
@@ -170,53 +165,27 @@ bool addConsoleMessage(const char *Text, CONSOLE_TEXT_JUSTIFICATION jusType, SDW
 			FitText.resize(FitText.length() - 1);	// Erase last char.
 		}
 
-		sstrcpy(messageText, FitText.c_str());
-		debug(LOG_CONSOLE, "(to player %d): %s", (int)player, messageText);
-		consoleStorage.player = player;
+		debug(LOG_CONSOLE, "(to player %d): %s", (int)player, FitText.c_str());
 
-		// set justified text flags
-		switch (jusType)
-		{
-		case LEFT_JUSTIFY:
-			consoleStorage.JustifyType = FTEXT_LEFTJUSTIFY;		// Align to left edge of screen
-			break;
-
-		case RIGHT_JUSTIFY:
-			consoleStorage.JustifyType = FTEXT_RIGHTJUSTIFY;	// Align to right edge of screen
-			break;
-
-		case CENTRE_JUSTIFY:
-			consoleStorage.JustifyType = FTEXT_CENTRE;			// Align to centre of the screen
-			break;
-		default:
-			debug(LOG_FATAL, "Unknown type of text justification for console print, aborting.");
-			abort();
-			break;
-		}
-
-		consoleStorage.text = messageText;
-		consoleStorage.timeAdded = realTime;		// Store the time when it was added
-		wzMutexLock(mtx);  // Don't add messages unless locked!
 		if (player == INFO_MESSAGE)
 		{
-			InfoMessages.push_back(consoleStorage);
+			InfoMessages.emplace_back(FitText, font_regular, realTime, jusType, player);
 		}
 		else
 		{
-			ActiveMessages.push_back(consoleStorage);	// everything gets logged here for a specific period of time
+			ActiveMessages.emplace_back(FitText, font_regular, realTime, jusType, player);	// everything gets logged here for a specific period of time
 			if (team)
 			{
-				TeamMessages.push_back(consoleStorage);	// persistent team specific logs
+				TeamMessages.emplace_back(FitText, font_regular, realTime, jusType, player);	// persistent team specific logs
 			}
-			HistoryMessages.push_back(consoleStorage);	// persistent messages (all types)
+			HistoryMessages.emplace_back(FitText, font_regular, realTime, jusType, player);	// persistent messages (all types)
 		}
-		wzMutexUnlock(mtx);
 	}
 	return true;
 }
 
 /// \return The number of active console messages
-int	getNumberConsoleMessages(void)
+int	getNumberConsoleMessages()
 {
 	return (ActiveMessages.size());
 }
@@ -224,14 +193,13 @@ int	getNumberConsoleMessages(void)
 /** Update the console messages.
 	This function will remove messages that are overdue.
 */
-void	updateConsoleMessages(void)
+void	updateConsoleMessages()
 {
 	// If there are no messages or we're on permanent (usually for scripts) then exit
-	if ((!getNumberConsoleMessages() && !InfoMessages.size()) || mainConsole.permanent)
+	if ((!getNumberConsoleMessages() && InfoMessages.empty()) || mainConsole.permanent)
 	{
 		return;
 	}
-	wzMutexLock(mtx);  // don't remove messages unless locked
 	for (auto i = InfoMessages.begin(); i != InfoMessages.end();)
 	{
 		if (realTime - i->timeAdded > messageDuration)
@@ -255,7 +223,6 @@ void	updateConsoleMessages(void)
 			++i;
 		}
 	}
-	wzMutexUnlock(mtx);
 }
 
 /**
@@ -264,7 +231,7 @@ void	updateConsoleMessages(void)
 	us to put up messages that stay there until we remove them
 	ourselves - be sure and reset message duration afterwards
 */
-void	removeTopConsoleMessage(void)
+void	removeTopConsoleMessage()
 {
 	if (getNumberConsoleMessages())
 	{
@@ -273,13 +240,13 @@ void	removeTopConsoleMessage(void)
 }
 
 /** Clears just Active console messages */
-void clearActiveConsole(void)
+void clearActiveConsole()
 {
 	ActiveMessages.clear();
 }
 
 /** Clears all console messages */
-void	flushConsoleMessages(void)
+void	flushConsoleMessages()
 {
 	ActiveMessages.clear();
 	TeamMessages.clear();
@@ -287,20 +254,20 @@ void	flushConsoleMessages(void)
 }
 
 /** Sets console text color depending on message type */
-static void setConsoleTextColor(SDWORD player)
+static PIELIGHT getConsoleTextColor(int player)
 {
 	// System messages
 	if (player == SYSTEM_MESSAGE)
 	{
-		iV_SetTextColour(WZCOL_CONS_TEXT_SYSTEM);
+		return WZCOL_CONS_TEXT_SYSTEM;
 	}
 	else if (player == NOTIFY_MESSAGE)
 	{
-		iV_SetTextColour(WZCOL_YELLOW);
+		return WZCOL_YELLOW;
 	}
 	else if (player == INFO_MESSAGE)
 	{
-		iV_SetTextColour(WZCOL_CONS_TEXT_INFO);
+		return WZCOL_CONS_TEXT_INFO;
 	}
 	else
 	{
@@ -309,19 +276,32 @@ static void setConsoleTextColor(SDWORD player)
 		{
 			if (aiCheckAlliances(player, selectedPlayer))
 			{
-				iV_SetTextColour(WZCOL_CONS_TEXT_USER_ALLY);
+				return WZCOL_CONS_TEXT_USER_ALLY;
 			}
 			else
 			{
-				iV_SetTextColour(WZCOL_CONS_TEXT_USER_ENEMY);
+				return WZCOL_CONS_TEXT_USER_ENEMY;
 			}
 		}
-		else
-		{
-			// Friend-foe is off
-			iV_SetTextColour(WZCOL_TEXT_BRIGHT);
-		}
+		// Friend-foe is off
+		return WZCOL_TEXT_BRIGHT;
 	}
+}
+
+static void console_drawtext(WzText &display, PIELIGHT colour, int x, int y, CONSOLE_TEXT_JUSTIFICATION justify, int width)
+{
+	switch (justify)
+	{
+	case LEFT_JUSTIFY:
+		break; // do nothing
+	case RIGHT_JUSTIFY:
+		x = x + width - display.width();
+		break;
+	case CENTRE_JUSTIFY:
+		x = x + (width - display.width()) / 2;
+		break;
+	}
+	display.render(x, y, colour);
 }
 
 // Show global (mode=true) or team (mode=false) history messages
@@ -379,40 +359,27 @@ void displayOldMessages(bool mode)
 		}
 		for (int i = startpos; i < count; ++i)
 		{
-			// Set text color depending on message type
-			if (mode)
-			{
-				iV_SetTextColour(WZCOL_CONS_TEXT_USER_ALLY);
-			}
-			else
-			{
-				setConsoleTextColor((*WhichMessages)[i].player);
-			}
-			TextYpos = iV_DrawFormattedText((*WhichMessages)[i].text.c_str(),
-			                                historyConsole.topX + nudgeright,
-			                                TextYpos,
-			                                historyConsole.width,
-			                                (*WhichMessages)[i].JustifyType);
+			PIELIGHT colour = mode ? WZCOL_CONS_TEXT_USER_ALLY : getConsoleTextColor((*WhichMessages)[i].player);
+			console_drawtext((*WhichMessages)[i].display, colour, historyConsole.topX + nudgeright, TextYpos, (*WhichMessages)[i].JustifyType, historyConsole.width);
+			TextYpos += (*WhichMessages)[i].display.lineSize();
 		}
 	}
 }
 
 /** Displays all the console messages */
-void	displayConsoleMessages(void)
+void	displayConsoleMessages()
 {
 	// Check if we have any messages we want to show
-	if (!getNumberConsoleMessages() && !bConsoleDropped && !InfoMessages.size())
+	if (!getNumberConsoleMessages() && !bConsoleDropped && InfoMessages.empty())
 	{
 		return;
 	}
 
 	// scripts can disable the console
-	if (!bConsoleDisplayEnabled && !InfoMessages.size())
+	if (!bConsoleDisplayEnabled && InfoMessages.empty())
 	{
 		return;
 	}
-
-	iV_SetFont(font_regular);
 
 	pie_SetDepthBufferStatus(DEPTH_CMP_ALWAYS_WRT_ON);
 	pie_SetFogStatus(false);
@@ -422,16 +389,13 @@ void	displayConsoleMessages(void)
 		displayOldMessages(HistoryMode);
 	}
 
-	wzMutexLock(mtx);  // don't iterate without a lock
-	if (InfoMessages.size())
+	if (!InfoMessages.empty())
 	{
 		auto i = InfoMessages.end() - 1;		// we can only show the last one...
-		setConsoleTextColor(i->player);
-
 		int tmp = pie_GetVideoBufferWidth();
 		drawBlueBox(0, 0,tmp, 18);
-		tmp -= iV_GetTextWidth(i->text.c_str());
-		iV_DrawFormattedText(i->text.c_str(), tmp - 6, linePitch - 2, iV_GetTextWidth(i->text.c_str()), i->JustifyType);
+		tmp -= i->display.width();
+		console_drawtext(i->display, getConsoleTextColor(i->player), tmp - 6, linePitch - 2, i->JustifyType, i->display.width());
 	}
 	int TextYpos = mainConsole.topY;
 	// Draw the blue background for the text (only in game, not lobby)
@@ -440,12 +404,11 @@ void	displayConsoleMessages(void)
 		iV_TransBoxFill(mainConsole.topX - CON_BORDER_WIDTH, mainConsole.topY - mainConsole.textDepth - CON_BORDER_HEIGHT,
 						mainConsole.topX + mainConsole.width, mainConsole.topY + (getNumberConsoleMessages() * linePitch) + CON_BORDER_HEIGHT - linePitch);
 	}
-	for (auto i = ActiveMessages.begin(); i != ActiveMessages.end(); ++i)
+	for (auto & ActiveMessage : ActiveMessages)
 	{
-		setConsoleTextColor(i->player);
-		TextYpos = iV_DrawFormattedText(i->text.c_str(), mainConsole.topX, TextYpos, mainConsole.width, i->JustifyType);
+		console_drawtext(ActiveMessage.display, getConsoleTextColor(ActiveMessage.player), mainConsole.topX, TextYpos, ActiveMessage.JustifyType, mainConsole.width);
+		TextYpos += ActiveMessage.display.lineSize();
 	}
-	wzMutexUnlock(mtx);
 }
 
 /** Allows toggling of the box under the console text */
@@ -499,7 +462,7 @@ void	setConsolePermanence(bool state, bool bClearOld)
 }
 
 /** Check if mouse is over the Active console 'window' area */
-bool mouseOverConsoleBox(void)
+bool mouseOverConsoleBox()
 {
 	int gotMessages = getNumberConsoleMessages();
 	if (gotMessages &&
@@ -514,7 +477,7 @@ bool mouseOverConsoleBox(void)
 }
 
 /** Check if mouse is over the History console 'window' area */
-bool	mouseOverHistoryConsoleBox(void)
+bool	mouseOverHistoryConsoleBox()
 {
 	int nudgeright = 0;
 	if (isSecondaryWindowUp())
@@ -572,7 +535,7 @@ void	setConsoleLineInfo(UDWORD vis)
 }
 
 /** get how many lines are allowed and how many are visible */
-UDWORD getConsoleLineInfo(void)
+UDWORD getConsoleLineInfo()
 {
 	return consoleVisibleLines;
 }
@@ -584,7 +547,7 @@ void	permitNewConsoleMessages(bool allow)
 }
 
 /// \return the visibility of the console
-bool	getConsoleDisplayStatus(void)
+bool	getConsoleDisplayStatus()
 {
 	return (bConsoleDisplayEnabled);
 }

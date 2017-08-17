@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,10 +28,9 @@
 #include <QtCore/QJsonArray>
 
 #include "lib/framework/frame.h"
-#include "lib/framework/strres.h"
-#include "lib/framework/frameresource.h"
 #include "lib/framework/wzconfig.h"
 #include "lib/netplay/netplay.h"
+#include "lib/ivis_opengl/imd.h"
 #include "objects.h"
 #include "lib/gamelib/gtime.h"
 #include "research.h"
@@ -39,7 +38,6 @@
 #include "lib/sound/audio.h"
 #include "lib/sound/audio_id.h"
 #include "lib/script/script.h"
-#include "scripttabs.h"
 #include "hci.h"
 #include "console.h"
 #include "cmddroid.h"
@@ -86,10 +84,10 @@ static void replaceTransDroidComponents(DROID *psTransporter, UDWORD oldType,
                                         UDWORD oldCompInc, UDWORD newCompInc);
 
 
-bool researchInitVars(void)
+bool researchInitVars()
 {
-	psCBLastResearch = NULL;
-	psCBLastResStructure = NULL;
+	psCBLastResearch = nullptr;
+	psCBLastResStructure = nullptr;
 	CBResFacilityOwner = -1;
 	asResearch.clear();
 
@@ -105,7 +103,7 @@ bool researchInitVars(void)
 }
 
 /** Load the research stats */
-bool loadResearch(QString filename)
+bool loadResearch(const QString& filename)
 {
 	WzConfig ini(filename, WzConfig::ReadOnlyAndRequired);
 	QStringList list = ini.childGroups();
@@ -116,9 +114,9 @@ bool loadResearch(QString filename)
 	for (int inc = 0; inc < list.size(); ++inc)
 	{
 		// HACK FIXME: the code assumes we have empty PLAYER_RESEARCH entries to throw around
-		for (int j = 0; j < MAX_PLAYERS; j++)
+		for (auto &j : asPlayerResList)
 		{
-			asPlayerResList[j].push_back(dummy);
+			j.push_back(dummy);
 		}
 
 		ini.beginGroup(list[inc]);
@@ -182,7 +180,7 @@ bool loadResearch(QString filename)
 
 		//get the IMDs used in the interface
 		QString statID = ini.value("statID", "").toString();
-		research.psStat = NULL;
+		research.psStat = nullptr;
 		if (statID.compare("") != 0)
 		{
 			//try find the structure stat with given name
@@ -194,14 +192,14 @@ bool loadResearch(QString filename)
 		if (imdName.compare("") != 0)
 		{
 			research.pIMD = modelGet(imdName);
-			ASSERT(research.pIMD != NULL, "Cannot find the research PIE '%s' for record '%s'", imdName.toUtf8().data(), getName(&research));
+			ASSERT(research.pIMD != nullptr, "Cannot find the research PIE '%s' for record '%s'", imdName.toUtf8().data(), getName(&research));
 		}
 
 		QString imdName2 = ini.value("imdName2", "").toString();
 		if (imdName2.compare("") != 0)
 		{
 			research.pIMD2 = modelGet(imdName2);
-			ASSERT(research.pIMD2 != NULL, "Cannot find the 2nd research '%s' PIE for record '%s'", imdName2.toUtf8().data(), getName(&research));
+			ASSERT(research.pIMD2 != nullptr, "Cannot find the 2nd research '%s' PIE for record '%s'", imdName2.toUtf8().data(), getName(&research));
 		}
 
 		QString msgName = ini.value("msgName", "").toString();
@@ -234,7 +232,7 @@ bool loadResearch(QString filename)
 		{
 			QString compID = compResults[j].trimmed();
 			COMPONENT_STATS *pComp = getCompStatsFromName(compID);
-			if (pComp != NULL)
+			if (pComp != nullptr)
 			{
 				research.componentResults.push_back(pComp);
 			}
@@ -258,13 +256,13 @@ bool loadResearch(QString filename)
 			QString oldCompID = pair[0].trimmed();
 			QString newCompID = pair[1].trimmed();
 			COMPONENT_STATS *oldComp = getCompStatsFromName(oldCompID);
-			if (oldComp == NULL)
+			if (oldComp == nullptr)
 			{
 				ASSERT(false, "Invalid item '%s' in list of replaced components of research '%s'. Wrong component code.", oldCompID.toUtf8().constData(), getName(&research));
 				continue;
 			}
 			COMPONENT_STATS *newComp = getCompStatsFromName(newCompID);
-			if (newComp == NULL)
+			if (newComp == nullptr)
 			{
 				ASSERT(false, "Invalid item '%s' in list of replaced components of research '%s'. Wrong component code.", newCompID.toUtf8().constData(), getName(&research));
 				continue;
@@ -281,7 +279,7 @@ bool loadResearch(QString filename)
 		{
 			QString compID = redComp[j].trimmed();
 			COMPONENT_STATS *pComp = getCompStatsFromName(compID);
-			if (pComp == NULL)
+			if (pComp == nullptr)
 			{
 				ASSERT(false, "Invalid item '%s' in list of redundant components of research '%s' ", compID.toUtf8().constData(), getName(&research));
 			}
@@ -342,8 +340,8 @@ bool loadResearch(QString filename)
 		{
 			QString resID = preRes[j].trimmed();
 			RESEARCH *preResItem = getResearch(resID.toUtf8().constData());
-			ASSERT(preResItem != NULL, "Invalid item '%s' in list of pre-requisites of research '%s' ", resID.toUtf8().constData(), getName(&asResearch[inc]));
-			if (preResItem != NULL)
+			ASSERT(preResItem != nullptr, "Invalid item '%s' in list of pre-requisites of research '%s' ", resID.toUtf8().constData(), getName(&asResearch[inc]));
+			if (preResItem != nullptr)
 			{
 				asResearch[inc].pPRList.push_back(preResItem->index);
 			}
@@ -392,7 +390,7 @@ bool researchAvailable(int inc, int playerID, QUEUE_MODE mode)
 	if (researchStarted)
 	{
 		STRUCTURE *psBuilding = findResearchingFacilityByResearchIndex(playerID, inc);  // May fail to find the structure here, if the research is merely pending, not actually started.
-		if (psBuilding != NULL && psBuilding->status == SS_BEING_BUILT)
+		if (psBuilding != nullptr && psBuilding->status == SS_BEING_BUILT)
 		{
 			researchStarted = false;  // Although research is started, the facility is currently being upgraded or demolished, so we want to be able to research this elsewhere.
 		}
@@ -498,38 +496,38 @@ void researchResult(UDWORD researchIndex, UBYTE player, bool bDisplay, STRUCTURE
 	MakeResearchCompleted(&asPlayerResList[player][researchIndex]);
 
 	//check for structures to be made available
-	for (int inc = 0; inc < pResearch->pStructureResults.size(); inc++)
+	for (unsigned short pStructureResult : pResearch->pStructureResults)
 	{
-		if (apStructTypeLists[player][pResearch->pStructureResults[inc]] != REDUNDANT)
+		if (apStructTypeLists[player][pStructureResult] != REDUNDANT)
 		{
-			apStructTypeLists[player][pResearch->pStructureResults[inc]] = AVAILABLE;
+			apStructTypeLists[player][pStructureResult] = AVAILABLE;
 		}
 	}
 
 	//check for structures to be made redundant
-	for (int inc = 0; inc < pResearch->pRedStructs.size(); inc++)
+	for (unsigned short pRedStruct : pResearch->pRedStructs)
 	{
-		apStructTypeLists[player][pResearch->pRedStructs[inc]] = REDUNDANT;
+		apStructTypeLists[player][pRedStruct] = REDUNDANT;
 	}
 
 	//check for component replacement
-	if (pResearch->componentReplacement.size() != 0)
+	if (!pResearch->componentReplacement.empty())
 	{
-		for (int ri = 0; ri < pResearch->componentReplacement.size(); ri++)
+		for (auto &ri : pResearch->componentReplacement)
 		{
-			COMPONENT_STATS *pOldComp = pResearch->componentReplacement[ri].pOldComponent;
-			replaceComponent(pResearch->componentReplacement[ri].pNewComponent, pOldComp, player);
+			COMPONENT_STATS *pOldComp = ri.pOldComponent;
+			replaceComponent(ri.pNewComponent, pOldComp, player);
 			apCompLists[player][pOldComp->compType][pOldComp->index] = REDUNDANT;
 		}
 	}
 
 	//check for artefacts to be made available
-	for (int inc = 0; inc < pResearch->componentResults.size(); inc++)
+	for (auto &componentResult : pResearch->componentResults)
 	{
 		//determine the type of artefact
-		COMPONENT_TYPE type = pResearch->componentResults[inc]->compType;
+		COMPONENT_TYPE type = componentResult->compType;
 		//set the component state to AVAILABLE
-		int compInc = pResearch->componentResults[inc]->index;
+		int compInc = componentResult->index;
 		if (apCompLists[player][type][compInc] != REDUNDANT)
 		{
 			apCompLists[player][type][compInc] = AVAILABLE;
@@ -553,10 +551,10 @@ void researchResult(UDWORD researchIndex, UBYTE player, bool bDisplay, STRUCTURE
 	}
 
 	//check for artefacts to be made redundant
-	for (int inc = 0; inc < pResearch->pRedArtefacts.size(); inc++)
+	for (auto &pRedArtefact : pResearch->pRedArtefacts)
 	{
-		COMPONENT_TYPE type = pResearch->pRedArtefacts[inc]->compType;
-		apCompLists[player][type][pResearch->pRedArtefacts[inc]->index] = REDUNDANT;
+		COMPONENT_TYPE type = pRedArtefact->compType;
+		apCompLists[player][type][pRedArtefact->index] = REDUNDANT;
 	}
 
 	//Add message to player's list if Major Topic
@@ -569,12 +567,13 @@ void researchResult(UDWORD researchIndex, UBYTE player, bool bDisplay, STRUCTURE
 		}
 
 		//check there is viewdata for the research topic - just don't add message if not!
-		if (pResearch->pViewData != NULL)
+		if (pResearch->pViewData != nullptr)
 		{
 			pMessage = addMessage(MSG_RESEARCH, false, player);
-			if (pMessage != NULL)
+			if (pMessage != nullptr)
 			{
-				pMessage->pViewData = (MSG_VIEWDATA *)pResearch->pViewData;
+				pMessage->pViewData = pResearch->pViewData;
+				jsDebugMessageUpdate();
 			}
 		}
 	}
@@ -586,7 +585,7 @@ void researchResult(UDWORD researchIndex, UBYTE player, bool bDisplay, STRUCTURE
 	if (player == selectedPlayer && bDisplay)
 	{
 		//add console text message
-		if (pResearch->pViewData != NULL)
+		if (pResearch->pViewData != nullptr)
 		{
 			snprintf(consoleMsg, MAX_RESEARCH_MSG_SIZE, _("Research completed: %s"), _(pResearch->pViewData->textMsg[0].toUtf8().constData()));
 			addConsoleMessage(consoleMsg, LEFT_JUSTIFY, SYSTEM_MESSAGE);
@@ -599,7 +598,7 @@ void researchResult(UDWORD researchIndex, UBYTE player, bool bDisplay, STRUCTURE
 
 	if (psResearchFacility)
 	{
-		psResearchFacility->pFunctionality->researchFacility.psSubject = NULL;		// Make sure topic is cleared
+		psResearchFacility->pFunctionality->researchFacility.psSubject = nullptr;		// Make sure topic is cleared
 	}
 	if ((bMultiPlayer || player == selectedPlayer) && bTrigger)
 	{
@@ -607,41 +606,40 @@ void researchResult(UDWORD researchIndex, UBYTE player, bool bDisplay, STRUCTURE
 		CBResFacilityOwner = player;
 		psCBLastResStructure = psResearchFacility;
 		eventFireCallbackTrigger((TRIGGER_TYPE)CALL_RESEARCHCOMPLETED);
-		psCBLastResStructure = NULL;
+		psCBLastResStructure = nullptr;
 		CBResFacilityOwner = -1;
-		psCBLastResearch = NULL;
+		psCBLastResearch = nullptr;
 	}
 	triggerEventResearched(pResearch, psResearchFacility, player);
 }
 
 /*This function is called when the research files are reloaded*/
-bool ResearchShutDown(void)
+bool ResearchShutDown()
 {
 	ResearchRelease();
 	return true;
 }
 
 /*This function is called when a game finishes*/
-void ResearchRelease(void)
+void ResearchRelease()
 {
 	asResearch.clear();
-	for (int i = 0; i < MAX_PLAYERS; i++)
+	for (auto &i : asPlayerResList)
 	{
-		asPlayerResList[i].clear();
+		i.clear();
 	}
 }
 
 /*puts research facility on hold*/
 void holdResearch(STRUCTURE *psBuilding, QUEUE_MODE mode)
 {
-	ASSERT(psBuilding->pStructureType->type == REF_RESEARCH,
-	       "holdResearch: structure not a research facility");
+	ASSERT_OR_RETURN(, psBuilding->pStructureType->type == REF_RESEARCH, "structure not a research facility");
 
 	RESEARCH_FACILITY *psResFac = &psBuilding->pFunctionality->researchFacility;
 
 	if (mode == ModeQueue)
 	{
-		sendStructureInfo(psBuilding, STRUCTUREINFO_HOLDRESEARCH, NULL);
+		sendStructureInfo(psBuilding, STRUCTUREINFO_HOLDRESEARCH, nullptr);
 		setStatusPendingHold(*psResFac);
 		return;
 	}
@@ -663,14 +661,13 @@ void holdResearch(STRUCTURE *psBuilding, QUEUE_MODE mode)
 /*release a research facility from hold*/
 void releaseResearch(STRUCTURE *psBuilding, QUEUE_MODE mode)
 {
-	ASSERT(psBuilding->pStructureType->type == REF_RESEARCH,
-	       "releaseResearch: structure not a research facility");
+	ASSERT_OR_RETURN(, psBuilding->pStructureType->type == REF_RESEARCH, "structure not a research facility");
 
 	RESEARCH_FACILITY *psResFac = &psBuilding->pFunctionality->researchFacility;
 
 	if (mode == ModeQueue)
 	{
-		sendStructureInfo(psBuilding, STRUCTUREINFO_RELEASERESEARCH, NULL);
+		sendStructureInfo(psBuilding, STRUCTUREINFO_RELEASERESEARCH, nullptr);
 		setStatusPendingRelease(*psResFac);
 		return;
 	}
@@ -692,13 +689,13 @@ void CancelAllResearch(UDWORD pl)
 {
 	STRUCTURE	*psCurr;
 
-	for (psCurr = apsStructLists[pl]; psCurr != NULL; psCurr = psCurr->psNext)
+	for (psCurr = apsStructLists[pl]; psCurr != nullptr; psCurr = psCurr->psNext)
 	{
 		if (psCurr->pStructureType->type == REF_RESEARCH)
 		{
 			if (
-			    (((RESEARCH_FACILITY *)psCurr->pFunctionality) != NULL)
-			    && (((RESEARCH_FACILITY *)psCurr->pFunctionality)->psSubject != NULL)
+			    (((RESEARCH_FACILITY *)psCurr->pFunctionality) != nullptr)
+			    && (((RESEARCH_FACILITY *)psCurr->pFunctionality)->psSubject != nullptr)
 			)
 			{
 				debug(LOG_NEVER, "canceling research for %p\n", psCurr);
@@ -751,23 +748,23 @@ void cancelResearch(STRUCTURE *psBuilding, QUEUE_MODE mode)
 		}
 
 		// Initialise the research facility's subject
-		psResFac->psSubject = NULL;
+		psResFac->psSubject = nullptr;
 
 		delPowerRequest(psBuilding);
 	}
 }
 
 /* For a given view data get the research this is related to */
-RESEARCH *getResearchForMsg(VIEWDATA *pViewData)
+RESEARCH *getResearchForMsg(const VIEWDATA *pViewData)
 {
-	for (int inc = 0; inc < asResearch.size(); inc++)
+	for (auto &inc : asResearch)
 	{
-		if (asResearch[inc].pViewData == pViewData)	// compare the pointer
+		if (inc.pViewData == pViewData)	// compare the pointer
 		{
-			return &asResearch[inc];
+			return &inc;
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 //set the iconID based on the name read in in the stats
@@ -1021,15 +1018,15 @@ SDWORD	mapIconToRID(UDWORD iconID)
 //return a pointer to a research topic based on the name
 RESEARCH *getResearch(const char *pName)
 {
-	for (int inc = 0; inc < asResearch.size(); inc++)
+	for (auto &inc : asResearch)
 	{
-		if (asResearch[inc].id.compare(pName) == 0)
+		if (inc.id.compare(pName) == 0)
 		{
-			return &asResearch[inc];
+			return &inc;
 		}
 	}
 	debug(LOG_WARNING, "Unknown research - %s", pName);
-	return NULL;
+	return nullptr;
 }
 
 /* looks through the players lists of structures and droids to see if any are using
@@ -1141,7 +1138,7 @@ void researchReward(UBYTE losingPlayer, UBYTE rewardPlayer)
 	RESEARCH_FACILITY	*psFacility;
 
 	//look through the losing players structures to find a research facility
-	for (psStruct = apsStructLists[losingPlayer]; psStruct != NULL; psStruct =
+	for (psStruct = apsStructLists[losingPlayer]; psStruct != nullptr; psStruct =
 	         psStruct->psNext)
 	{
 		if (psStruct->pStructureType->type == REF_RESEARCH)
@@ -1168,7 +1165,7 @@ void researchReward(UBYTE losingPlayer, UBYTE rewardPlayer)
 	//if a topic was found give the reward player the results of that research
 	if (rewardID)
 	{
-		researchResult(rewardID, rewardPlayer, true, NULL, true);
+		researchResult(rewardID, rewardPlayer, true, nullptr, true);
 		if (rewardPlayer == selectedPlayer)
 		{
 			//name the actual reward
@@ -1219,7 +1216,7 @@ void replaceDroidComponent(DROID *pList, UDWORD oldType, UDWORD oldCompInc,
 	DROID   *psDroid;
 
 	//check thru the droids
-	for (psDroid = pList; psDroid != NULL; psDroid = psDroid->psNext)
+	for (psDroid = pList; psDroid != nullptr; psDroid = psDroid->psNext)
 	{
 		switchComponent(psDroid, oldType, oldCompInc, newCompInc);
 		// Need to replace the units inside the transporter
@@ -1238,7 +1235,7 @@ void replaceTransDroidComponents(DROID *psTransporter, UDWORD oldType,
 
 	ASSERT(isTransporter(psTransporter), "invalid unit type");
 
-	for (psCurr = psTransporter->psGroup->psList; psCurr != NULL; psCurr =
+	for (psCurr = psTransporter->psGroup->psList; psCurr != nullptr; psCurr =
 	         psCurr->psGrpNext)
 	{
 		if (psCurr != psTransporter)
@@ -1261,7 +1258,7 @@ void replaceStructureComponent(STRUCTURE *pList, UDWORD oldType, UDWORD oldCompI
 	}
 
 	//check thru the structures
-	for (psStructure = pList; psStructure != NULL; psStructure = psStructure->psNext)
+	for (psStructure = pList; psStructure != nullptr; psStructure = psStructure->psNext)
 	{
 		switch (oldType)
 		{
@@ -1288,7 +1285,7 @@ void replaceStructureComponent(STRUCTURE *pList, UDWORD oldType, UDWORD oldCompI
 static void switchComponent(DROID *psDroid, UDWORD oldType, UDWORD oldCompInc,
                             UDWORD newCompInc)
 {
-	ASSERT_OR_RETURN(, psDroid != NULL, "Invalid droid pointer");
+	ASSERT_OR_RETURN(, psDroid != nullptr, "Invalid droid pointer");
 
 	switch (oldType)
 	{
@@ -1362,10 +1359,10 @@ std::vector<AllyResearch> const &listAllyResearch(unsigned ref)
 			}
 
 			// Check each research facility to see if they are doing this topic. (As opposed to having started the topic, but stopped researching it.)
-			for (STRUCTURE *psStruct = apsStructLists[player]; psStruct != NULL; psStruct = psStruct->psNext)
+			for (STRUCTURE *psStruct = apsStructLists[player]; psStruct != nullptr; psStruct = psStruct->psNext)
 			{
 				RESEARCH_FACILITY *res = (RESEARCH_FACILITY *)psStruct->pFunctionality;
-				if (psStruct->pStructureType->type != REF_RESEARCH || res->psSubject == NULL)
+				if (psStruct->pStructureType->type != REF_RESEARCH || res->psSubject == nullptr)
 				{
 					continue;  // Not a researching research facility.
 				}
@@ -1387,9 +1384,9 @@ std::vector<AllyResearch> const &listAllyResearch(unsigned ref)
 				researches[cRef].push_back(r);
 			}
 		}
-		for (std::map<unsigned, std::vector<AllyResearch> >::iterator i = researches.begin(); i != researches.end(); ++i)
+		for (auto &research : researches)
 		{
-			std::sort(i->second.begin(), i->second.end(), allyResearchSortFunction);
+			std::sort(research.second.begin(), research.second.end(), allyResearchSortFunction);
 		}
 	}
 

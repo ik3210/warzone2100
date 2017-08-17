@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -DYY_NO_INPUT $(SDL_CFLAGS) $(PHYSFS_CFLAGS) $(PNG_CFLAGS) $(VORBISFILE_CFLAGS) $(VORBIS_CFLAGS) $(OPENAL_CFLAGS) $(OPENGLC_CFLAGS) $(OPENGL_CFLAGS) $(WZ_CPPFLAGS) $(GLEW_CFLAGS) $(LIBCRYPTO_CFLAGS)
+AM_CPPFLAGS = -DYY_NO_INPUT $(SDL_CFLAGS) $(PHYSFS_CFLAGS) $(PNG_CFLAGS) $(VORBISFILE_CFLAGS) $(VORBIS_CFLAGS) $(OPENAL_CFLAGS) $(FONT_CFLAGS) $(OPENGL_CFLAGS) $(WZ_CPPFLAGS) $(GLEW_CFLAGS) $(LIBCRYPTO_CFLAGS)
 AM_CFLAGS = $(WZ_CFLAGS)
 AM_CXXFLAGS = $(WZ_CXXFLAGS) $(QT5_CFLAGS)
 
@@ -21,7 +21,7 @@ MOCEDFILES = $(MOCHEADER:%.h=%_moc.cpp)
 .PHONY: autorevision.h
 
 autorevision.h autorevision.cache:
-	cd $(top_srcdir) && ./build_tools/autorevision -t h -o $(abs_builddir)/autorevision.cache > $(abs_builddir)/autorevision.h.new
+	cd $(top_srcdir) && ./build_tools/autorevision -t h -o "$(abs_builddir)/autorevision.cache" > "$(abs_builddir)/autorevision.h.new"
 	cmp -s autorevision.h.new autorevision.h && rm autorevision.h.new || mv -f autorevision.h.new autorevision.h
 
 CLEANFILES = \
@@ -47,13 +47,10 @@ noinst_HEADERS = \
 	actiondef.h \
 	advvis.h \
 	ai.h \
-	anim_id.h \
-	animobj.h \
 	astar.h \
 	atmos.h \
 	basedef.h \
 	baseobject.h \
-	bridge.h \
 	bucket3d.h \
 	cheat.h \
 	challenge.h \
@@ -72,7 +69,6 @@ noinst_HEADERS = \
 	display3d.h \
 	displaydef.h \
 	display.h \
-	drive.h \
 	droiddef.h \
 	droid.h \
 	edit3d.h \
@@ -179,12 +175,10 @@ COMMONSOURCES = \
 	action.cpp \
 	advvis.cpp \
 	ai.cpp \
-	animobj.cpp \
 	astar.cpp \
 	atmos.cpp \
 	aud.cpp \
 	baseobject.cpp \
-	bridge.cpp \
 	bucket3d.cpp \
 	challenge.cpp \
 	cheat.cpp \
@@ -200,7 +194,6 @@ COMMONSOURCES = \
 	difficulty.cpp \
 	display3d.cpp \
 	display.cpp \
-	drive.cpp \
 	droid.cpp \
 	edit3d.cpp \
 	effects.cpp \
@@ -234,6 +227,7 @@ COMMONSOURCES = \
 	message.cpp \
 	miscimd.cpp \
 	mission.cpp \
+	modding.cpp \
 	move.cpp \
 	multibot.cpp \
 	multigifts.cpp \
@@ -297,8 +291,7 @@ COMMONLIBS = \
 	$(top_builddir)/lib/ivis_opengl/libivis_opengl.a \
 	$(top_builddir)/lib/gamelib/libgamelib.a \
 	$(top_builddir)/lib/exceptionhandler/libexceptionhandler.a \
-	$(top_builddir)/3rdparty/miniupnpc/libminiupnpc.a \
-	$(top_builddir)/3rdparty/quesoglc/libquesoglc.a
+	$(top_builddir)/3rdparty/miniupnpc/libminiupnpc.a
 
 if PORTABLE
 warzone2100_portable_SOURCES = $(COMMONSOURCES) $(nodist_COMMONSOURCES)
@@ -338,11 +331,11 @@ endif
 
 if PORTABLE
 warzone2100_portable_LDADD = $(warzone2100_portable_LIBS) $(LTLIBINTL) $(SDL_LIBS) $(PHYSFS_LIBS) $(PNG_LIBS) $(VORBISFILE_LIBS) $(VORBIS_LIBS) \
-	$(THEORA_LIBS) $(OPENAL_LIBS) $(OPENGLC_LIBS) $(OPENGL_LIBS) $(SQT5_LIBS) $(QT5_LIBS) $(GLEW_LIBS) \
+	$(THEORA_LIBS) $(OPENAL_LIBS) $(FONT_LIBS) $(OPENGL_LIBS) $(SQT5_LIBS) $(QT5_LIBS) $(GLEW_LIBS) \
 	$(X_LIBS) $(X_EXTRA_LIBS) $(LIBCRYPTO_LIBS) $(LDFLAGS)
 else
 warzone2100_LDADD = $(warzone2100_LIBS) $(LTLIBINTL) $(SDL_LIBS) $(PHYSFS_LIBS) $(PNG_LIBS) $(VORBISFILE_LIBS) $(VORBIS_LIBS) \
-	$(THEORA_LIBS) $(OPENAL_LIBS) $(OPENGLC_LIBS) $(OPENGL_LIBS) $(SQT5_LIBS) $(QT5_LIBS) $(GLEW_LIBS) \
+	$(THEORA_LIBS) $(OPENAL_LIBS) $(FONT_LIBS) $(OPENGL_LIBS) $(SQT5_LIBS) $(QT5_LIBS) $(GLEW_LIBS) \
 	$(X_LIBS) $(X_EXTRA_LIBS) $(LIBCRYPTO_LIBS) $(LDFLAGS)
 endif
 
@@ -354,4 +347,3 @@ else
 warzone2100_LDADD += $(top_builddir)/win32/warzone2100.o  $(WIN32_LIBS)
 endif
 endif
-

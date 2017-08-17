@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -26,11 +26,6 @@
 #include <QtCore/QString>
 #include "lib/framework/wzapp.h"
 
-// Needed for cross compiler static builds
-#if defined(WZ_CC_MINGW) && !defined(QT_STATICPLUGIN)
-#error "We only support static builds at this time!"
-#endif
-
 #include <QtWidgets/QApplication>
 // This is for the cross-compiler, for static QT 5 builds to avoid the 'plugins' crap on windows
 #if defined(QT_STATICPLUGIN)
@@ -42,9 +37,9 @@
 #include "lib/ivis_opengl/pieclip.h"
 #include "lib/gamelib/gtime.h"
 #include "src/warzoneconfig.h"
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_thread.h>
-#include <SDL2/SDL_clipboard.h>
+#include <SDL.h>
+#include <SDL_thread.h>
+#include <SDL_clipboard.h>
 #include "wz2100icon.h"
 #include "cursors_sdl.h"
 #include <algorithm>
@@ -71,8 +66,8 @@ int main(int argc, char *argv[])
 }
 
 // At this time, we only have 1 window and 1 GL context.
-static SDL_Window *WZwindow = NULL;
-static SDL_GLContext WZglcontext = NULL;
+static SDL_Window *WZwindow = nullptr;
+static SDL_GLContext WZglcontext = nullptr;
 unsigned int screenWidth = 0;
 unsigned int screenHeight = 0;
 
@@ -222,8 +217,8 @@ unsigned int wzGetCurrentKey(void)
 /* Put a character into a text buffer overwriting any text under the cursor */
 QString wzGetSelection()
 {
-	QString retval = NULL;
-	static char *scrap = NULL;
+	QString retval = nullptr;
+	static char *scrap = nullptr;
 
 	if (get_scrap(&scrap))
 	{
@@ -433,10 +428,7 @@ int wzGetTicks()
 
 void wzFatalDialog(const char *msg)
 {
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
-	                         "We have a problem!",
-	                         msg,
-	                         NULL);
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "We have a problem!", msg, nullptr);
 }
 
 void wzScreenFlip()
@@ -505,6 +497,11 @@ int wzThreadJoin(WZ_THREAD *thread)
 	int result;
 	SDL_WaitThread((SDL_Thread *)thread, &result);
 	return result;
+}
+
+void wzThreadDetach(WZ_THREAD *thread)
+{
+	SDL_DetachThread((SDL_Thread *)thread);
 }
 
 void wzThreadStart(WZ_THREAD *thread)
@@ -1095,7 +1092,7 @@ static void inputHandleKeyEvent(SDL_KeyboardEvent *keyEvent)
 */
 void inputhandleText(SDL_TextInputEvent *Tevent)
 {
-	size_t *newtextsize = NULL;
+	size_t *newtextsize = nullptr;
 	int size = 	SDL_strlen(Tevent->text);
 	if (size)
 	{
@@ -1103,7 +1100,7 @@ void inputhandleText(SDL_TextInputEvent *Tevent)
 		{
 			// clean up memory from last use.
 			free(utf8Buf);
-			utf8Buf = NULL;
+			utf8Buf = nullptr;
 		}
 		utf8Buf = UTF8toUTF32(Tevent->text, newtextsize);
 		debug(LOG_INPUT, "Keyboard: text input \"%s\"", Tevent->text);
@@ -1236,50 +1233,6 @@ static void inputHandleMouseMotionEvent(SDL_MouseMotionEvent *motionEvent)
 	}
 }
 
-// Get human readable results
-const char *getSDL_fmt_string(Uint32 format)
-{
-	switch (format)
-	{
-	case SDL_PIXELFORMAT_INDEX1LSB: return "SDL_PIXELFORMAT_INDEX1LSB"; break;
-	case SDL_PIXELFORMAT_INDEX1MSB: return "SDL_PIXELFORMAT_INDEX1MSB"; break;
-	case SDL_PIXELFORMAT_INDEX4LSB: return "SDL_PIXELFORMAT_INDEX4LSB"; break;
-	case SDL_PIXELFORMAT_INDEX4MSB: return "SDL_PIXELFORMAT_INDEX4MSB"; break;
-	case SDL_PIXELFORMAT_INDEX8: return "SDL_PIXELFORMAT_INDEX8"; break;
-	case SDL_PIXELFORMAT_RGB332: return "SDL_PIXELFORMAT_RGB332"; break;
-	case SDL_PIXELFORMAT_RGB444: return "SDL_PIXELFORMAT_RGB444"; break;
-	case SDL_PIXELFORMAT_RGB555: return "SDL_PIXELFORMAT_RGB555"; break;
-	case SDL_PIXELFORMAT_BGR555: return "SDL_PIXELFORMAT_BGR555"; break;
-	case SDL_PIXELFORMAT_ARGB4444: return "SDL_PIXELFORMAT_ARGB4444"; break;
-	case SDL_PIXELFORMAT_RGBA4444: return "SDL_PIXELFORMAT_RGBA4444"; break;
-	case SDL_PIXELFORMAT_ABGR4444: return "SDL_PIXELFORMAT_ABGR4444"; break;
-	case SDL_PIXELFORMAT_BGRA4444: return "SDL_PIXELFORMAT_BGRA4444"; break;
-	case SDL_PIXELFORMAT_ARGB1555: return "SDL_PIXELFORMAT_ARGB1555"; break;
-	case SDL_PIXELFORMAT_RGBA5551: return "SDL_PIXELFORMAT_RGBA5551"; break;
-	case SDL_PIXELFORMAT_ABGR1555: return "SDL_PIXELFORMAT_ABGR1555"; break;
-	case SDL_PIXELFORMAT_BGRA5551: return "SDL_PIXELFORMAT_BGRA5551"; break;
-	case SDL_PIXELFORMAT_RGB565: return "SDL_PIXELFORMAT_RGB565"; break;
-	case SDL_PIXELFORMAT_BGR565: return "SDL_PIXELFORMAT_BGR565"; break;
-	case SDL_PIXELFORMAT_RGB24: return "SDL_PIXELFORMAT_RGB24"; break;
-	case SDL_PIXELFORMAT_BGR24: return "SDL_PIXELFORMAT_BGR24"; break;
-	case SDL_PIXELFORMAT_RGB888: return "SDL_PIXELFORMAT_RGB888"; break;
-	case SDL_PIXELFORMAT_RGBX8888: return "SDL_PIXELFORMAT_RGBX8888"; break;
-	case SDL_PIXELFORMAT_BGR888: return "SDL_PIXELFORMAT_BGR888"; break;
-	case SDL_PIXELFORMAT_BGRX8888: return "SDL_PIXELFORMAT_BGRX8888"; break;
-	case SDL_PIXELFORMAT_ARGB8888: return "SDL_PIXELFORMAT_ARGB8888"; break;
-	case SDL_PIXELFORMAT_RGBA8888: return "SDL_PIXELFORMAT_RGBA8888"; break;
-	case SDL_PIXELFORMAT_ABGR8888: return "SDL_PIXELFORMAT_ABGR8888"; break;
-	case SDL_PIXELFORMAT_BGRA8888: return "SDL_PIXELFORMAT_BGRA8888"; break;
-	case SDL_PIXELFORMAT_ARGB2101010: return "SDL_PIXELFORMAT_ARGB2101010"; break;
-	case SDL_PIXELFORMAT_YV12: return "SDL_PIXELFORMAT_YV12"; break;
-	case SDL_PIXELFORMAT_IYUV: return "SDL_PIXELFORMAT_IYUV"; break;
-	case SDL_PIXELFORMAT_YUY2: return "SDL_PIXELFORMAT_YUY2"; break;
-	case SDL_PIXELFORMAT_UYVY: return "SDL_PIXELFORMAT_UYVY"; break;
-	case SDL_PIXELFORMAT_YVYU: return "SDL_PIXELFORMAT_YVYU"; break;
-	default : return "SDL_PIXELFORMAT_UNKNOWN"; break;
-	}
-}
-
 // This stage, we only setup keycodes, and let Qt (for the script engine) know we are alive.
 void wzMain(int &argc, char **argv)
 {
@@ -1307,7 +1260,6 @@ bool wzMainScreenSetup(int antialiasing, bool fullscreen, bool vsync)
 	// Enable stencil buffer, needed for shadows to work.
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
-	// Enable FSAA anti-aliasing if and at the level requested by the user
 	if (antialiasing)
 	{
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
@@ -1331,7 +1283,7 @@ bool wzMainScreenSetup(int antialiasing, bool fullscreen, bool vsync)
 				exit(EXIT_FAILURE);
 			}
 
-			debug(LOG_WZ, "Monitor[%d]%dx%d %d %s", i, displaymode.w, displaymode.h, displaymode.refresh_rate, getSDL_fmt_string(displaymode.format));
+			debug(LOG_WZ, "Monitor[%d]%dx%d %d %s", i, displaymode.w, displaymode.h, displaymode.refresh_rate, SDL_GetPixelFormatName(displaymode.format));
 			if (displaymode.refresh_rate < 59)
 			{
 				//continue;    // only store 60Hz & higher modes, some display report 59 on linux
@@ -1410,7 +1362,7 @@ bool wzMainScreenSetup(int antialiasing, bool fullscreen, bool vsync)
 	}
 
 	int bpp = SDL_BITSPERPIXEL(SDL_GetWindowPixelFormat(WZwindow));
-	debug(LOG_WZ, "Bpp = %d format %s" , bpp, getSDL_fmt_string(SDL_GetWindowPixelFormat(WZwindow)));
+	debug(LOG_WZ, "Bpp = %d format %s" , bpp, SDL_GetPixelFormatName(SDL_GetWindowPixelFormat(WZwindow)));
 	if (!bpp)
 	{
 		debug(LOG_ERROR, "Video mode %dx%d@%dbpp is not supported!", width, height, bitDepth);
@@ -1486,16 +1438,6 @@ bool wzMainScreenSetup(int antialiasing, bool fullscreen, bool vsync)
 
 	// FIXME: aspect ratio
 	glViewport(0, 0, width, height);
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	glLoadIdentity();
-	glOrtho(0, width, height, 0, 1, -1);
-
-	glMatrixMode(GL_TEXTURE);
-	glLoadIdentity();
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
 	glCullFace(GL_FRONT);
 	glEnable(GL_CULL_FACE);
 
@@ -1611,5 +1553,5 @@ void wzShutdown()
 	SDL_Quit();
 	appPtr->quit();
 	delete appPtr;
-	appPtr = NULL;
+	appPtr = nullptr;
 }

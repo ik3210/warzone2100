@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -42,6 +42,7 @@
 
 #include "lib/exceptionhandler/dumpinfo.h"
 #include "lib/framework/file.h"
+#include "lib/framework/math_ext.h"
 #include "lib/ivis_opengl/piestate.h"
 #include "lib/ivis_opengl/pieclip.h"
 #include "lib/ivis_opengl/screen.h"
@@ -131,7 +132,7 @@ static QImage loadQImage(char const *fileName, char const *format = nullptr)
 			data.resize(lengthRead);
 			QImage image;
 			image.loadFromData(&data[0], data.size(), format);
-			return std::move(image);
+			return image;
 		}
 		data.resize(data.size() + 16384);
 	}
@@ -224,7 +225,7 @@ WzMainWindow::~WzMainWindow()
 
 WzMainWindow *WzMainWindow::instance()
 {
-	assert(myself != NULL);
+	assert(myself != nullptr);
 	return myself;
 }
 
@@ -255,16 +256,6 @@ void WzMainWindow::resizeGL(int width, int height)
 	scaledFont.setPixelSize(12 * height / 480);
 
 	glViewport(0, 0, width, height);
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	glLoadIdentity();
-	glOrtho(0, width, height, 0, 1, -1);
-
-	glMatrixMode(GL_TEXTURE);
-	glLoadIdentity();
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
 	glCullFace(GL_FRONT);
 	glEnable(GL_CULL_FACE);
 }
@@ -299,7 +290,7 @@ void WzMainWindow::setCursor(QCursor cursor)
 	QWidget::setCursor(cursor);
 }
 
-WzMainWindow *WzMainWindow::myself = NULL;
+WzMainWindow *WzMainWindow::myself = nullptr;
 
 void WzMainWindow::setFontType(enum iV_fonts fontID)
 {
@@ -942,7 +933,7 @@ UDWORD inputGetKey(utf_32_char *unicode)
 		retVal = ' ';  // Don't return 0 if we got a virtual key, since that's interpreted as no input.
 	}
 
-	if (unicode != NULL)
+	if (unicode != nullptr)
 	{
 		*unicode = inputBuffer.front().unicode;
 	}
@@ -1049,6 +1040,15 @@ int wzThreadJoin(WZ_THREAD *thread)
 	int ret = thread->ret;
 	delete thread;
 	return ret;
+}
+
+void wzThreadDetach(WZ_THREAD *thread)
+{
+	QEventLoop::connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+	if (thread->isFinished())
+	{
+		delete thread;
+	}
 }
 
 void wzThreadStart(WZ_THREAD *thread)
@@ -1191,10 +1191,6 @@ void iV_DrawTextRotated(const char *string, float XPos, float YPos, float rotati
 }
 
 
-void iV_SetTextSize(float size)
-{
-	WzMainWindow::instance()->setFontSize(size);
-}
 #endif
 
 QString wzGetSelection()
@@ -1212,7 +1208,7 @@ QString wzGetSelection()
 void wzFatalDialog(const char *text)
 {
 	crashing = true;
-	QMessageBox::critical(NULL, "Fatal error", text);
+	QMessageBox::critical(nullptr, "Fatal error", text);
 }
 
 static int WZkeyToQtKey(int code)

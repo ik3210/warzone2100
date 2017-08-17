@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -32,14 +32,14 @@
 #include "pointtree.h"
 
 
-static PointTree *gridPointTree = NULL;  // A quad-tree-like object.
+static PointTree *gridPointTree = nullptr;  // A quad-tree-like object.
 static PointTree::Filter *gridFiltersUnseen;
 static PointTree::Filter *gridFiltersDroidsByPlayer;
 
 // initialise the grid system
-bool gridInitialise(void)
+bool gridInitialise()
 {
-	ASSERT(gridPointTree == NULL, "gridInitialise already called, without calling gridShutDown.");
+	ASSERT(gridPointTree == nullptr, "gridInitialise already called, without calling gridShutDown.");
 	gridPointTree = new PointTree;
 	gridFiltersUnseen = new PointTree::Filter[MAX_PLAYERS];
 	gridFiltersDroidsByPlayer = new PointTree::Filter[MAX_PLAYERS];
@@ -48,7 +48,7 @@ bool gridInitialise(void)
 }
 
 // reset the grid system
-void gridReset(void)
+void gridReset()
 {
 	gridPointTree->clear();
 
@@ -58,14 +58,14 @@ void gridReset(void)
 		BASE_OBJECT *start[3] = {(BASE_OBJECT *)apsDroidLists[player], (BASE_OBJECT *)apsStructLists[player], (BASE_OBJECT *)apsFeatureLists[player]};
 		for (unsigned type = 0; type != sizeof(start) / sizeof(*start); ++type)
 		{
-			for (BASE_OBJECT *psObj = start[type]; psObj != NULL; psObj = psObj->psNext)
+			for (BASE_OBJECT *psObj = start[type]; psObj != nullptr; psObj = psObj->psNext)
 			{
 				if (!psObj->died)
 				{
 					gridPointTree->insert(psObj, psObj->pos.x, psObj->pos.y);
-					for (unsigned viewer = 0; viewer < MAX_PLAYERS; ++viewer)
+					for (unsigned char &viewer : psObj->seenThisTick)
 					{
-						psObj->seenThisTick[viewer] = 0;
+						viewer = 0;
 					}
 				}
 			}
@@ -82,14 +82,14 @@ void gridReset(void)
 }
 
 // shutdown the grid system
-void gridShutDown(void)
+void gridShutDown()
 {
 	delete gridPointTree;
-	gridPointTree = NULL;
+	gridPointTree = nullptr;
 	delete[] gridFiltersUnseen;
-	gridFiltersUnseen = NULL;
+	gridFiltersUnseen = nullptr;
 	delete[] gridFiltersDroidsByPlayer;
-	gridFiltersDroidsByPlayer = NULL;
+	gridFiltersDroidsByPlayer = nullptr;
 }
 
 static bool isInRadius(int32_t x, int32_t y, uint32_t radius)
@@ -102,7 +102,7 @@ static bool isInRadius(int32_t x, int32_t y, uint32_t radius)
 template<class Condition>
 static GridList const &gridStartIterateFiltered(int32_t x, int32_t y, uint32_t radius, PointTree::Filter *filter, Condition const &condition)
 {
-	if (filter == NULL)
+	if (filter == nullptr)
 	{
 		gridPointTree->query(x, y, radius);
 	}
@@ -162,7 +162,7 @@ struct ConditionTrue
 
 GridList const &gridStartIterate(int32_t x, int32_t y, uint32_t radius)
 {
-	return gridStartIterateFiltered(x, y, radius, NULL, ConditionTrue());
+	return gridStartIterateFiltered(x, y, radius, nullptr, ConditionTrue());
 }
 
 GridList const &gridStartIterateArea(int32_t x, int32_t y, uint32_t x2, uint32_t y2)
@@ -200,7 +200,7 @@ GridList const &gridStartIterateUnseen(int32_t x, int32_t y, uint32_t radius, in
 	return gridStartIterateFiltered(x, y, radius, &gridFiltersUnseen[player], ConditionUnseen(player));
 }
 
-BASE_OBJECT **gridIterateDup(void)
+BASE_OBJECT **gridIterateDup()
 {
 	size_t bytes = gridPointTree->lastQueryResults.size() * sizeof(void *);
 	BASE_OBJECT **ret = (BASE_OBJECT **)malloc(bytes);

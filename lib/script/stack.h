@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -33,10 +33,10 @@
 #define MAXSTACKLEN	8000
 
 /* Initialise the stack */
-extern bool stackInitialise(void);
+extern bool stackInitialise();
 
 /* Shutdown the stack */
-extern void stackShutDown(void);
+extern void stackShutDown();
 
 /* Push a value onto the stack */
 extern bool stackPush(INTERP_VAL  *psVal);
@@ -57,10 +57,10 @@ extern bool stackPopType(INTERP_VAL  *psVal);
 extern bool stackPeek(INTERP_VAL *psVal, UDWORD index);
 
 /* Print the top value on the stack */
-extern void stackPrintTop(void);
+extern void stackPrintTop();
 
 /* Check if the stack is empty */
-extern bool stackEmpty(void);
+extern bool stackEmpty();
 
 /* Do binary operations on the top of the stack
  * This effectively pops two values and pushes the result
@@ -76,6 +76,6 @@ extern bool stackUnaryOp(OPCODE opcode);
 extern bool stackCastTop(INTERP_TYPE neededType);
 
 /* Reset the stack to an empty state */
-extern void stackReset(void);
+extern void stackReset();
 
 #endif

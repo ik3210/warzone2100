@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,13 +28,16 @@
 #include "lib/framework/opengl.h"
 #include "lib/ivis_opengl/screen.h"
 #include "lib/netplay/netplay.h"
+#include "lib/ivis_opengl/pieclip.h"
 
+#include "levels.h"
 #include "clparse.h"
 #include "display3d.h"
 #include "frontend.h"
 #include "keybind.h"
 #include "loadsave.h"
 #include "main.h"
+#include "modding.h"
 #include "multiplay.h"
 #include "version.h"
 #include "warzoneconfig.h"
@@ -57,15 +60,18 @@ struct poptOption
 	int enumeration;
 	const char *descrip;
 	const char *argDescrip;
+	bool hidden;
 };
 
 typedef struct _poptContext
 {
-	int argc, current, size;
-	const char **argv;
-	const char *parameter;
-	const char *bad;
-	const struct poptOption *table;
+	int argc = 0;
+	int current = 0;
+	int size = 0;
+	const char **argv = nullptr;
+	const char *parameter = nullptr;
+	const char *bad = nullptr;
+	const struct poptOption *table = nullptr;
 } *poptContext;
 
 /// TODO: Find a way to use the real qFatal from Qt
@@ -74,15 +80,20 @@ typedef struct _poptContext
 
 /// Enable automatic test games
 static bool wz_autogame = false;
+static std::string wz_saveandquit;
+static std::string wz_test;
 
-static void poptPrintHelp(poptContext ctx, FILE *output, WZ_DECL_UNUSED int unused)
+static void poptPrintHelp(poptContext ctx, FILE *output, bool show_all)
 {
-	int i;
-
 	fprintf(output, "Usage: %s [OPTION...]\n", ctx->argv[0]);
-	for (i = 0; i < ctx->size; i++)
+	for (int i = 0; i < ctx->size; i++)
 	{
 		char txt[128];
+
+		if (ctx->table[i].hidden && !show_all)
+		{
+			continue;
+		}
 
 		if (ctx->table[i].short_form != '\0')
 		{
@@ -125,8 +136,8 @@ static int poptGetNextOpt(poptContext ctx)
 	char *pparam;
 	int i;
 
-	ctx->bad = NULL;
-	ctx->parameter = NULL;
+	ctx->bad = nullptr;
+	ctx->parameter = nullptr;
 	parameter[0] = '\0';
 	match[0] = '\0';
 
@@ -200,7 +211,7 @@ static poptContext poptGetContext(WZ_DECL_UNUSED void *unused, int argc, const c
 	ctx.argv = argv;
 	ctx.table = table;
 	ctx.current = 1;
-	ctx.parameter = NULL;
+	ctx.parameter = nullptr;
 
 	for (ctx.size = 0; table[ctx.size].string; ctx.size++) ;	// count table size
 
@@ -219,6 +230,7 @@ typedef enum
 	CLI_FULLSCREEN,
 	CLI_GAME,
 	CLI_HELP,
+	CLI_HELP_ALL,
 	CLI_MOD_GLOB,
 	CLI_MOD_CA,
 	CLI_MOD_MP,
@@ -238,41 +250,46 @@ typedef enum
 	CLI_TEXTURECOMPRESSION,
 	CLI_NOTEXTURECOMPRESSION,
 	CLI_AUTOGAME,
+	CLI_SAVEANDQUIT,
+	CLI_SKIRMISH,
 } CLI_OPTIONS;
 
-static const struct poptOption *getOptionsTable(void)
+static const struct poptOption *getOptionsTable()
 {
 	static const struct poptOption optionsTable[] =
 	{
-		{ "configdir",  '\0', POPT_ARG_STRING, NULL, CLI_CONFIGDIR,  N_("Set configuration directory"),       N_("configuration directory") },
-		{ "datadir",    '\0', POPT_ARG_STRING, NULL, CLI_DATADIR,    N_("Set default data directory"),        N_("data directory") },
-		{ "debug",      '\0', POPT_ARG_STRING, NULL, CLI_DEBUG,      N_("Show debug for given level"),        N_("debug level") },
-		{ "debugfile",  '\0', POPT_ARG_STRING, NULL, CLI_DEBUGFILE,  N_("Log debug output to file"),          N_("file") },
-		{ "flush-debug-stderr", '\0', POPT_ARG_NONE, NULL, CLI_FLUSHDEBUGSTDERR, N_("Flush all debug output written to stderr"), NULL },
-		{ "fullscreen", '\0', POPT_ARG_NONE,   NULL, CLI_FULLSCREEN, N_("Play in fullscreen mode"),           NULL },
-		{ "game",       '\0', POPT_ARG_STRING, NULL, CLI_GAME,       N_("Load a specific game"),              N_("game-name") },
-		{ "help",       'h',  POPT_ARG_NONE,   NULL, CLI_HELP,       N_("Show this help message and exit"),   NULL },
-		{ "mod",        '\0', POPT_ARG_STRING, NULL, CLI_MOD_GLOB,   N_("Enable a global mod"),               N_("mod") },
-		{ "mod_ca",     '\0', POPT_ARG_STRING, NULL, CLI_MOD_CA,     N_("Enable a campaign only mod"),        N_("mod") },
-		{ "mod_mp",     '\0', POPT_ARG_STRING, NULL, CLI_MOD_MP,     N_("Enable a multiplay only mod"),       N_("mod") },
-		{ "noassert",	'\0', POPT_ARG_NONE,   NULL, CLI_NOASSERT,   N_("Disable asserts"),                   NULL },
-		{ "crash",		'\0', POPT_ARG_NONE,   NULL, CLI_CRASH,      N_("Causes a crash to test the crash handler"), NULL },
-		{ "loadskirmish",'\0', POPT_ARG_STRING, NULL, CLI_LOADSKIRMISH, N_("Load a saved skirmish game"),     N_("savegame") },
-		{ "loadcampaign",'\0', POPT_ARG_STRING, NULL, CLI_LOADCAMPAIGN, N_("Load a saved campaign game"),     N_("savegame") },
-		{ "window",     '\0', POPT_ARG_NONE,   NULL, CLI_WINDOW,     N_("Play in windowed mode"),             NULL },
-		{ "version",    '\0', POPT_ARG_NONE,   NULL, CLI_VERSION,    N_("Show version information and exit"), NULL },
-		{ "resolution", '\0', POPT_ARG_STRING, NULL, CLI_RESOLUTION, N_("Set the resolution to use"),         N_("WIDTHxHEIGHT") },
-		{ "shadows",    '\0', POPT_ARG_NONE,   NULL, CLI_SHADOWS,    N_("Enable shadows"),                    NULL },
-		{ "noshadows",  '\0', POPT_ARG_NONE,   NULL, CLI_NOSHADOWS,  N_("Disable shadows"),                   NULL },
-		{ "sound",      '\0', POPT_ARG_NONE,   NULL, CLI_SOUND,      N_("Enable sound"),                      NULL },
-		{ "nosound",    '\0', POPT_ARG_NONE,   NULL, CLI_NOSOUND,    N_("Disable sound"),                     NULL },
-		{ "join",       '\0', POPT_ARG_STRING, NULL, CLI_CONNECTTOIP, N_("Connect directly to IP/hostname"),   N_("host") },
-		{ "host",       '\0', POPT_ARG_NONE,   NULL, CLI_HOSTLAUNCH, N_("Go directly to host screen"),        NULL },
-		{ "texturecompression", '\0', POPT_ARG_NONE, NULL, CLI_TEXTURECOMPRESSION, N_("Enable texture compression"), NULL },
-		{ "notexturecompression", '\0', POPT_ARG_NONE, NULL, CLI_NOTEXTURECOMPRESSION, N_("Disable texture compression"), NULL },
-		{ "autogame",   '\0', POPT_ARG_NONE,   NULL, CLI_AUTOGAME,   N_("Run games automatically for testing"), NULL },
+		{ "configdir",  '\0', POPT_ARG_STRING, nullptr, CLI_CONFIGDIR,  N_("Set configuration directory"),       N_("configuration directory"), false },
+		{ "datadir",    '\0', POPT_ARG_STRING, nullptr, CLI_DATADIR,    N_("Add data directory"),                N_("data directory"), false },
+		{ "debug",      '\0', POPT_ARG_STRING, nullptr, CLI_DEBUG,      N_("Show debug for given level"),        N_("debug level"), false },
+		{ "debugfile",  '\0', POPT_ARG_STRING, nullptr, CLI_DEBUGFILE,  N_("Log debug output to file"),          N_("file"), false },
+		{ "flush-debug-stderr", '\0', POPT_ARG_NONE, nullptr, CLI_FLUSHDEBUGSTDERR, N_("Flush all debug output written to stderr"), nullptr, true },
+		{ "fullscreen", '\0', POPT_ARG_NONE,   nullptr, CLI_FULLSCREEN, N_("Play in fullscreen mode"),           nullptr, false },
+		{ "game",       '\0', POPT_ARG_STRING, nullptr, CLI_GAME,       N_("Load a specific game mode"),         N_("level name"), true },
+		{ "help",       'h',  POPT_ARG_NONE,   nullptr, CLI_HELP,       N_("Show options and exit"),             nullptr, false },
+		{ "help-all",   '\0', POPT_ARG_NONE,   nullptr, CLI_HELP_ALL,   N_("Show all options and exit"),         nullptr, false },
+		{ "mod",        '\0', POPT_ARG_STRING, nullptr, CLI_MOD_GLOB,   N_("Enable a global mod"),               N_("mod"), false },
+		{ "mod_ca",     '\0', POPT_ARG_STRING, nullptr, CLI_MOD_CA,     N_("Enable a campaign only mod"),        N_("mod"), false },
+		{ "mod_mp",     '\0', POPT_ARG_STRING, nullptr, CLI_MOD_MP,     N_("Enable a multiplay only mod"),       N_("mod"), false },
+		{ "noassert",	'\0', POPT_ARG_NONE,   nullptr, CLI_NOASSERT,   N_("Disable asserts"),                   nullptr, false },
+		{ "crash",		'\0', POPT_ARG_NONE,   nullptr, CLI_CRASH,      N_("Causes a crash to test the crash handler"), nullptr, true },
+		{ "loadskirmish",'\0', POPT_ARG_STRING, nullptr, CLI_LOADSKIRMISH, N_("Load a saved skirmish game"),     N_("savegame"), true },
+		{ "loadcampaign",'\0', POPT_ARG_STRING, nullptr, CLI_LOADCAMPAIGN, N_("Load a saved campaign game"),     N_("savegame"), true },
+		{ "window",     '\0', POPT_ARG_NONE,   nullptr, CLI_WINDOW,     N_("Play in windowed mode"),             nullptr, false },
+		{ "version",    '\0', POPT_ARG_NONE,   nullptr, CLI_VERSION,    N_("Show version information and exit"), nullptr, false },
+		{ "resolution", '\0', POPT_ARG_STRING, nullptr, CLI_RESOLUTION, N_("Set the resolution to use"),         N_("WIDTHxHEIGHT"), false },
+		{ "shadows",    '\0', POPT_ARG_NONE,   nullptr, CLI_SHADOWS,    N_("Enable shadows"),                    nullptr, false },
+		{ "noshadows",  '\0', POPT_ARG_NONE,   nullptr, CLI_NOSHADOWS,  N_("Disable shadows"),                   nullptr, false },
+		{ "sound",      '\0', POPT_ARG_NONE,   nullptr, CLI_SOUND,      N_("Enable sound"),                      nullptr, false },
+		{ "nosound",    '\0', POPT_ARG_NONE,   nullptr, CLI_NOSOUND,    N_("Disable sound"),                     nullptr, false },
+		{ "join",       '\0', POPT_ARG_STRING, nullptr, CLI_CONNECTTOIP, N_("Connect directly to IP/hostname"),  N_("host"), true },
+		{ "host",       '\0', POPT_ARG_NONE,   nullptr, CLI_HOSTLAUNCH, N_("Go directly to host screen"),        nullptr, true },
+		{ "texturecompression", '\0', POPT_ARG_NONE, nullptr, CLI_TEXTURECOMPRESSION, N_("Enable texture compression"), nullptr, false },
+		{ "notexturecompression", '\0', POPT_ARG_NONE, nullptr, CLI_NOTEXTURECOMPRESSION, N_("Disable texture compression"), nullptr, false },
+		{ "autogame",   '\0', POPT_ARG_NONE,   nullptr, CLI_AUTOGAME,   N_("Run games automatically for testing"), nullptr, true },
+		{ "saveandquit", '\0', POPT_ARG_STRING, nullptr, CLI_SAVEANDQUIT, N_("Immediately save game and quit"), N_("save name"), true },
+		{ "skirmish",   '\0', POPT_ARG_STRING, nullptr, CLI_SKIRMISH,   N_("Start skirmish game with given settings file"), N_("test"), true },
 		// Terminating entry
-		{ NULL,         '\0', 0,               NULL, 0,              NULL,                                    NULL },
+		{ nullptr,         '\0', 0,               nullptr, 0,              nullptr,                                    nullptr, true },
 	};
 
 	static struct poptOption TranslatedOptionsTable[sizeof(optionsTable) / sizeof(struct poptOption)];
@@ -288,12 +305,12 @@ static const struct poptOption *getOptionsTable(void)
 			TranslatedOptionsTable[i] = optionsTable[i];
 
 			// If there is a description, make sure to translate it with gettext
-			if (TranslatedOptionsTable[i].descrip != NULL)
+			if (TranslatedOptionsTable[i].descrip != nullptr)
 			{
 				TranslatedOptionsTable[i].descrip = gettext(TranslatedOptionsTable[i].descrip);
 			}
 
-			if (TranslatedOptionsTable[i].argDescrip != NULL)
+			if (TranslatedOptionsTable[i].argDescrip != nullptr)
 			{
 				TranslatedOptionsTable[i].argDescrip = gettext(TranslatedOptionsTable[i].argDescrip);
 			}
@@ -316,7 +333,7 @@ static const struct poptOption *getOptionsTable(void)
  * \return Returns true on success, false on error */
 bool ParseCommandLineEarly(int argc, const char **argv)
 {
-	poptContext poptCon = poptGetContext(NULL, argc, argv, getOptionsTable(), 0);
+	poptContext poptCon = poptGetContext(nullptr, argc, argv, getOptionsTable(), 0);
 	int iOption;
 
 #if defined(WZ_OS_MAC) && defined(DEBUG)
@@ -339,7 +356,7 @@ bool ParseCommandLineEarly(int argc, const char **argv)
 		case CLI_DEBUG:
 			// retrieve the debug section name
 			token = poptGetOptArg(poptCon);
-			if (token == NULL)
+			if (token == nullptr)
 			{
 				qFatal("Usage: --debug=<flag>");
 			}
@@ -354,7 +371,7 @@ bool ParseCommandLineEarly(int argc, const char **argv)
 		case CLI_DEBUGFILE:
 			// find the file name
 			token = poptGetOptArg(poptCon);
-			if (token == NULL)
+			if (token == nullptr)
 			{
 				qFatal("Missing debugfile filename?");
 			}
@@ -370,7 +387,7 @@ bool ParseCommandLineEarly(int argc, const char **argv)
 		case CLI_CONFIGDIR:
 			// retrieve the configuration directory
 			token = poptGetOptArg(poptCon);
-			if (token == NULL)
+			if (token == nullptr)
 			{
 				qFatal("Unrecognised configuration directory");
 			}
@@ -378,7 +395,8 @@ bool ParseCommandLineEarly(int argc, const char **argv)
 			break;
 
 		case CLI_HELP:
-			poptPrintHelp(poptCon, stdout, 0);
+		case CLI_HELP_ALL:
+			poptPrintHelp(poptCon, stdout, option == CLI_HELP_ALL);
 			return false;
 
 		case CLI_VERSION:
@@ -402,7 +420,7 @@ bool ParseCommandLineEarly(int argc, const char **argv)
  * \return Returns true on success, false on error */
 bool ParseCommandLine(int argc, const char **argv)
 {
-	poptContext poptCon = poptGetContext(NULL, argc, argv, getOptionsTable(), 0);
+	poptContext poptCon = poptGetContext(nullptr, argc, argv, getOptionsTable(), 0);
 	int iOption;
 
 	/* loop through command line */
@@ -418,6 +436,7 @@ bool ParseCommandLine(int argc, const char **argv)
 		case CLI_FLUSHDEBUGSTDERR:
 		case CLI_CONFIGDIR:
 		case CLI_HELP:
+		case CLI_HELP_ALL:
 		case CLI_VERSION:
 			// These options are parsed in ParseCommandLineEarly() already, so ignore them
 			break;
@@ -437,7 +456,7 @@ bool ParseCommandLine(int argc, const char **argv)
 		case CLI_DATADIR:
 			// retrieve the quoted path name
 			token = poptGetOptArg(poptCon);
-			if (token == NULL)
+			if (token == nullptr)
 			{
 				qFatal("Unrecognised datadir");
 			}
@@ -450,7 +469,7 @@ bool ParseCommandLine(int argc, const char **argv)
 		case CLI_CONNECTTOIP:
 			//get the ip we want to connect with, and go directly to join screen.
 			token = poptGetOptArg(poptCon);
-			if (token == NULL)
+			if (token == nullptr)
 			{
 				qFatal("No IP/hostname given");
 			}
@@ -458,12 +477,12 @@ bool ParseCommandLine(int argc, const char **argv)
 			break;
 		case CLI_HOSTLAUNCH:
 			// go directly to host screen, bypass all others.
-			hostlaunch = true;
+			hostlaunch = 1;
 			break;
 		case CLI_GAME:
 			// retrieve the game name
 			token = poptGetOptArg(poptCon);
-			if (token == NULL
+			if (token == nullptr
 			    || (strcmp(token, "CAM_1A") && strcmp(token, "CAM_2A") && strcmp(token, "CAM_3A")
 			        && strcmp(token, "TUTORIAL3") && strcmp(token, "FASTPLAY")))
 			{
@@ -474,6 +493,10 @@ bool ParseCommandLine(int argc, const char **argv)
 			bMultiPlayer = false;
 			bMultiMessages = false;
 			NetPlay.players[0].allocated = true;
+			for (int i = 0; i < MAX_PLAYERS; i++)
+			{
+				NET_InitPlayer(i, true, false);
+			}
 			if (!strcmp(token, "CAM_1A") || !strcmp(token, "CAM_2A") || !strcmp(token, "CAM_3A"))
 			{
 				game.type = CAMPAIGN;
@@ -487,61 +510,38 @@ bool ParseCommandLine(int argc, const char **argv)
 			break;
 		case CLI_MOD_GLOB:
 			{
-				unsigned int i;
-
 				// retrieve the file name
 				token = poptGetOptArg(poptCon);
-				if (token == NULL)
+				if (token == nullptr)
 				{
 					qFatal("Missing mod name?");
 				}
 
-				// Find an empty place in the global_mods list
-				for (i = 0; i < 100 && global_mods[i] != NULL; ++i) {}
-				if (i >= 100 || global_mods[i] != NULL)
-				{
-					qFatal("Too many mods registered! Aborting!");
-				}
-				global_mods[i] = strdup(token);
+				global_mods.push_back(token);
 				break;
 			}
 		case CLI_MOD_CA:
 			{
-				unsigned int i;
-
 				// retrieve the file name
 				token = poptGetOptArg(poptCon);
-				if (token == NULL)
+				if (token == nullptr)
 				{
 					qFatal("Missing mod name?");
 				}
 
-				// Find an empty place in the campaign_mods list
-				for (i = 0; i < 100 && campaign_mods[i] != NULL; ++i) {}
-				if (i >= 100 || campaign_mods[i] != NULL)
-				{
-					qFatal("Too many mods registered! Aborting!");
-				}
-				campaign_mods[i] = strdup(token);
+				campaign_mods.push_back(token);
 				break;
 			}
 		case CLI_MOD_MP:
 			{
-				unsigned int i;
-
 				// retrieve the file name
 				token = poptGetOptArg(poptCon);
-				if (token == NULL)
+				if (token == nullptr)
 				{
 					qFatal("Missing mod name?");
 				}
 
-				for (i = 0; i < 100 && multiplay_mods[i] != NULL; ++i) {}
-				if (i >= 100 || multiplay_mods[i] != NULL)
-				{
-					qFatal("Too many mods registered! Aborting!");
-				}
-				multiplay_mods[i] = strdup(token);
+				multiplay_mods.push_back(token);
 				break;
 			}
 		case CLI_RESOLUTION:
@@ -574,9 +574,9 @@ bool ParseCommandLine(int argc, const char **argv)
 		case CLI_LOADSKIRMISH:
 			// retrieve the game name
 			token = poptGetOptArg(poptCon);
-			if (token == NULL)
+			if (token == nullptr)
 			{
-				qFatal("Unrecognised savegame name");
+				qFatal("Unrecognised skirmish savegame name");
 			}
 			snprintf(saveGameName, sizeof(saveGameName), "%s/skirmish/%s.gam", SaveGamePath, token);
 			SPinit();
@@ -587,9 +587,9 @@ bool ParseCommandLine(int argc, const char **argv)
 		case CLI_LOADCAMPAIGN:
 			// retrieve the game name
 			token = poptGetOptArg(poptCon);
-			if (token == NULL)
+			if (token == nullptr)
 			{
-				qFatal("Unrecognised savegame name");
+				qFatal("Unrecognised campaign savegame name");
 			}
 			snprintf(saveGameName, sizeof(saveGameName), "%s/campaign/%s.gam", SaveGamePath, token);
 			SPinit();
@@ -627,6 +627,25 @@ bool ParseCommandLine(int argc, const char **argv)
 		case CLI_AUTOGAME:
 			wz_autogame = true;
 			break;
+
+		case CLI_SAVEANDQUIT:
+			token = poptGetOptArg(poptCon);
+			if (token == nullptr || !strchr(token, '/'))
+			{
+				qFatal("Bad savegame name (needs to be a full path)");
+			}
+			wz_saveandquit = token;
+			break;
+
+		case CLI_SKIRMISH:
+			hostlaunch = 2;
+			token = poptGetOptArg(poptCon);
+			if (token == nullptr)
+			{
+				qFatal("Bad test key");
+			}
+			wz_test = token;
+			break;
 		};
 	}
 
@@ -636,4 +655,14 @@ bool ParseCommandLine(int argc, const char **argv)
 bool autogame_enabled()
 {
 	return wz_autogame;
+}
+
+const std::string &saveandquit_enabled()
+{
+	return wz_saveandquit;
+}
+
+const std::string &wz_skirmish_test()
+{
+	return wz_test;
 }

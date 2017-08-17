@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -100,7 +100,7 @@ int pie_AddTexPage(iV_Image *s, const char *filename, bool gameTexture, int page
 	}
 	// it is uploaded, we do not need it anymore
 	free(s->bmp);
-	s->bmp = NULL;
+	s->bmp = nullptr;
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -165,14 +165,13 @@ void pie_MakeTexPageTCMaskName(char *filename)
  */
 int iV_GetTexture(const char *filename, bool compression)
 {
-	unsigned int i = 0;
 	iV_Image sSprite;
 	char path[PATH_MAX];
 
 	/* Have we already loaded this one then? */
 	sstrcpy(path, filename);
 	pie_MakeTexPageName(path);
-	for (i = 0; i < _TEX_PAGE.size(); i++)
+	for (int i = 0; i < _TEX_PAGE.size(); i++)
 	{
 		if (strncmp(path, _TEX_PAGE[i].name, iV_TEXNAME_MAX) == 0)
 		{
@@ -217,7 +216,6 @@ bool replaceTexture(const QString &oldfile, const QString &newfile)
 			pie_MakeTexPageName(tmpname);
 			pie_AddTexPage(&image, tmpname, true, i);
 			iV_unloadImage(&image);
-			glErrors();
 			return true;
 		}
 	}
@@ -226,7 +224,7 @@ bool replaceTexture(const QString &oldfile, const QString &newfile)
 	return false;
 }
 
-void pie_TexShutDown(void)
+void pie_TexShutDown()
 {
 	// TODO, lazy deletions for faster loading of next level
 	debug(LOG_TEXTURE, "Cleaning out %u textures", _TEX_PAGE.size());
@@ -238,7 +236,7 @@ void pie_TexShutDown(void)
 	_TEX_PAGE.clear();
 }
 
-void pie_TexInit(void)
+void pie_TexInit()
 {
 	debug(LOG_TEXTURE, "pie_TexInit successful");
 }
@@ -250,7 +248,7 @@ void iV_unloadImage(iV_Image *image)
 		if (image->bmp)
 		{
 			free(image->bmp);
-			image->bmp = NULL;
+			image->bmp = nullptr;
 		}
 	}
 	else

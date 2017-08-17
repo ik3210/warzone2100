@@ -7,7 +7,6 @@ endif
 SUBDIRS = \
 	win32 \
 	3rdparty/miniupnpc \
-	3rdparty/quesoglc \
 	lib/framework \
 	lib/exceptionhandler \
 	lib/script \
@@ -30,6 +29,7 @@ SUBDIRS = \
 dist_doc_DATA = \
 	AUTHORS \
 	ChangeLog \
+	README.md \
 	COPYING \
 	COPYING.NONGPL \
 	COPYING.README

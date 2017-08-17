@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@
 #define pie_ECM                 0x1
 #define pie_TRANSLUCENT         0x2
 #define pie_ADDITIVE            0x4
-#define pie_FORCE_FOG			0x8
+#define pie_FORCE_FOG           0x8
 #define pie_HEIGHT_SCALED       0x10
 #define pie_RAISE               0x20
 #define pie_BUTTON              0x40
@@ -72,6 +72,7 @@ enum REND_MODE
 	REND_OPAQUE,
 	REND_MULTIPLICATIVE,
 	REND_PREMULTIPLIED,
+	REND_TEXT,
 };
 
 enum DEPTH_MODE
@@ -92,6 +93,18 @@ enum SHADER_MODE
 	SHADER_NONE,
 	SHADER_COMPONENT,
 	SHADER_BUTTON,
+	SHADER_NOLIGHT,
+	SHADER_TERRAIN,
+	SHADER_TERRAIN_DEPTH,
+	SHADER_DECALS,
+	SHADER_WATER,
+	SHADER_RECT,
+	SHADER_TEXRECT,
+	SHADER_GFX_COLOUR,
+	SHADER_GFX_TEXT,
+	SHADER_GENERIC_COLOR,
+	SHADER_LINE,
+	SHADER_TEXT,
 	SHADER_MAX
 };
 
@@ -100,15 +113,25 @@ enum SHADER_MODE
 // Simple derived types
 //
 //*************************************************************************
-struct iView
-{
-	Vector3i p, r;
-};
 
 struct iV_Image
 {
 	unsigned int width, height, depth;
 	unsigned char *bmp;
+};
+
+struct PIELIGHTBYTES
+{
+        uint8_t r, g, b, a;
+};
+
+/** Our basic colour type. Use whenever you want to define a colour.
+ *  Set bytes separetely, and do not assume a byte order between the components. */
+union PIELIGHT
+{
+        PIELIGHTBYTES byte;
+        UDWORD rgba;
+        UBYTE vector[4];
 };
 
 #endif // _pieTypes_h

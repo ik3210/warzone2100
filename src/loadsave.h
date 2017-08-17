@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -57,22 +57,21 @@ extern bool		bRequestLoad;
  */
 /***************************************************************************/
 
-extern void		drawBlueBox(UDWORD x, UDWORD y, UDWORD w, UDWORD h);
+void drawBlueBox(UDWORD x, UDWORD y, UDWORD w, UDWORD h);
 
-extern bool		addLoadSave(LOADSAVE_MODE mode, const char *title);
-extern bool		closeLoadSave(void);
-extern bool		runLoadSave(bool bResetMissionWidgets);
-extern bool		displayLoadSave(void);
+bool addLoadSave(LOADSAVE_MODE mode, const char *title);
+bool closeLoadSave();
+bool runLoadSave(bool bResetMissionWidgets);
+bool displayLoadSave();
 
-extern void		removeWildcards(char *pStr);
+void removeWildcards(char *pStr);
 
 // return whether the save screen was displayed in the mission results screen
-bool saveInMissionRes(void);
+bool saveInMissionRes();
 
 // return whether the save screen was displayed in the middle of a mission
-bool saveMidMission(void);
+bool saveMidMission();
 
-
-extern void deleteSaveGame(char *saveGameName);
+void deleteSaveGame(char *saveGameName);
 
 #endif // __INCLUDED_SRC_LOADSAVE_H__

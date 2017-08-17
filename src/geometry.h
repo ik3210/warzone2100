@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -22,18 +22,17 @@
 #define __INCLUDED_SRC_GEOMETRY_H__
 
 #include "map.h"
-#include "hci.h"
 
 struct QUAD
 {
 	Vector2i coords[4];
 };
 
-extern uint16_t calcDirection(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
+uint16_t calcDirection(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 bool inQuad(const Vector2i *pt, const QUAD *quad);
 Vector2i positionInQuad(Vector2i const &pt, QUAD const &quad);
-extern DROID *getNearestDroid(UDWORD x, UDWORD y, bool bSelected);
-extern bool droidOnScreen(DROID *psDroid, SDWORD tolerance);
+DROID *getNearestDroid(UDWORD x, UDWORD y, bool bSelected);
+bool droidOnScreen(DROID *psDroid, SDWORD tolerance);
 
 static inline STRUCTURE *getTileStructure(UDWORD x, UDWORD y)
 {
@@ -42,7 +41,7 @@ static inline STRUCTURE *getTileStructure(UDWORD x, UDWORD y)
 	{
 		return (STRUCTURE *)psObj;
 	}
-	return NULL;
+	return nullptr;
 }
 
 static inline FEATURE *getTileFeature(UDWORD x, UDWORD y)
@@ -52,7 +51,7 @@ static inline FEATURE *getTileFeature(UDWORD x, UDWORD y)
 	{
 		return (FEATURE *)psObj;
 	}
-	return NULL;
+	return nullptr;
 }
 
 /// WARNING: Returns NULL if tile not visible to selectedPlayer.
@@ -66,7 +65,7 @@ static inline BASE_OBJECT *getTileOccupier(UDWORD x, UDWORD y)
 	}
 	else
 	{
-		return NULL;
+		return nullptr;
 	}
 }
 

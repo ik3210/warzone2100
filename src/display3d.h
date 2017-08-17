@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,7 +28,6 @@
 #include "objectdef.h"
 #include "message.h"
 
-
 /*!
  * Special tile types
  */
@@ -48,52 +47,55 @@ enum ENERGY_BAR
 	BAR_LAST
 };
 
+struct iView
+{
+	Vector3i p, r;
+};
+
 extern bool showFPS;
 extern bool showSAMPLES;
 extern bool showORDERS;
 extern bool showLevelName;
 
-extern float getViewDistance(void);
-extern void setViewDistance(float dist);
+float getViewDistance();
+void setViewDistance(float dist);
 extern bool	radarOnScreen;
 extern bool	radarPermitted;
 extern bool rangeOnScreen; // Added to get sensor/gun range on screen.  -Q 5-10-05
-extern void setViewPos(UDWORD x, UDWORD y, bool Pan);
+void setViewPos(UDWORD x, UDWORD y, bool Pan);
 Vector2i    getPlayerPos();
-extern void setPlayerPos(SDWORD x, SDWORD y);
-extern void disp3d_setView(iView *newView);
-extern void disp3d_resetView(void);
-extern void disp3d_getView(iView *newView);
+void setPlayerPos(SDWORD x, SDWORD y);
+void disp3d_setView(iView *newView);
+void disp3d_resetView();
+void disp3d_getView(iView *newView);
 
-extern void draw3DScene(void);
-extern void renderStructure(STRUCTURE *psStructure);
-extern void renderFeature(FEATURE *psFeature);
-extern void renderProximityMsg(PROXIMITY_DISPLAY	*psProxDisp);
-extern void renderProjectile(PROJECTILE *psCurr);
-extern void renderAnimComponent(const COMPONENT_OBJECT *psObj);
-extern void renderDeliveryPoint(FLAG_POSITION *psPosition, bool blueprint);
-extern void debugToggleSensorDisplay(void);
+void draw3DScene();
+void renderStructure(STRUCTURE *psStructure, const glm::mat4 &viewMatrix);
+void renderFeature(FEATURE *psFeature, const glm::mat4 &viewMatrix);
+void renderProximityMsg(PROXIMITY_DISPLAY	*psProxDisp, const glm::mat4 &viewMatrix);
+void renderProjectile(PROJECTILE *psCurr, const glm::mat4 &viewMatrix);
+void renderDeliveryPoint(FLAG_POSITION *psPosition, bool blueprint, const glm::mat4 &viewMatrix);
+void debugToggleSensorDisplay();
 
-extern void calcScreenCoords(DROID *psDroid);
-extern ENERGY_BAR toggleEnergyBars(void);
+void calcScreenCoords(DROID *psDroid, const glm::mat4 &viewMatrix);
+ENERGY_BAR toggleEnergyBars();
 
-extern bool doWeDrawProximitys(void);
-extern void setProximityDraw(bool val);
-extern void renderShadow(DROID *psDroid, iIMDShape *psShadowIMD);
+bool doWeDrawProximitys();
+void setProximityDraw(bool val);
 
-extern bool	clipXY(SDWORD x, SDWORD y);
+bool	clipXY(SDWORD x, SDWORD y);
 
-extern bool init3DView(void);
+bool init3DView();
 extern iView player;
 extern bool selectAttempt;
 
 extern SDWORD scrollSpeed;
-extern void assignSensorTarget(BASE_OBJECT *psObj);
-extern void assignDestTarget(void);
-extern UDWORD getWaterTileNum(void);
-extern void setUnderwaterTile(UDWORD num);
-extern UDWORD getRubbleTileNum(void);
-extern void setRubbleTile(UDWORD num);
+void assignSensorTarget(BASE_OBJECT *psObj);
+void assignDestTarget();
+UDWORD getWaterTileNum();
+void setUnderwaterTile(UDWORD num);
+UDWORD getRubbleTileNum();
+void setRubbleTile(UDWORD num);
 
 STRUCTURE *getTileBlueprintStructure(int mapX, int mapY);  ///< Gets the blueprint at those coordinates, if any. Previous return value becomes invalid.
 STRUCTURE_STATS const *getTileBlueprintStats(int mapX, int mapY);  ///< Gets the structure stats of the blueprint at those coordinates, if any.
@@ -109,10 +111,10 @@ extern bool showPath;
 extern const Vector2i visibleTiles;
 
 /*returns the graphic ID for a droid rank*/
-extern UDWORD  getDroidRankGraphic(DROID *psDroid);
+UDWORD  getDroidRankGraphic(DROID *psDroid);
 
 /* Visualize radius at position */
-extern void showRangeAtPos(SDWORD centerX, SDWORD centerY, SDWORD radius);
+void showRangeAtPos(SDWORD centerX, SDWORD centerY, SDWORD radius);
 
 void setSkyBox(const char *page, float mywind, float myscale);
 
@@ -124,5 +126,8 @@ extern UWORD barMode;
 extern bool CauseCrash;
 
 extern bool tuiTargetOrigin;
+
+/// Draws using the animation systems. Usually want to use in a while loop to get all model levels.
+void drawShape(BASE_OBJECT *psObj, iIMDShape *strImd, int colour, PIELIGHT buildingBrightness, int pieFlag, int pieFlagData, const glm::mat4& viewMatrix);
 
 #endif // __INCLUDED_SRC_DISPLAY3D_H__

@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 
 #include "lib/framework/wzapp.h"
 #include "lib/framework/wzconfig.h"
+#include "lib/framework/fixedpoint.h"
 #include "lib/sound/audio.h"
 #include "lib/netplay/netplay.h"
 #include "qtscriptfuncs.h"
@@ -42,6 +43,8 @@
 #include "display3d.h"
 #include "map.h"
 #include "mission.h"
+#include "move.h"
+#include "order.h"
 #include "transporter.h"
 #include "message.h"
 #include "display3d.h"
@@ -65,6 +68,7 @@
 #include "atmos.h"
 #include "warcam.h"
 #include "projectile.h"
+#include "component.h"
 
 #define FAKE_REF_LASSAT 999
 #define ALL_PLAYERS -1
@@ -99,7 +103,7 @@ typedef QMap<BASE_OBJECT *, int> GROUPMAP;
 typedef QMap<QScriptEngine *, GROUPMAP *> ENGINEMAP;
 static ENGINEMAP groups;
 
-struct labeltype
+struct LABEL
 {
 	Vector2i p1, p2;
 	int id;
@@ -109,14 +113,14 @@ struct labeltype
 	QList<int> idlist;
 	int triggered;
 
-	bool operator==(const labeltype &o) const
+	bool operator==(const LABEL &o) const
 	{
 		return id == o.id && type == o.type && player == o.player;
 	}
 };
-typedef QMap<QString, labeltype> LABELMAP;
+typedef QMap<QString, LABEL> LABELMAP;
 static LABELMAP labels;
-static QStandardItemModel *labelModel = NULL;
+static QStandardItemModel *labelModel = nullptr;
 
 #define SCRIPT_ASSERT_PLAYER(_context, _player) \
 	SCRIPT_ASSERT(_context, _player >= 0 && _player < MAX_PLAYERS, "Invalid player index %d", _player);
@@ -175,7 +179,7 @@ static void updateLabelModel()
 	int nextRow = 0;
 	for (LABELMAP::iterator i = labels.begin(); i != labels.end(); i++)
 	{
-		const labeltype &l = i.value();
+		const LABEL &l = i.value();
 		labelModel->setItem(nextRow, 0, new QStandardItem(i.key()));
 		const char *c = "?";
 		switch (l.type)
@@ -232,7 +236,7 @@ QStandardItemModel *createLabelModel()
 	return labelModel;
 }
 
-static void clearMarks()
+void clearMarks()
 {
 	for (int x = 0; x < mapWidth; x++) // clear old marks
 	{
@@ -244,18 +248,36 @@ static void clearMarks()
 	}
 }
 
-void showLabel(const QString &key)
+void markAllLabels(bool only_active)
+{
+	for (const auto &key : labels.keys())
+	{
+		const LABEL &l = labels[key];
+		if (!only_active || l.triggered <= 0)
+		{
+			showLabel(key, false, false);
+		}
+	}
+}
+
+void showLabel(const QString &key, bool clear_old, bool jump_to)
 {
 	if (!labels.contains(key))
 	{
 		debug(LOG_ERROR, "label %s not found", key.toUtf8().constData());
 		return;
 	}
-	labeltype &l = labels[key];
+	LABEL &l = labels[key];
+	if (clear_old)
+	{
+		clearMarks();
+	}
 	if (l.type == SCRIPT_AREA || l.type == SCRIPT_POSITION)
 	{
-		setViewPos(map_coord(l.p1.x), map_coord(l.p1.y), false); // move camera position
-		clearMarks();
+		if (jump_to)
+		{
+			setViewPos(map_coord(l.p1.x), map_coord(l.p1.y), false); // move camera position
+		}
 		int maxx = map_coord(l.p2.x);
 		int maxy = map_coord(l.p2.y);
 		if (l.type == SCRIPT_POSITION)
@@ -274,8 +296,10 @@ void showLabel(const QString &key)
 	}
 	else if (l.type == SCRIPT_RADIUS)
 	{
-		setViewPos(map_coord(l.p1.x), map_coord(l.p1.y), false); // move camera position
-		clearMarks();
+		if (jump_to)
+		{
+			setViewPos(map_coord(l.p1.x), map_coord(l.p1.y), false); // move camera position
+		}
 		for (int x = MAX(map_coord(l.p1.x - l.p2.x), 0); x < MIN(map_coord(l.p1.x + l.p2.x), mapWidth); x++)
 		{
 			for (int y = MAX(map_coord(l.p1.y - l.p2.x), 0); y < MIN(map_coord(l.p1.y + l.p2.x), mapHeight); y++) // l.p2.x is radius, not a bug
@@ -290,8 +314,10 @@ void showLabel(const QString &key)
 	}
 	else if (l.type == SCRIPT_RADIUS)
 	{
-		setViewPos(map_coord(l.p1.x), map_coord(l.p1.y), false); // move camera position
-		clearMarks();
+		if (jump_to)
+		{
+			setViewPos(map_coord(l.p1.x), map_coord(l.p1.y), false); // move camera position
+		}
 		for (int x = MAX(map_coord(l.p1.x - l.p2.x), 0); x < MIN(map_coord(l.p1.x + l.p2.x), mapWidth); x++)
 		{
 			for (int y = MAX(map_coord(l.p1.y - l.p2.x), 0); y < MIN(map_coord(l.p1.y + l.p2.x), mapHeight); y++) // l.p2.x is radius, not a bug
@@ -306,11 +332,13 @@ void showLabel(const QString &key)
 	}
 	else if (l.type == OBJ_DROID || l.type == OBJ_FEATURE || l.type == OBJ_STRUCTURE)
 	{
-		clearMarks();
 		BASE_OBJECT *psObj = IdToObject((OBJECT_TYPE)l.type, l.id, l.player);
 		if (psObj)
 		{
-			setViewPos(map_coord(psObj->pos.x), map_coord(psObj->pos.y), false); // move camera position
+			if (jump_to)
+			{
+				setViewPos(map_coord(psObj->pos.x), map_coord(psObj->pos.y), false); // move camera position
+			}
 			MAPTILE *psTile = mapTile(map_coord(psObj->pos.x), map_coord(psObj->pos.y));
 			psTile->tileInfoBits |= BITS_MARKED;
 		}
@@ -318,7 +346,6 @@ void showLabel(const QString &key)
 	else if (l.type == SCRIPT_GROUP)
 	{
 		bool cameraMoved = false;
-		clearMarks();
 		for (ENGINEMAP::iterator i = groups.begin(); i != groups.end(); ++i)
 		{
 			for (GROUPMAP::const_iterator iter = i.value()->constBegin(); iter != i.value()->constEnd(); ++iter)
@@ -326,7 +353,7 @@ void showLabel(const QString &key)
 				if (iter.value() == l.id)
 				{
 					BASE_OBJECT *psObj = iter.key();
-					if (!cameraMoved)
+					if (!cameraMoved && jump_to)
 					{
 						setViewPos(map_coord(psObj->pos.x), map_coord(psObj->pos.y), false); // move camera position
 						cameraMoved = true;
@@ -346,9 +373,8 @@ std::pair<bool, int> seenLabelCheck(QScriptEngine *engine, BASE_OBJECT *seen, BA
 	GROUPMAP *psMap = groups.value(engine);
 	int groupId = psMap->value(seen);
 	bool foundObj = false, foundGroup = false;
-	for (LABELMAP::iterator i = labels.begin(); i != labels.end(); i++)
+	for (auto &l : labels)
 	{
-		labeltype &l = (*i);
 		if (l.id == seen->id && l.triggered == 0
 		    && (l.subscriber == ALL_PLAYERS || l.subscriber == viewer->player))
 		{
@@ -376,10 +402,10 @@ bool areaLabelCheck(DROID *psDroid)
 	bool activated = false;
 	for (LABELMAP::iterator i = labels.begin(); i != labels.end(); i++)
 	{
-		labeltype &l = i.value();
+		LABEL &l = i.value();
 		if (l.triggered == 0 && (l.subscriber == ALL_PLAYERS || l.subscriber == psDroid->player)
 		    && ((l.type == SCRIPT_AREA && l.p1.x < x && l.p1.y < y && l.p2.x > x && l.p2.y > y)
-		        || (l.type == SCRIPT_RADIUS && iHypot(l.p1 - removeZ(psDroid->pos)) < l.p2.x)))
+		        || (l.type == SCRIPT_RADIUS && iHypot(l.p1 - psDroid->pos.xy) < l.p2.x)))
 		{
 			// We're inside an untriggered area
 			activated = true;
@@ -835,7 +861,7 @@ BASE_OBJECT *IdToObject(OBJECT_TYPE type, int id, int player)
 	case OBJ_DROID: return IdToDroid(id, player);
 	case OBJ_FEATURE: return IdToFeature(id, player);
 	case OBJ_STRUCTURE: return IdToStruct(id, player);
-	default: return NULL;
+	default: return nullptr;
 	}
 }
 
@@ -846,6 +872,7 @@ BASE_OBJECT *IdToObject(OBJECT_TYPE type, int id, int player)
 bool loadGroup(QScriptEngine *engine, int groupId, int objId)
 {
 	BASE_OBJECT *psObj = IdToPointer(objId, ANYPLAYER);
+	ASSERT_OR_RETURN(false, psObj, "Non-existent object %d in group %d in savegame", objId, groupId);
 	return groupAddObject(psObj, groupId, engine);
 }
 
@@ -857,6 +884,7 @@ bool saveGroups(WzConfig &ini, QScriptEngine *engine)
 	{
 		QStringList value;
 		BASE_OBJECT *psObj = i.key();
+		ASSERT(!isDead(psObj), "Wanted to save dead %s to savegame!", objInfo(psObj));
 		if (ini.contains(QString::number(psObj->id)))
 		{
 			value.push_back(ini.value(QString::number(psObj->id)).toString());
@@ -888,7 +916,7 @@ bool loadLabels(const char *filename)
 	for (int i = 0; i < list.size(); ++i)
 	{
 		ini.beginGroup(list[i]);
-		labeltype p;
+		LABEL p;
 		QString label(ini.value("label").toString());
 		if (labels.contains(label))
 		{
@@ -971,8 +999,8 @@ bool writeLabels(const char *filename)
 	WzConfig ini(filename, WzConfig::ReadAndWrite);
 	for (LABELMAP::const_iterator i = labels.constBegin(); i != labels.constEnd(); i++)
 	{
-		QString key = i.key();
-		labeltype l = i.value();
+		const QString& key = i.key();
+		LABEL l = i.value();
 		if (l.type == SCRIPT_POSITION)
 		{
 			ini.beginGroup("position_" + QString::number(c[0]++));
@@ -1009,9 +1037,9 @@ bool writeLabels(const char *filename)
 			ini.setValue("player", l.player);
 			ini.setValue("triggered", l.triggered);
 			QStringList list;
-			for (int i = 0; i < l.idlist.size(); i++)
+			for (int i : l.idlist)
 			{
-				list += QString::number(l.idlist[i]);
+				list += QString::number(i);
 			}
 			ini.setValue("members", list);
 			ini.setValue("label", key);
@@ -1070,7 +1098,7 @@ static QScriptValue js_resetLabel(QScriptContext *context, QScriptEngine *)
 {
 	QString labelName = context->argument(0).toString();
 	SCRIPT_ASSERT(context, labels.contains(labelName), "Label %s not found", labelName.toUtf8().constData());
-	labeltype &l = labels[labelName];
+	LABEL &l = labels[labelName];
 	l.triggered = 0; // make active again
 	if (context->argumentCount() > 1)
 	{
@@ -1090,7 +1118,7 @@ static QScriptValue js_enumLabels(QScriptContext *context, QScriptEngine *engine
 		SCRIPT_TYPE type = (SCRIPT_TYPE)context->argument(0).toInt32();
 		for (LABELMAP::iterator i = labels.begin(); i != labels.end(); i++)
 		{
-			labeltype &l = (*i);
+			LABEL &l = (*i);
 			if (l.type == type)
 			{
 				matches += i.key();
@@ -1114,7 +1142,7 @@ static QScriptValue js_enumLabels(QScriptContext *context, QScriptEngine *engine
 //-- This is a fast operation of O(log n) algorithmic complexity. (3.2+ only)
 static QScriptValue js_addLabel(QScriptContext *context, QScriptEngine *engine)
 {
-	struct labeltype value;
+	LABEL value;
 	QScriptValue qval = context->argument(0);
 	value.type = qval.property("type").toInt32();
 	value.id = qval.property("id").toInt32();
@@ -1165,7 +1193,7 @@ static QScriptValue js_removeLabel(QScriptContext *context, QScriptEngine *engin
 //-- This is a relatively slow operation of O(n) algorithmic complexity. (3.2+ only)
 static QScriptValue js_getLabel(QScriptContext *context, QScriptEngine *engine)
 {
-	struct labeltype value;
+	LABEL value;
 	QScriptValue objparam = context->argument(0);
 	value.id = objparam.property("id").toInt32();
 	value.player = objparam.property("player").toInt32();
@@ -1220,7 +1248,7 @@ static QScriptValue js_getObject(QScriptContext *context, QScriptEngine *engine)
 	if (labels.contains(label))
 	{
 		ret = engine->newObject();
-		labeltype p = labels.value(label);
+		LABEL p = labels.value(label);
 		ret.setProperty("type", p.type, QScriptValue::ReadOnly);
 		switch (p.type)
 		{
@@ -1404,13 +1432,18 @@ static QScriptValue js_activateStructure(QScriptContext *context, QScriptEngine 
 	return QScriptValue(true);
 }
 
-//-- \subsection{findResearch(research)}
+//-- \subsection{findResearch(research, [player])}
 //-- Return list of research items remaining to be researched for the given research item. (3.2+ only)
+//-- (Optional second argument 3.2.3+ only)
 static QScriptValue js_findResearch(QScriptContext *context, QScriptEngine *engine)
 {
 	QList<RESEARCH *> list;
 	QString resName = context->argument(0).toString();
 	int player = engine->globalObject().property("me").toInt32();
+	if (context->argumentCount() == 2)
+	{
+		player = context->argument(1).toInt32();
+	}
 	RESEARCH *psTarget = getResearch(resName.toUtf8().constData());
 	SCRIPT_ASSERT(context, psTarget, "No such research: %s", resName.toUtf8().constData());
 	PLAYER_RESEARCH *plrRes = &asPlayerResList[player][psTarget->index];
@@ -1430,8 +1463,8 @@ static QScriptValue js_findResearch(QScriptContext *context, QScriptEngine *engi
 			list.append(cur);
 		}
 		RESEARCH *prev = cur;
-		cur = NULL;
-		if (prev->pPRList.size())
+		cur = nullptr;
+		if (!prev->pPRList.empty())
 		{
 			cur = &asResearch[prev->pPRList[0]]; // get first pre-req
 		}
@@ -1440,7 +1473,7 @@ static QScriptValue js_findResearch(QScriptContext *context, QScriptEngine *engi
 			// push any other pre-reqs on the stack
 			reslist += &asResearch[prev->pPRList[i]];
 		}
-		if (!cur && reslist.size())
+		if (!cur && !reslist.empty())
 		{
 			cur = reslist.takeFirst(); // retrieve options from the stack
 		}
@@ -1467,7 +1500,7 @@ static QScriptValue js_pursueResearch(QScriptContext *context, QScriptEngine *en
 	STRUCTURE *psStruct = IdToStruct(id, player);
 	SCRIPT_ASSERT(context, psStruct, "No such structure id %d belonging to player %d", id, player);
 	QScriptValue list = context->argument(1);
-	RESEARCH *psResearch = NULL;  // Dummy initialisation.
+	RESEARCH *psResearch = nullptr;  // Dummy initialisation.
 	if (list.isArray())
 	{
 		int length = list.property("length").toInt32();
@@ -1503,7 +1536,7 @@ static QScriptValue js_pursueResearch(QScriptContext *context, QScriptEngine *en
 	}
 	SCRIPT_ASSERT(context, psStruct->pStructureType->type == REF_RESEARCH, "Not a research lab: %s", objInfo(psStruct));
 	RESEARCH_FACILITY *psResLab = (RESEARCH_FACILITY *)psStruct->pFunctionality;
-	SCRIPT_ASSERT(context, psResLab->psSubject == NULL, "Research lab not ready");
+	SCRIPT_ASSERT(context, psResLab->psSubject == nullptr, "Research lab not ready");
 	// Go down the requirements list for the desired tech
 	QList<RESEARCH *> reslist;
 	RESEARCH *cur = psResearch;
@@ -1536,7 +1569,7 @@ static QScriptValue js_pursueResearch(QScriptContext *context, QScriptEngine *en
 			}
 		}
 		RESEARCH *prev = cur;
-		cur = NULL;
+		cur = nullptr;
 		if (!prev->pPRList.empty())
 		{
 			cur = &asResearch[prev->pPRList[0]]; // get first pre-req
@@ -1684,7 +1717,7 @@ static DROID_TEMPLATE *makeTemplate(int player, const QString &templName, QScrip
 		debug(LOG_SCRIPT, "Wanted to build %s but body types all unavailable",
 		      templName.toUtf8().constData());
 		delete psTemplate;
-		return NULL; // no component available
+		return nullptr; // no component available
 	}
 	int prop = get_first_available_component(player, capacity, context->argument(paramstart + 1), COMP_PROPULSION, strict);
 	if (prop < 0)
@@ -1692,7 +1725,7 @@ static DROID_TEMPLATE *makeTemplate(int player, const QString &templName, QScrip
 		debug(LOG_SCRIPT, "Wanted to build %s but propulsion types all unavailable",
 		      templName.toUtf8().constData());
 		delete psTemplate;
-		return NULL; // no component available
+		return nullptr; // no component available
 	}
 	psTemplate->asParts[COMP_BODY] = body;
 	psTemplate->asParts[COMP_PROPULSION] = prop;
@@ -1714,11 +1747,15 @@ static DROID_TEMPLATE *makeTemplate(int player, const QString &templName, QScrip
 		compName = context->argument(firstTurret).toString();
 	}
 	COMPONENT_STATS *psComp = getCompStatsFromName(compName);
-	if (psComp == NULL)
+	if (psComp == nullptr)
 	{
 		debug(LOG_ERROR, "Wanted to build %s but %s does not exist", templName.toUtf8().constData(), compName.toUtf8().constData());
 		delete psTemplate;
-		return NULL;
+		return nullptr;
+	}
+	if (psComp->droidTypeOverride != DROID_ANY)
+	{
+		psTemplate->droidType = psComp->droidTypeOverride; // set droidType based on component
 	}
 	if (psComp->compType == COMP_WEAPON)
 	{
@@ -1729,7 +1766,7 @@ static DROID_TEMPLATE *makeTemplate(int player, const QString &templName, QScrip
 			{
 				debug(LOG_SCRIPT, "Wanted to build %s but no weapon available", templName.toUtf8().constData());
 				delete psTemplate;
-				return NULL;
+				return nullptr;
 			}
 			psTemplate->asWeaps[i] = result;
 			psTemplate->numWeaps++;
@@ -1746,7 +1783,7 @@ static DROID_TEMPLATE *makeTemplate(int player, const QString &templName, QScrip
 		{
 			debug(LOG_SCRIPT, "Wanted to build %s but turret unavailable", templName.toUtf8().constData());
 			delete psTemplate;
-			return NULL;
+			return nullptr;
 		}
 		psTemplate->asParts[psComp->compType] = result;
 	}
@@ -1759,7 +1796,7 @@ static DROID_TEMPLATE *makeTemplate(int player, const QString &templName, QScrip
 	{
 		delete psTemplate;
 		debug(LOG_ERROR, "Invalid template %s", templName.toUtf8().constData());
-		return NULL;
+		return nullptr;
 	}
 }
 
@@ -1781,7 +1818,7 @@ static QScriptValue js_addDroid(QScriptContext *context, QScriptEngine *engine)
 	DROID_TEMPLATE *psTemplate = makeTemplate(player, templName, context, 4, SIZE_NUM, false);
 	if (psTemplate)
 	{
-		DROID *psDroid = NULL;
+		DROID *psDroid = nullptr;
 		bool oldMulti = bMultiMessages;
 		bMultiMessages = false; // ugh, fixme
 		if (onMission)
@@ -1798,7 +1835,7 @@ static QScriptValue js_addDroid(QScriptContext *context, QScriptEngine *engine)
 		}
 		else
 		{
-			psDroid = buildDroid(psTemplate, world_coord(x) + TILE_UNITS / 2, world_coord(y) + TILE_UNITS / 2, player, onMission, NULL);
+			psDroid = buildDroid(psTemplate, world_coord(x) + TILE_UNITS / 2, world_coord(y) + TILE_UNITS / 2, player, onMission, nullptr);
 			if (psDroid)
 			{
 				addDroid(psDroid, apsDroidLists);
@@ -1820,7 +1857,6 @@ static QScriptValue js_addDroid(QScriptContext *context, QScriptEngine *engine)
 //-- Load a droid, which is currently located on the campaign off-world mission list,
 //-- into a transporter, which is also currently on the campaign off-world mission list.
 //-- (3.2+ only)
-
 static QScriptValue js_addDroidToTransporter(QScriptContext *context, QScriptEngine *engine)
 {
 	QScriptValue transporterVal = context->argument(0);
@@ -1884,9 +1920,8 @@ static QScriptValue js_buildDroid(QScriptContext *context, QScriptEngine *engine
 		              "Invalid template %s for factory %s",
 		              getName(psTemplate), getName(psStruct->pStructureType));
 		// Delete similar template from existing list before adding this one
-		for (int j = 0; j < apsTemplateList.size(); j++)
+		for (auto t : apsTemplateList)
 		{
-			DROID_TEMPLATE *t = apsTemplateList[j];
 			if (t->name.compare(psTemplate->name) == 0)
 			{
 				debug(LOG_SCRIPT, "deleting %s for player %d", getName(t), player);
@@ -1904,7 +1939,7 @@ static QScriptValue js_buildDroid(QScriptContext *context, QScriptEngine *engine
 			return QScriptValue(false);
 		}
 	}
-	return QScriptValue(psTemplate != NULL);
+	return QScriptValue(psTemplate != nullptr);
 }
 
 //-- \subsection{enumStruct([player[, structure type[, looking player]]])}
@@ -2509,7 +2544,14 @@ static QScriptValue js_orderDroid(QScriptContext *context, QScriptEngine *)
 	              "Invalid order: %s", getDroidOrderName(order));
 	if (order == DORDER_REARM)
 	{
-		moveToRearm(psDroid);
+		if (STRUCTURE *psStruct = findNearestReArmPad(psDroid, psDroid->psBaseStruct, false))
+		{
+			orderDroidObj(psDroid, order, psStruct, ModeQueue);
+		}
+		else
+		{
+			orderDroid(psDroid, DORDER_RTB, ModeQueue);
+		}
 	}
 	else
 	{
@@ -2639,6 +2681,17 @@ static QScriptValue js_startTransporterEntry(QScriptContext *context, QScriptEng
 	return QScriptValue();
 }
 
+//-- \subsection{useSafetyTransport(flag)}
+//-- Change if the mission transporter will fetch droids in non offworld missions
+//-- setReinforcementTime() is be used to hide it before coming back after the set time
+//-- which is handled by the campaign library in the victory data section (3.2.4+ only).
+static QScriptValue js_useSafetyTransport(QScriptContext *context, QScriptEngine *)
+{
+	bool flag = context->argument(0).toBool();
+	setDroidsToSafetyFlag(flag);
+	return QScriptValue();
+}
+
 //-- \subsection{setReinforcementTime(time)} Set time for reinforcements to arrive. If time is
 //-- negative, the reinforcement GUI is removed and the timer stopped. Time is in seconds.
 //-- If time equals to the magic LZ_COMPROMISED_TIME constant, reinforcement GUI ticker
@@ -2661,7 +2714,7 @@ static QScriptValue js_setReinforcementTime(QScriptContext *context, QScriptEngi
 		intRemoveTransporterTimer();
 		/* Only remove the launch if haven't got a transporter droid since the scripts set the
 		 * time to -1 at the between stage if there are not going to be reinforcements on the submap  */
-		for (psDroid = apsDroidLists[selectedPlayer]; psDroid != NULL; psDroid = psDroid->psNext)
+		for (psDroid = apsDroidLists[selectedPlayer]; psDroid != nullptr; psDroid = psDroid->psNext)
 		{
 			if (isTransporter(psDroid))
 			{
@@ -2669,7 +2722,7 @@ static QScriptValue js_setReinforcementTime(QScriptContext *context, QScriptEngi
 			}
 		}
 		// if not found a transporter, can remove the launch button
-		if (psDroid ==  NULL)
+		if (psDroid ==  nullptr)
 		{
 			intRemoveTransporterLaunch();
 		}
@@ -2771,13 +2824,14 @@ static QScriptValue js_gameOverMessage(QScriptContext *context, QScriptEngine *e
 	if (psMessage)
 	{
 		//set the data
-		psMessage->pViewData = (MSG_VIEWDATA *)psViewData;
+		psMessage->pViewData = psViewData;
 		displayImmediateMessage(psMessage);
 		stopReticuleButtonFlash(IDRET_INTEL_MAP);
 
 		//we need to set this here so the VIDEO_QUIT callback is not called
 		setScriptWinLoseVideo(gameWon ? PLAY_WIN : PLAY_LOSE);
 	}
+	jsDebugMessageUpdate();
 	displayGameOver(gameWon);
 	if (challengeActive)
 	{
@@ -2806,6 +2860,11 @@ static QScriptValue js_completeResearch(QScriptContext *context, QScriptEngine *
 		player = engine->globalObject().property("me").toInt32();
 	}
 	RESEARCH *psResearch = getResearch(researchName.toUtf8().constData());
+	PLAYER_RESEARCH *plrRes = &asPlayerResList[player][psResearch->index];
+	if (IsResearchCompleted(plrRes))
+	{
+		return QScriptValue(false);
+	}
 	SCRIPT_ASSERT(context, psResearch, "No such research %s for player %d", researchName.toUtf8().constData(), player);
 	SCRIPT_ASSERT(context, psResearch->index < asResearch.size(), "Research index out of bounds");
 	if (bMultiMessages && (gameTime > 2))
@@ -2815,7 +2874,7 @@ static QScriptValue js_completeResearch(QScriptContext *context, QScriptEngine *
 	}
 	else
 	{
-		researchResult(psResearch->index, player, false, NULL, false);
+		researchResult(psResearch->index, player, false, nullptr, false);
 	}
 	return QScriptValue();
 }
@@ -2969,9 +3028,9 @@ static QScriptValue js_setDesign(QScriptContext *context, QScriptEngine *engine)
 		bool researched = researchedTemplate(keyvaluepair.second, selectedPlayer);
 		keyvaluepair.second->enabled = (researched || allowDesign);
 	}
-	for (std::list<DROID_TEMPLATE>::iterator i = localTemplates.begin(); i != localTemplates.end(); ++i)
+	for (auto &localTemplate : localTemplates)
 	{
-		psCurr = &*i;
+		psCurr = &localTemplate;
 		bool researched = researchedTemplate(psCurr, selectedPlayer);
 		psCurr->enabled = (researched || allowDesign);
 	}
@@ -2999,9 +3058,9 @@ static QScriptValue js_enableTemplate(QScriptContext *context, QScriptEngine *en
 		debug(LOG_ERROR, "Template %s was not found!", templateName.toUtf8().constData());
 		return QScriptValue(false);
 	}
-	for (std::list<DROID_TEMPLATE>::iterator i = localTemplates.begin(); i != localTemplates.end(); ++i)
+	for (auto &localTemplate : localTemplates)
 	{
-		psCurr = &*i;
+		psCurr = &localTemplate;
 		if (templateName.compare(psCurr->id) == 0)
 		{
 			psCurr->enabled = true;
@@ -3091,7 +3150,7 @@ static QScriptValue js_applyLimitSet(QScriptContext *context, QScriptEngine *eng
 	return QScriptValue();
 }
 
-static void setComponent(QString name, int player, int value)
+static void setComponent(const QString& name, int player, int value)
 {
 	COMPONENT_STATS *psComp = getCompStatsFromName(name);
 	ASSERT_OR_RETURN(, psComp, "Bad component %s", name.toUtf8().constData());
@@ -3283,7 +3342,7 @@ static QScriptValue js_setDroidExperience(QScriptContext *context, QScriptEngine
 }
 
 //-- \subsection{donateObject(object, to)}
-//-- Donate a game object (currently restricted to droids) to another player. Returns true if
+//-- Donate a game object (restricted to droids before 3.2.3) to another player. Returns true if
 //-- donation was successful. May return false if this donation would push the receiving player
 //-- over unit limits. (3.2+ only)
 static QScriptValue js_donateObject(QScriptContext *context, QScriptEngine *engine)
@@ -3293,6 +3352,7 @@ static QScriptValue js_donateObject(QScriptContext *context, QScriptEngine *engi
 	uint8_t player = val.property("player").toInt32();
 	OBJECT_TYPE type = (OBJECT_TYPE)val.property("type").toInt32();
 	uint8_t to = context->argument(1).toInt32();
+	uint8_t giftType = 0;
 	if (type == OBJ_DROID)
 	{
 		// Check unit limits.
@@ -3304,14 +3364,29 @@ static QScriptValue js_donateObject(QScriptContext *context, QScriptEngine *engi
 		{
 			return QScriptValue(false);
 		}
-		uint8_t giftType = DROID_GIFT;
-		NETbeginEncode(NETgameQueue(selectedPlayer), GAME_GIFT);
-		NETuint8_t(&giftType);
-		NETuint8_t(&player);
-		NETuint8_t(&to);
-		NETuint32_t(&id);
-		NETend();
+		giftType = DROID_GIFT;
 	}
+	else if (type == OBJ_STRUCTURE)
+	{
+		STRUCTURE *psStruct = IdToStruct(id, player);
+		SCRIPT_ASSERT(context, psStruct, "No such struct id %u belonging to player %u", id, player);
+		int max = psStruct->pStructureType - asStructureStats;
+		if (asStructLimits[player][max].currentQuantity + 1 > asStructLimits[player][max].limit)
+		{
+			return QScriptValue(false);
+		}
+		giftType = STRUCTURE_GIFT;
+	}
+	else
+	{
+		return QScriptValue(false);
+	}
+	NETbeginEncode(NETgameQueue(selectedPlayer), GAME_GIFT);
+	NETuint8_t(&giftType);
+	NETuint8_t(&player);
+	NETuint8_t(&to);
+	NETuint32_t(&id);
+	NETend();
 	return QScriptValue(true);
 }
 
@@ -3610,7 +3685,7 @@ static QScriptValue js_enumArea(QScriptContext *context, QScriptEngine *engine)
 		QString label = context->argument(0).toString();
 		nextparam = 1;
 		SCRIPT_ASSERT(context, labels.contains(label), "Label %s not found", label.toUtf8().constData());
-		labeltype p = labels.value(label);
+		LABEL p = labels.value(label);
 		SCRIPT_ASSERT(context, p.type == SCRIPT_AREA, "Wrong label type for %s", label.toUtf8().constData());
 		x1 = p.p1.x;
 		y1 = p.p1.y;
@@ -3699,6 +3774,7 @@ static QScriptValue js_removeBeacon(QScriptContext *context, QScriptEngine *engi
 			}
 		}
 	}
+	jsDebugMessageUpdate();
 	return QScriptValue(true);
 }
 
@@ -3918,8 +3994,8 @@ static QScriptValue js_hackAddMessage(QScriptContext *context, QScriptEngine *)
 	{
 		VIEWDATA *psViewData = getViewData(mess.toUtf8().constData());
 		SCRIPT_ASSERT(context, psViewData, "Viewdata not found");
-		psMessage->pViewData = (MSG_VIEWDATA *)psViewData;
-		debug(LOG_MSG, "Adding %s pViewData=%p", psViewData->pName, psMessage->pViewData);
+		psMessage->pViewData = psViewData;
+		debug(LOG_MSG, "Adding %s pViewData=%p", psViewData->name.toUtf8().constData(), psMessage->pViewData);
 		if (msgType == MSG_PROXIMITY)
 		{
 			VIEW_PROXIMITY *psProx = (VIEW_PROXIMITY *)psViewData->pData;
@@ -3935,6 +4011,7 @@ static QScriptValue js_hackAddMessage(QScriptContext *context, QScriptEngine *)
 			displayImmediateMessage(psMessage);
 		}
 	}
+	jsDebugMessageUpdate();
 	return QScriptValue();
 }
 
@@ -3947,16 +4024,17 @@ static QScriptValue js_hackRemoveMessage(QScriptContext *context, QScriptEngine 
 	int player = context->argument(2).toInt32();
 	VIEWDATA *psViewData = getViewData(mess.toUtf8().constData());
 	SCRIPT_ASSERT(context, psViewData, "Viewdata not found");
-	MESSAGE *psMessage = findMessage((MSG_VIEWDATA *)psViewData, msgType, player);
+	MESSAGE *psMessage = findMessage(psViewData, msgType, player);
 	if (psMessage)
 	{
-		debug(LOG_MSG, "Removing %s", psViewData->pName);
+		debug(LOG_MSG, "Removing %s", psViewData->name.toUtf8().constData());
 		removeMessage(psMessage, player);
 	}
 	else
 	{
-		debug(LOG_ERROR, "cannot find message - %s", psViewData->pName);
+		debug(LOG_ERROR, "cannot find message - %s", psViewData->name.toUtf8().constData());
 	}
+	jsDebugMessageUpdate();
 	return QScriptValue();
 }
 
@@ -3993,7 +4071,6 @@ static QScriptValue js_setSunIntensity(QScriptContext *context, QScriptEngine *)
 	pie_Lighting0(LIGHT_AMBIENT, ambient);
 	pie_Lighting0(LIGHT_DIFFUSE, diffuse);
 	pie_Lighting0(LIGHT_SPECULAR, specular);
-	pie_SetupLighting();
 	return QScriptValue();
 }
 
@@ -4015,6 +4092,16 @@ static QScriptValue js_setSky(QScriptContext *context, QScriptEngine *)
 	float wind = context->argument(1).toNumber();
 	float scale = context->argument(2).toNumber();
 	setSkyBox(page.toUtf8().constData(), wind, scale);
+	return QScriptValue();
+}
+
+//-- \subsection{hackDoNotSave(name)}
+//-- Do not save the given global given by name to savegames. Must be
+//-- done again each time game is loaded, since this too is not saved.
+static QScriptValue js_hackDoNotSave(QScriptContext *context, QScriptEngine *)
+{
+	QString name = context->argument(0).toString();
+	doNotSaveGlobal(name);
 	return QScriptValue();
 }
 
@@ -4050,7 +4137,7 @@ static QScriptValue js_hackMarkTiles(QScriptContext *context, QScriptEngine *)
 	{
 		QString label = context->argument(0).toString();
 		SCRIPT_ASSERT(context, labels.contains(label), "Label %s not found", label.toUtf8().constData());
-		labeltype &l = labels[label];
+		const LABEL &l = labels[label];
 		if (l.type == SCRIPT_AREA)
 		{
 			for (int x = map_coord(l.p1.x); x < map_coord(l.p2.x); x++)
@@ -4119,11 +4206,44 @@ static QScriptValue js_cameraTrack(QScriptContext *context, QScriptEngine *)
 		int player = droidVal.property("player").toInt32();
 		DROID *targetDroid = IdToDroid(id, player);
 		SCRIPT_ASSERT(context, targetDroid, "No such droid id %d belonging to player %d", id, player);
-		for (DROID *psDroid = apsDroidLists[selectedPlayer]; psDroid != NULL; psDroid = psDroid->psNext)
+		for (DROID *psDroid = apsDroidLists[selectedPlayer]; psDroid != nullptr; psDroid = psDroid->psNext)
 		{
 			psDroid->selected = (psDroid == targetDroid); // select only the target droid
 		}
 		setWarCamActive(true);
+	}
+	return QScriptValue();
+}
+
+//-- \subsection{setHealth(object, health)}
+//-- Change the health of the given game object, in percentage. Does not take care of network sync, so for multiplayer games,
+//-- needs wrapping in a syncRequest. (3.2.3+ only.)
+static QScriptValue js_setHealth(QScriptContext *context, QScriptEngine *)
+{
+	QScriptValue objVal = context->argument(0);
+	int health = context->argument(1).toInt32();
+	SCRIPT_ASSERT(context, health >= 1, "Bad health value %d", health);
+	int id = objVal.property("id").toInt32();
+	int player = objVal.property("player").toInt32();
+	OBJECT_TYPE type = (OBJECT_TYPE)objVal.property("type").toInt32();
+	SCRIPT_ASSERT(context, type == OBJ_DROID || type == OBJ_STRUCTURE || type == OBJ_FEATURE, "Bad object type");
+	if (type == OBJ_DROID)
+	{
+		DROID *psDroid = IdToDroid(id, player);
+		SCRIPT_ASSERT(context, psDroid, "No such droid id %d belonging to player %d", id, player);
+		psDroid->body = health * (double)psDroid->originalBody / 100;
+	}
+	else if (type == OBJ_STRUCTURE)
+	{
+		STRUCTURE *psStruct = IdToStruct(id, player);
+		SCRIPT_ASSERT(context, psStruct, "No such structure id %d belonging to player %d", id, player);
+		psStruct->body = health * MAX(1, structureBody(psStruct)) / 100;
+	}
+	else
+	{
+		FEATURE *psFeat = IdToFeature(id, player);
+		SCRIPT_ASSERT(context, psFeat, "No such feature id %d belonging to player %d", id, player);
+		psFeat->body = health * psFeat->psStats->body / 100;
 	}
 	return QScriptValue();
 }
@@ -4173,7 +4293,7 @@ static QScriptValue js_syncRequest(QScriptContext *context, QScriptEngine *)
 	int32_t req_id = context->argument(0).toInt32();
 	int32_t x = world_coord(context->argument(1).toInt32());
 	int32_t y = world_coord(context->argument(2).toInt32());
-	BASE_OBJECT *psObj = NULL, *psObj2 = NULL;
+	BASE_OBJECT *psObj = nullptr, *psObj2 = nullptr;
 	if (context->argumentCount() > 3)
 	{
 		QScriptValue objVal = context->argument(3);
@@ -4207,6 +4327,17 @@ static QScriptValue js_replaceTexture(QScriptContext *context, QScriptEngine *)
 	return QScriptValue();
 }
 
+//-- \subsection{changePlayerColour(player, colour)}
+//-- Change a player's colour slot. The current player colour can be read from the playerData array. There are as many
+//-- colour slots as the maximum number of players. (3.2.3+ only)
+static QScriptValue js_changePlayerColour(QScriptContext *context, QScriptEngine *)
+{
+	int player = context->argument(0).toInt32();
+	int colour = context->argument(1).toInt32();
+	setPlayerColour(player, colour);
+	return QScriptValue();
+}
+
 // ----------------------------------------------------------------------------------------
 // Register functions with scripting system
 
@@ -4217,7 +4348,7 @@ bool unregisterFunctions(QScriptEngine *engine)
 	delete psMap;
 	ASSERT(num == 1, "Number of engines removed from group map is %d!", num);
 	labels.clear();
-	labelModel = NULL;
+	labelModel = nullptr;
 	return true;
 }
 
@@ -4231,7 +4362,7 @@ void prepareLabels()
 		QScriptEngine *engine = iter.key();
 		for (LABELMAP::iterator i = labels.begin(); i != labels.end(); ++i)
 		{
-			struct labeltype l = i.value();
+			LABEL l = i.value();
 			if (l.type == SCRIPT_GROUP)
 			{
 				QScriptValue groupMembers = iter.key()->globalObject().property("groupSizes");
@@ -4255,17 +4386,17 @@ void prepareLabels()
 // flag all droids as requiring update on next frame
 static void dirtyAllDroids(int player)
 {
-	for (DROID *psDroid = apsDroidLists[player]; psDroid != NULL; psDroid = psDroid->psNext)
+	for (DROID *psDroid = apsDroidLists[player]; psDroid != nullptr; psDroid = psDroid->psNext)
 	{
-		psDroid->flags |= BASEFLAG_DIRTY;
+		psDroid->flags.set(OBJECT_FLAG_DIRTY);
 	}
-	for (DROID *psDroid = mission.apsDroidLists[player]; psDroid != NULL; psDroid = psDroid->psNext)
+	for (DROID *psDroid = mission.apsDroidLists[player]; psDroid != nullptr; psDroid = psDroid->psNext)
 	{
-		psDroid->flags |= BASEFLAG_DIRTY;
+		psDroid->flags.set(OBJECT_FLAG_DIRTY);
 	}
-	for (DROID *psDroid = apsLimboDroids[player]; psDroid != NULL; psDroid = psDroid->psNext)
+	for (DROID *psDroid = apsLimboDroids[player]; psDroid != nullptr; psDroid = psDroid->psNext)
 	{
-		psDroid->flags |= BASEFLAG_DIRTY;
+		psDroid->flags.set(OBJECT_FLAG_DIRTY);
 	}
 }
 
@@ -4273,11 +4404,11 @@ static void dirtyAllStructures(int player)
 {
 	for (STRUCTURE *psCurr = apsStructLists[player]; psCurr; psCurr = psCurr->psNext)
 	{
-		psCurr->flags |= BASEFLAG_DIRTY;
+		psCurr->flags.set(OBJECT_FLAG_DIRTY);
 	}
 	for (STRUCTURE *psCurr = mission.apsStructLists[player]; psCurr; psCurr = psCurr->psNext)
 	{
-		psCurr->flags |= BASEFLAG_DIRTY;
+		psCurr->flags.set(OBJECT_FLAG_DIRTY);
 	}
 }
 
@@ -4298,7 +4429,12 @@ QScriptValue js_stats(QScriptContext *context, QScriptEngine *engine)
 			BODY_STATS *psStats = asBodyStats + index;
 			if (name == "HitPoints")
 			{
-				psStats->upgrade[player].body = value;
+				psStats->upgrade[player].hitpoints = value;
+				dirtyAllDroids(player);
+			}
+			else if (name == "HitPointPct")
+			{
+				psStats->upgrade[player].hitpointPct = value;
 				dirtyAllDroids(player);
 			}
 			else if (name == "Armour")
@@ -4323,30 +4459,138 @@ QScriptValue js_stats(QScriptContext *context, QScriptEngine *engine)
 				SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
 			}
 		}
+		else if (type == COMP_BRAIN)
+		{
+			SCRIPT_ASSERT(context, index < numBrainStats, "Bad index");
+			BRAIN_STATS *psStats = asBrainStats + index;
+			if (name == "BaseCommandLimit")
+			{
+				psStats->upgrade[player].maxDroids = value;
+			}
+			else if (name == "CommandLimitByLevel")
+			{
+				psStats->upgrade[player].maxDroidsMult = value;
+			}
+			else if (name == "RankThresholds")
+			{
+				SCRIPT_ASSERT(context, context->argument(0).isArray(), "Level thresholds not an array!");
+				int length = context->argument(0).property("length").toInt32();
+				for (int i = 0; i < length; i++)
+				{
+					psStats->upgrade[player].rankThresholds[i] = context->argument(0).property(i).toInt32();
+				}
+			}
+			else if (name == "HitPoints")
+			{
+				psStats->upgrade[player].hitpoints = value;
+				dirtyAllDroids(player);
+			}
+			else if (name == "HitPointPct")
+			{
+				psStats->upgrade[player].hitpointPct = value;
+				dirtyAllDroids(player);
+			}
+			else
+			{
+				SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+			}
+		}
 		else if (type == COMP_SENSOR)
 		{
 			SCRIPT_ASSERT(context, index < numSensorStats, "Bad index");
 			SENSOR_STATS *psStats = asSensorStats + index;
-			SCRIPT_ASSERT(context, name == "Range", "Invalid sensor parameter");
-			psStats->upgrade[player].range = value;
-			dirtyAllDroids(player);
-			dirtyAllStructures(player);
+			if (name == "Range")
+			{
+				psStats->upgrade[player].range = value;
+				dirtyAllDroids(player);
+				dirtyAllStructures(player);
+			}
+			else if (name == "HitPoints")
+			{
+				psStats->upgrade[player].hitpoints = value;
+				dirtyAllDroids(player);
+			}
+			else if (name == "HitPointPct")
+			{
+				psStats->upgrade[player].hitpointPct = value;
+				dirtyAllDroids(player);
+			}
+			else
+			{
+				SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+			}
 		}
 		else if (type == COMP_ECM)
 		{
 			SCRIPT_ASSERT(context, index < numECMStats, "Bad index");
 			ECM_STATS *psStats = asECMStats + index;
-			SCRIPT_ASSERT(context, name == "Range", "Invalid ECM parameter");
-			psStats->upgrade[player].range = value;
-			dirtyAllDroids(player);
-			dirtyAllStructures(player);
+			if (name == "Range")
+			{
+				psStats->upgrade[player].range = value;
+				dirtyAllDroids(player);
+				dirtyAllStructures(player);
+			}
+			else if (name == "HitPoints")
+			{
+				psStats->upgrade[player].hitpoints = value;
+				dirtyAllDroids(player);
+			}
+			else if (name == "HitPointPct")
+			{
+				psStats->upgrade[player].hitpointPct = value;
+				dirtyAllDroids(player);
+			}
+			else
+			{
+				SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+			}
+		}
+		else if (type == COMP_PROPULSION)
+		{
+			SCRIPT_ASSERT(context, index < numPropulsionStats, "Bad index");
+			PROPULSION_STATS *psStats = asPropulsionStats + index;
+			if (name == "HitPoints")
+			{
+				psStats->upgrade[player].hitpoints = value;
+				dirtyAllDroids(player);
+			}
+			else if (name == "HitPointPct")
+			{
+				psStats->upgrade[player].hitpointPct = value;
+				dirtyAllDroids(player);
+			}
+			else if (name == "HitPointPctOfBody")
+			{
+				psStats->upgrade[player].hitpointPctOfBody = value;
+				dirtyAllDroids(player);
+			}
+			else
+			{
+				SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+			}
 		}
 		else if (type == COMP_CONSTRUCT)
 		{
 			SCRIPT_ASSERT(context, index < numConstructStats, "Bad index");
 			CONSTRUCT_STATS *psStats = asConstructStats + index;
-			SCRIPT_ASSERT(context, name == "ConstructorPoints", "Invalid constructor parameter");
-			psStats->upgrade[player].constructPoints = value;
+			if (name == "ConstructorPoints")
+			{
+				psStats->upgrade[player].constructPoints = value;
+			}
+			else if (name == "HitPoints")
+			{
+				psStats->upgrade[player].hitpoints = value;
+				dirtyAllDroids(player);
+			}
+			else if (name == "HitPointPct")
+			{
+				psStats->upgrade[player].hitpointPct = value;
+				dirtyAllDroids(player);
+			}
+			else
+			{
+				SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+			}
 		}
 		else if (type == COMP_WEAPON)
 		{
@@ -4403,6 +4647,16 @@ QScriptValue js_stats(QScriptContext *context, QScriptEngine *engine)
 			else if (name == "RepeatRadius")
 			{
 				psStats->upgrade[player].periodicalDamageRadius = value;
+			}
+			else if (name == "HitPoints")
+			{
+				psStats->upgrade[player].hitpoints = value;
+				dirtyAllDroids(player);
+			}
+			else if (name == "HitPointPct")
+			{
+				psStats->upgrade[player].hitpointPct = value;
+				dirtyAllDroids(player);
 			}
 			else
 			{
@@ -4475,10 +4729,14 @@ QScriptValue js_stats(QScriptContext *context, QScriptEngine *engine)
 	if (type == COMP_BODY)
 	{
 		SCRIPT_ASSERT(context, index < numBodyStats, "Bad index");
-		BODY_STATS *psStats = asBodyStats + index;
+		const BODY_STATS *psStats = asBodyStats + index;
 		if (name == "HitPoints")
 		{
-			return psStats->upgrade[player].body;
+			return psStats->upgrade[player].hitpoints;
+		}
+		else if (name == "HitPointPct")
+		{
+			return psStats->upgrade[player].hitpointPct;
 		}
 		else if (name == "Armour")
 		{
@@ -4501,31 +4759,129 @@ QScriptValue js_stats(QScriptContext *context, QScriptEngine *engine)
 			SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
 		}
 	}
+	else if (type == COMP_BRAIN)
+	{
+		SCRIPT_ASSERT(context, index < numBrainStats, "Bad index");
+		const BRAIN_STATS *psStats = asBrainStats + index;
+		if (name == "BaseCommandLimit")
+		{
+			return psStats->upgrade[player].maxDroids;
+		}
+		else if (name == "CommandLimitByLevel")
+		{
+			return psStats->upgrade[player].maxDroidsMult;
+		}
+		else if (name == "RankThresholds")
+		{
+			int length = psStats->upgrade[player].rankThresholds.size();
+			QScriptValue value = engine->newArray(length);
+			for (int i = 0; i < length; i++)
+			{
+				value.setProperty(i, psStats->upgrade[player].rankThresholds[i], QScriptValue::Undeletable | QScriptValue::ReadOnly);
+			}
+			return value;
+		}
+		else if (name == "HitPoints")
+		{
+			return psStats->upgrade[player].hitpoints;
+		}
+		else if (name == "HitPointPct")
+		{
+			return psStats->upgrade[player].hitpointPct;
+		}
+		else
+		{
+			SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+		}
+	}
 	else if (type == COMP_SENSOR)
 	{
 		SCRIPT_ASSERT(context, index < numSensorStats, "Bad index");
-		SENSOR_STATS *psStats = asSensorStats + index;
-		SCRIPT_ASSERT(context, name == "Range", "Invalid sensor parameter");
-		return psStats->upgrade[player].range;
+		const SENSOR_STATS *psStats = asSensorStats + index;
+		if (name == "Range")
+		{
+			return psStats->upgrade[player].range;
+		}
+		else if (name == "HitPoints")
+		{
+			return psStats->upgrade[player].hitpoints;
+		}
+		else if (name == "HitPointPct")
+		{
+			return psStats->upgrade[player].hitpointPct;
+		}
+		else
+		{
+			SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+		}
 	}
 	else if (type == COMP_ECM)
 	{
 		SCRIPT_ASSERT(context, index < numECMStats, "Bad index");
-		ECM_STATS *psStats = asECMStats + index;
-		SCRIPT_ASSERT(context, name == "Range", "Invalid ECM parameter");
-		return psStats->upgrade[player].range;
+		const ECM_STATS *psStats = asECMStats + index;
+		if (name == "Range")
+		{
+			return psStats->upgrade[player].range;
+		}
+		else if (name == "HitPoints")
+		{
+			return psStats->upgrade[player].hitpoints;
+		}
+		else if (name == "HitPointPct")
+		{
+			return psStats->upgrade[player].hitpointPct;
+		}
+		else
+		{
+			SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+		}
+	}
+	else if (type == COMP_PROPULSION)
+	{
+		SCRIPT_ASSERT(context, index < numPropulsionStats, "Bad index");
+		const PROPULSION_STATS *psStats = asPropulsionStats + index;
+		if (name == "HitPoints")
+		{
+			return psStats->upgrade[player].hitpoints;
+		}
+		else if (name == "HitPointPct")
+		{
+			return psStats->upgrade[player].hitpointPct;
+		}
+		else if (name == "HitPointPctOfBody")
+		{
+			return psStats->upgrade[player].hitpointPctOfBody;
+		}
+		else
+		{
+			SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+		}
 	}
 	else if (type == COMP_CONSTRUCT)
 	{
 		SCRIPT_ASSERT(context, index < numConstructStats, "Bad index");
-		CONSTRUCT_STATS *psStats = asConstructStats + index;
-		SCRIPT_ASSERT(context, name == "ConstructorPoints", "Invalid constructor parameter");
-		return psStats->upgrade[player].constructPoints;
+		const CONSTRUCT_STATS *psStats = asConstructStats + index;
+		if (name == "ConstructorPoints")
+		{
+			return psStats->upgrade[player].constructPoints;
+		}
+		else if (name == "HitPoints")
+		{
+			return psStats->upgrade[player].hitpoints;
+		}
+		else if (name == "HitPointPct")
+		{
+			return psStats->upgrade[player].hitpointPct;
+		}
+		else
+		{
+			SCRIPT_ASSERT(context, false, "Upgrade component %s not found", name.toUtf8().constData());
+		}
 	}
 	else if (type == COMP_WEAPON)
 	{
 		SCRIPT_ASSERT(context, index < numWeaponStats, "Bad index");
-		WEAPON_STATS *psStats = asWeaponStats + index;
+		const WEAPON_STATS *psStats = asWeaponStats + index;
 		if (name == "MaxRange")
 		{
 			return psStats->upgrade[player].maxRange;
@@ -4578,6 +4934,14 @@ QScriptValue js_stats(QScriptContext *context, QScriptEngine *engine)
 		{
 			return psStats->upgrade[player].periodicalDamageRadius;
 		}
+		else if (name == "HitPoints")
+		{
+			return psStats->upgrade[player].hitpoints;
+		}
+		else if (name == "HitPointPct")
+		{
+			return psStats->upgrade[player].hitpointPct;
+		}
 		else
 		{
 			SCRIPT_ASSERT(context, false, "Invalid weapon method");
@@ -4586,7 +4950,7 @@ QScriptValue js_stats(QScriptContext *context, QScriptEngine *engine)
 	else if (type >= SCRCB_FIRST && type <= SCRCB_LAST)
 	{
 		SCRIPT_ASSERT(context, index < numStructureStats, "Bad index");
-		STRUCTURE_STATS *psStats = asStructureStats + index;
+		const STRUCTURE_STATS *psStats = asStructureStats + index;
 		switch (type)
 		{
 		case SCRCB_RES: return psStats->upgrade[player].research; break;
@@ -4607,7 +4971,7 @@ QScriptValue js_stats(QScriptContext *context, QScriptEngine *engine)
 	return QScriptValue::NullValue;
 }
 
-static void setStatsFunc(QScriptValue &base, QScriptEngine *engine, QString name, int player, int type, int index)
+static void setStatsFunc(QScriptValue &base, QScriptEngine *engine, const QString& name, int player, int type, int index)
 {
 	QScriptValue v = engine->newFunction(js_stats);
 	base.setProperty(name, v, QScriptValue::PropertyGetter | QScriptValue::PropertySetter);
@@ -4617,7 +4981,19 @@ static void setStatsFunc(QScriptValue &base, QScriptEngine *engine, QString name
 	v.setProperty("name", name, QScriptValue::SkipInEnumeration | QScriptValue::ReadOnly | QScriptValue::Undeletable);
 }
 
-bool registerFunctions(QScriptEngine *engine, QString scriptName)
+QScriptValue register_common(QScriptEngine *engine, COMPONENT_STATS *psStats)
+{
+	QScriptValue v = engine->newObject();
+	v.setProperty("Id", psStats->id, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+	v.setProperty("Weight", psStats->weight, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+	v.setProperty("BuildPower", psStats->buildPower, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+	v.setProperty("BuildTime", psStats->buildPoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+	v.setProperty("HitPoints", psStats->pBase->hitpoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+	v.setProperty("HitPointPct", psStats->pBase->hitpointPct, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+	return v;
+}
+
+bool registerFunctions(QScriptEngine *engine, const QString& scriptName)
 {
 	debug(LOG_WZ, "Loading functions for engine %p, script %s", engine, scriptName.toUtf8().constData());
 
@@ -4638,12 +5014,7 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 		for (int j = 0; j < numBodyStats; j++)
 		{
 			BODY_STATS *psStats = asBodyStats + j;
-			QScriptValue body = engine->newObject();
-			body.setProperty("Id", psStats->id, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			body.setProperty("Weight", psStats->weight, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			body.setProperty("BuildPower", psStats->buildPower, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			body.setProperty("BuildTime", psStats->buildPoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			body.setProperty("HitPoints", psStats->body, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			QScriptValue body = register_common(engine, psStats);
 			body.setProperty("Power", psStats->base.power, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 			body.setProperty("Armour", psStats->base.armour, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 			body.setProperty("Thermal", psStats->base.thermal, QScriptValue::ReadOnly | QScriptValue::Undeletable);
@@ -4654,76 +5025,99 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			bodybase.setProperty(psStats->name, body, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		stats.setProperty("Body", bodybase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Sensor] Sensor turrets
 		QScriptValue sensorbase = engine->newObject();
 		for (int j = 0; j < numSensorStats; j++)
 		{
 			SENSOR_STATS *psStats = asSensorStats + j;
-			QScriptValue sensor = engine->newObject();
-			sensor.setProperty("Id", psStats->id, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			sensor.setProperty("Weight", psStats->weight, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			sensor.setProperty("BuildPower", psStats->buildPower, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			sensor.setProperty("BuildTime", psStats->buildPoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			sensor.setProperty("HitPoints", psStats->body, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			QScriptValue sensor = register_common(engine, psStats);
 			sensor.setProperty("Range", psStats->base.range, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 			sensorbase.setProperty(psStats->name, sensor, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		stats.setProperty("Sensor", sensorbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[ECM] ECM (Electronic Counter-Measure) turrets
 		QScriptValue ecmbase = engine->newObject();
 		for (int j = 0; j < numECMStats; j++)
 		{
 			ECM_STATS *psStats = asECMStats + j;
-			QScriptValue ecm = engine->newObject();
-			ecm.setProperty("Id", psStats->id, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			ecm.setProperty("Weight", psStats->weight, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			ecm.setProperty("BuildPower", psStats->buildPower, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			ecm.setProperty("BuildTime", psStats->buildPoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			ecm.setProperty("HitPoints", psStats->body, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			QScriptValue ecm = register_common(engine, psStats);
 			ecm.setProperty("Range", psStats->base.range, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 			ecmbase.setProperty(psStats->name, ecm, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		stats.setProperty("ECM", ecmbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
+		//== \item[Propulsion] Propulsions
+		QScriptValue propbase = engine->newObject();
+		for (int j = 0; j < numPropulsionStats; j++)
+		{
+			PROPULSION_STATS *psStats = asPropulsionStats + j;
+			QScriptValue v = register_common(engine, psStats);
+			v.setProperty("HitpointPctOfBody", psStats->maxSpeed, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			v.setProperty("MaxSpeed", psStats->maxSpeed, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			v.setProperty("TurnSpeed", psStats->turnSpeed, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			v.setProperty("SpinSpeed", psStats->spinSpeed, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			v.setProperty("SpinAngle", psStats->spinAngle, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			v.setProperty("SkidDeceleration", psStats->skidDeceleration, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			v.setProperty("Acceleration", psStats->acceleration, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			v.setProperty("Deceleration", psStats->deceleration, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			propbase.setProperty(psStats->name, v, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+		}
+		stats.setProperty("Propulsion", propbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Repair] Repair turrets (not used, incidentially, for repair centers)
 		QScriptValue repairbase = engine->newObject();
 		for (int j = 0; j < numRepairStats; j++)
 		{
 			REPAIR_STATS *psStats = asRepairStats + j;
-			QScriptValue repair = engine->newObject();
-			repair.setProperty("Id", psStats->id, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			repair.setProperty("Weight", psStats->weight, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			repair.setProperty("BuildPower", psStats->buildPower, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			repair.setProperty("BuildTime", psStats->buildPoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			repair.setProperty("HitPoints", psStats->body, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			QScriptValue repair = register_common(engine, psStats);
 			repair.setProperty("RepairPoints", psStats->base.repairPoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 			repairbase.setProperty(psStats->name, repair, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		stats.setProperty("Repair", repairbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Construct] Constructor turrets (eg for trucks)
 		QScriptValue conbase = engine->newObject();
 		for (int j = 0; j < numConstructStats; j++)
 		{
 			CONSTRUCT_STATS *psStats = asConstructStats + j;
-			QScriptValue con = engine->newObject();
-			con.setProperty("Id", psStats->id, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			con.setProperty("Weight", psStats->weight, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			con.setProperty("BuildPower", psStats->buildPower, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			con.setProperty("BuildTime", psStats->buildPoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			con.setProperty("HitPoints", psStats->body, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			QScriptValue con = register_common(engine, psStats);
 			con.setProperty("ConstructorPoints", psStats->base.constructPoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 			conbase.setProperty(psStats->name, con, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		stats.setProperty("Construct", conbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
+		//== \item[Brain] Brains
+		QScriptValue brainbase = engine->newObject();
+		for (int j = 0; j < numBrainStats; j++)
+		{
+			BRAIN_STATS *psStats = asBrainStats + j;
+			QScriptValue br = register_common(engine, psStats);
+			br.setProperty("BaseCommandLimit", psStats->base.maxDroids, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			br.setProperty("CommandLimitByLevel", psStats->base.maxDroidsMult, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			QScriptValue thresholds = engine->newArray(psStats->base.rankThresholds.size());
+			for (int x = 0; x < psStats->base.rankThresholds.size(); x++)
+			{
+				thresholds.setProperty(x, psStats->base.rankThresholds.at(x), QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			}
+			br.setProperty("RankThresholds", thresholds, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			QScriptValue ranks = engine->newArray(psStats->rankNames.size());
+			for (int x = 0; x < psStats->rankNames.size(); x++)
+			{
+				ranks.setProperty(x, QString::fromStdString(psStats->rankNames.at(x)), QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			}
+			br.setProperty("RankNames", ranks, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			brainbase.setProperty(psStats->name, br, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+		}
+		stats.setProperty("Brain", brainbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Weapon] Weapon turrets
 		QScriptValue wbase = engine->newObject();
 		for (int j = 0; j < numWeaponStats; j++)
 		{
 			WEAPON_STATS *psStats = asWeaponStats + j;
-			QScriptValue weap = engine->newObject();
-			weap.setProperty("Id", psStats->id, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			weap.setProperty("Weight", psStats->weight, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			weap.setProperty("BuildPower", psStats->buildPower, QScriptValue::ReadOnly | QScriptValue::Undeletable);
-			weap.setProperty("BuildTime", psStats->buildPoints, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+			QScriptValue weap = register_common(engine, psStats);
 			weap.setProperty("MaxRange", psStats->base.maxRange, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 			weap.setProperty("MinRange", psStats->base.minRange, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 			weap.setProperty("HitChance", psStats->base.hitChance, QScriptValue::ReadOnly | QScriptValue::Undeletable);
@@ -4749,6 +5143,7 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			wbase.setProperty(psStats->name, weap, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		stats.setProperty("Weapon", wbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[WeaponClass] Defined weapon classes
 		QScriptValue weaptypes = engine->newArray(WSC_NUM_WEAPON_SUBCLASSES);
 		for (int j = 0; j < WSC_NUM_WEAPON_SUBCLASSES; j++)
@@ -4756,6 +5151,7 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			weaptypes.setProperty(j, getWeaponSubClass((WEAPON_SUBCLASS)j), QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		stats.setProperty("WeaponClass", weaptypes, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Building] Buildings
 		QScriptValue structbase = engine->newObject();
 		for (int j = 0; j < numStructureStats; j++)
@@ -4801,6 +5197,7 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 	for (int i = 0; i < MAX_PLAYERS; i++)
 	{
 		QScriptValue node = engine->newObject();
+
 		//== \item[Body] Droid bodies
 		QScriptValue bodybase = engine->newObject();
 		for (int j = 0; j < numBodyStats; j++)
@@ -4808,6 +5205,7 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			BODY_STATS *psStats = asBodyStats + j;
 			QScriptValue body = engine->newObject();
 			setStatsFunc(body, engine, "HitPoints", i, COMP_BODY, j);
+			setStatsFunc(body, engine, "HitPointPct", i, COMP_BODY, j);
 			setStatsFunc(body, engine, "Power", i, COMP_BODY, j);
 			setStatsFunc(body, engine, "Armour", i, COMP_BODY, j);
 			setStatsFunc(body, engine, "Thermal", i, COMP_BODY, j);
@@ -4815,16 +5213,33 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			bodybase.setProperty(psStats->name, body, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		node.setProperty("Body", bodybase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Sensor] Sensor turrets
 		QScriptValue sensorbase = engine->newObject();
 		for (int j = 0; j < numSensorStats; j++)
 		{
 			SENSOR_STATS *psStats = asSensorStats + j;
 			QScriptValue sensor = engine->newObject();
+			setStatsFunc(sensor, engine, "HitPoints", i, COMP_SENSOR, j);
+			setStatsFunc(sensor, engine, "HitPointPct", i, COMP_SENSOR, j);
 			setStatsFunc(sensor, engine, "Range", i, COMP_SENSOR, j);
 			sensorbase.setProperty(psStats->name, sensor, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		node.setProperty("Sensor", sensorbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
+		//== \item[Propulsion] Propulsions
+		QScriptValue propbase = engine->newObject();
+		for (int j = 0; j < numPropulsionStats; j++)
+		{
+			PROPULSION_STATS *psStats = asPropulsionStats + j;
+			QScriptValue v = engine->newObject();
+			setStatsFunc(v, engine, "HitPoints", i, COMP_PROPULSION, j);
+			setStatsFunc(v, engine, "HitPointPct", i, COMP_PROPULSION, j);
+			setStatsFunc(v, engine, "HitPointPctOfBody", i, COMP_PROPULSION, j);
+			propbase.setProperty(psStats->name, v, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+		}
+		node.setProperty("Propulsion", propbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[ECM] ECM (Electronic Counter-Measure) turrets
 		QScriptValue ecmbase = engine->newObject();
 		for (int j = 0; j < numECMStats; j++)
@@ -4832,9 +5247,12 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			ECM_STATS *psStats = asECMStats + j;
 			QScriptValue ecm = engine->newObject();
 			setStatsFunc(ecm, engine, "Range", i, COMP_ECM, j);
+			setStatsFunc(ecm, engine, "HitPoints", i, COMP_ECM, j);
+			setStatsFunc(ecm, engine, "HitPointPct", i, COMP_ECM, j);
 			ecmbase.setProperty(psStats->name, ecm, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		node.setProperty("ECM", ecmbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Repair] Repair turrets (not used, incidentially, for repair centers)
 		QScriptValue repairbase = engine->newObject();
 		for (int j = 0; j < numRepairStats; j++)
@@ -4842,9 +5260,12 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			REPAIR_STATS *psStats = asRepairStats + j;
 			QScriptValue repair = engine->newObject();
 			setStatsFunc(repair, engine, "RepairPoints", i, COMP_REPAIRUNIT, j);
+			setStatsFunc(repair, engine, "HitPoints", i, COMP_REPAIRUNIT, j);
+			setStatsFunc(repair, engine, "HitPointPct", i, COMP_REPAIRUNIT, j);
 			repairbase.setProperty(psStats->name, repair, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		node.setProperty("Repair", repairbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Construct] Constructor turrets (eg for trucks)
 		QScriptValue conbase = engine->newObject();
 		for (int j = 0; j < numConstructStats; j++)
@@ -4852,9 +5273,31 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			CONSTRUCT_STATS *psStats = asConstructStats + j;
 			QScriptValue con = engine->newObject();
 			setStatsFunc(con, engine, "ConstructorPoints", i, COMP_CONSTRUCT, j);
+			setStatsFunc(con, engine, "HitPoints", i, COMP_CONSTRUCT, j);
+			setStatsFunc(con, engine, "HitPointPct", i, COMP_CONSTRUCT, j);
 			conbase.setProperty(psStats->name, con, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		node.setProperty("Construct", conbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
+		//== \item[Brain] Brains
+		//== BaseCommandLimit: How many droids a commander can command. CommandLimitByLevel: How many extra droids
+		//== a commander can command for each of its rank levels. RankThresholds: An array describing how many
+		//== kills are required for this brain to level up to the next rank. To alter this from scripts, you must
+		//== set the entire array at once. Setting each item in the array will not work at the moment.
+		QScriptValue brainbase = engine->newObject();
+		for (int j = 0; j < numBrainStats; j++)
+		{
+			BRAIN_STATS *psStats = asBrainStats + j;
+			QScriptValue br = engine->newObject();
+			setStatsFunc(br, engine, "BaseCommandLimit", i, COMP_BRAIN, j);
+			setStatsFunc(br, engine, "CommandLimitByLevel", i, COMP_BRAIN, j);
+			setStatsFunc(br, engine, "RankThresholds", i, COMP_BRAIN, j);
+			setStatsFunc(br, engine, "HitPoints", i, COMP_BRAIN, j);
+			setStatsFunc(br, engine, "HitPointPct", i, COMP_BRAIN, j);
+			brainbase.setProperty(psStats->name, br, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+		}
+		node.setProperty("Brain", brainbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Weapon] Weapon turrets
 		QScriptValue wbase = engine->newObject();
 		for (int j = 0; j < numWeaponStats; j++)
@@ -4874,9 +5317,12 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			setStatsFunc(weap, engine, "RepeatDamage", i, COMP_WEAPON, j);
 			setStatsFunc(weap, engine, "RepeatTime", i, COMP_WEAPON, j);
 			setStatsFunc(weap, engine, "RepeatRadius", i, COMP_WEAPON, j);
+			setStatsFunc(weap, engine, "HitPoints", i, COMP_WEAPON, j);
+			setStatsFunc(weap, engine, "HitPointPct", i, COMP_WEAPON, j);
 			wbase.setProperty(psStats->name, weap, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		node.setProperty("Weapon", wbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		//== \item[Building] Buildings
 		QScriptValue structbase = engine->newObject();
 		for (int j = 0; j < numStructureStats; j++)
@@ -4898,6 +5344,7 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 			structbase.setProperty(psStats->name, strct, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 		}
 		node.setProperty("Building", structbase, QScriptValue::ReadOnly | QScriptValue::Undeletable);
+
 		// Finally
 		upgrades.setProperty(i, node, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 	}
@@ -4932,6 +5379,9 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 	engine->globalObject().setProperty("removeSpotter", engine->newFunction(js_removeSpotter));
 	engine->globalObject().setProperty("syncRequest", engine->newFunction(js_syncRequest));
 	engine->globalObject().setProperty("replaceTexture", engine->newFunction(js_replaceTexture));
+	engine->globalObject().setProperty("changePlayerColour", engine->newFunction(js_changePlayerColour));
+	engine->globalObject().setProperty("setHealth", engine->newFunction(js_setHealth));
+	engine->globalObject().setProperty("useSafetyTransport", engine->newFunction(js_useSafetyTransport));
 
 	// horrible hacks follow -- do not rely on these being present!
 	engine->globalObject().setProperty("hackNetOff", engine->newFunction(js_hackNetOff));
@@ -4944,6 +5394,7 @@ bool registerFunctions(QScriptEngine *engine, QString scriptName)
 	engine->globalObject().setProperty("hackAssert", engine->newFunction(js_hackAssert));
 	engine->globalObject().setProperty("hackMarkTiles", engine->newFunction(js_hackMarkTiles));
 	engine->globalObject().setProperty("receiveAllEvents", engine->newFunction(js_receiveAllEvents));
+	engine->globalObject().setProperty("hackDoNotSave", engine->newFunction(js_hackDoNotSave));
 
 	// General functions -- geared for use in AI scripts
 	engine->globalObject().setProperty("debug", engine->newFunction(js_debug));

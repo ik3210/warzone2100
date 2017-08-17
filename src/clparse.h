@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -29,5 +29,7 @@ bool ParseCommandLine(int argc, const char **argv);
 bool ParseCommandLineEarly(int argc, const char **argv);
 
 bool autogame_enabled();
+const std::string &saveandquit_enabled();
+const std::string &wz_skirmish_test();
 
 #endif // __INCLUDED_SRC_CLPARSE_H__

@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -72,7 +72,7 @@ void QtGameWidget::freeMouse()
 #ifdef WZ_WS_X11
 	XUngrabPointer(QX11Info::display(), CurrentTime);
 #elif defined(WZ_WS_WIN32)
-	ClipCursor(NULL);
+	ClipCursor(nullptr);
 #endif
 	mCursorTrapped = false;
 }
@@ -201,7 +201,7 @@ void QtGameWidget::updateResolutionList()
 	lpDevMode.dmDriverExtra = 0;	// increase to receive private driver data
 	if (mOriginalResolution == QSize(0, 0))
 	{
-		if (!EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &lpDevMode))
+		if (!EnumDisplaySettings(nullptr, ENUM_CURRENT_SETTINGS, &lpDevMode))
 		{
 			qWarning("Failed to enumerate display settings!");
 			return;
@@ -210,7 +210,7 @@ void QtGameWidget::updateResolutionList()
 		mOriginalRefreshRate = mCurrentRefreshRate = lpDevMode.dmDisplayFrequency;
 		mOriginalDepth = mCurrentDepth = lpDevMode.dmBitsPerPel;
 	}
-	for (int i = 0; EnumDisplaySettings(NULL, i, &lpDevMode); i++)
+	for (int i = 0; EnumDisplaySettings(nullptr, i, &lpDevMode); i++)
 	{
 		QSize res(lpDevMode.dmPelsWidth, lpDevMode.dmPelsHeight);
 		// not changing depth or refresh rate
@@ -233,7 +233,6 @@ void QtGameWidget::updateResolutionList()
 QGLFormat QtGameWidget::adjustFormat(const QGLFormat &format)
 {
 	QGLFormat adjusted(format);
-	mSwapInterval = adjusted.swapInterval();
 	adjusted.setSwapInterval(0);
 	return adjusted;
 }
@@ -244,7 +243,7 @@ void QtGameWidget::initializeGL()
 }
 
 QtGameWidget::QtGameWidget(QSize curResolution, const QGLFormat &format, QWidget *parent, Qt::WindowFlags f, const QGLWidget *shareWidget)
-	: QGLWidget(adjustFormat(format), parent, shareWidget, f), mOriginalResolution(0, 0), mMinimumSize(0, 0)
+	: QGLWidget(adjustFormat(format), parent, shareWidget, f), mOriginalResolution(0, 0), mMinimumSize(0, 0), mSwapInterval(format.swapInterval())
 {
 	QGLWidget::setFixedSize(curResolution);  // Don't know whether this needs to be done here, but if not, the window contents are displaced 2% of the time.
 	mWantedSize = curResolution;

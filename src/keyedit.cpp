@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -71,7 +71,6 @@
 // variables
 
 static KEY_MAPPING	*selectedKeyMap;
-static char keymapVersion[8] = "KM_0002";
 
 // ////////////////////////////////////////////////////////////////////////////
 // funcs
@@ -81,7 +80,7 @@ static bool pushedKeyMap(UDWORD key)
 	selectedKeyMap = (KEY_MAPPING *)widgGetFromID(psWScreen, key)->pUserData;
 	if (selectedKeyMap && selectedKeyMap->status != KEYMAP_ASSIGNABLE)
 	{
-		selectedKeyMap = NULL;
+		selectedKeyMap = nullptr;
 		audio_PlayTrack(ID_SOUND_BUILD_FAIL);
 
 	}
@@ -128,7 +127,7 @@ static bool pushedKeyCombo(KEY_CODE subkey)
 	pExist = keyFindMapping(metakey,  subkey);
 	if (pExist && (pExist->status == KEYMAP_ALWAYS || pExist->status == KEYMAP_ALWAYS_PROCESS))
 	{
-		selectedKeyMap = NULL;	// unhighlght selected.
+		selectedKeyMap = nullptr;	// unhighlght selected.
 		return false;
 	}
 
@@ -136,10 +135,10 @@ static bool pushedKeyCombo(KEY_CODE subkey)
 	keyReAssignMapping(metakey, subkey, KEY_IGNORE, (KEY_CODE)KEY_MAXSCAN);
 
 	/* Try and see if its there already - damn well should be! */
-	psMapping = keyGetMappingFromFunction((void *)selectedKeyMap->function);
+	psMapping = keyGetMappingFromFunction(selectedKeyMap->function);
 
 	/* Cough if it's not there */
-	ASSERT_OR_RETURN(false, psMapping != NULL, "Trying to patch a non-existant function mapping - whoop whoop!!!");
+	ASSERT_OR_RETURN(false, psMapping != nullptr, "Trying to patch a non-existant function mapping - whoop whoop!!!");
 
 	/* Now alter it to the new values */
 	psMapping->metaKeyCode = metakey;
@@ -150,12 +149,12 @@ static bool pushedKeyCombo(KEY_CODE subkey)
 	{
 		psMapping->altMetaKeyCode = alt;
 	}
-	selectedKeyMap = NULL;	// unhighlght selected .
+	selectedKeyMap = nullptr;	// unhighlght selected .
 	return true;
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-static KEY_CODE scanKeyBoardForBinding(void)
+static KEY_CODE scanKeyBoardForBinding()
 {
 	UDWORD i;
 	for (i = 0; i < KEY_MAXSCAN; i++)
@@ -180,7 +179,7 @@ static KEY_CODE scanKeyBoardForBinding(void)
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-bool runKeyMapEditor(void)
+bool runKeyMapEditor()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
@@ -255,7 +254,7 @@ static void displayKeyMap(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	int w = psWidget->width();
 	int h = psWidget->height();
 	KEY_MAPPING *psMapping = (KEY_MAPPING *)psWidget->pUserData;
-	char		sKey[MAX_STR_LENGTH];
+	char sKey[MAX_STR_LENGTH];
 
 	if (psMapping == selectedKeyMap)
 	{
@@ -272,10 +271,8 @@ static void displayKeyMap(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	}
 
 	// draw name
-	iV_SetFont(font_regular);											// font type
 	iV_SetTextColour(WZCOL_FORM_TEXT);
-
-	iV_DrawText(_(psMapping->pName), x + 2, y + (psWidget->height() / 2) + 3);
+	iV_DrawText(_(psMapping->name.c_str()), x + 2, y + (psWidget->height() / 2) + 3, font_regular);
 
 	// draw binding
 	keyMapToString(sKey, psMapping);
@@ -285,12 +282,7 @@ static void displayKeyMap(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		iV_SetTextColour(WZCOL_YELLOW);
 		sstrcat(sKey, " (numpad)");
 	}
-	iV_DrawText(sKey, x + 364, y + (psWidget->height() / 2) + 3);
-}
-
-static bool keyMappingSort(KEY_MAPPING const *a, KEY_MAPPING const *b)
-{
-	return strcmp(a->pName, b->pName) < 0;
+	iV_DrawText(sKey, x + 364, y + (psWidget->height() / 2) + 3, font_regular);
 }
 
 // ////////////////////////////////////////////////////////////////////////////
@@ -330,14 +322,16 @@ bool startKeyMapEditor(bool first)
 
 	//Put the buttons on it
 	std::vector<KEY_MAPPING *> mappings;
-	for (KEY_MAPPING *m = keyMappings; m != nullptr; m = m->psNext)
+	for (KEY_MAPPING &m : keyMappings)
 	{
-		if (m->status != KEYMAP__DEBUG && m->status != KEYMAP___HIDE)  // if it's not a debug mapping..
+		if (m.status != KEYMAP__DEBUG && m.status != KEYMAP___HIDE)  // if it's not a debug mapping..
 		{
-			mappings.push_back(m);
+			mappings.push_back(&m);
 		}
 	}
-	std::sort(mappings.begin(), mappings.end(), keyMappingSort);
+	std::sort(mappings.begin(), mappings.end(), [](KEY_MAPPING *a, KEY_MAPPING *b) {
+		return a->name < b->name;
+	});
 	/* Add our first mapping to the form */
 	/* Now add the others... */
 	for (std::vector<KEY_MAPPING *>::const_iterator i = mappings.begin(); i != mappings.end(); ++i)
@@ -358,154 +352,71 @@ bool startKeyMapEditor(bool first)
 
 // ////////////////////////////////////////////////////////////////////////////
 // save current keymaps to registry
-// FIXME: Use the endian-safe physfs functions.
-bool saveKeyMap(void)
+bool saveKeyMap()
 {
-	KEY_MAPPING	*psMapping;
-	SDWORD		count;
-	char		name[128];
-	PHYSFS_file *pfile;
-
-	// KeyMapPath
-	debug(LOG_WZ, "We are to write %s for keymap info", KeyMapPath);
-	pfile = PHYSFS_openWrite(KeyMapPath);
-	if (!pfile)
+	WzConfig ini(KeyMapPath, WzConfig::ReadAndWrite);
+	if (!ini.status() || !ini.isWritable())
 	{
 		// NOTE: Changed to LOG_FATAL, since we want to inform user via pop-up (windows only)
-		debug(LOG_FATAL, "saveKeyMap: %s could not be created: %s", KeyMapPath, PHYSFS_getLastError());
-		assert(false);
+		debug(LOG_FATAL, "Could not open %s", ini.fileName().toUtf8().constData());
 		return false;
 	}
 
-#define WRITE(var, size)                                               \
-	if (PHYSFS_write(pfile, var, 1, size) != size) {                     \
-		debug(LOG_FATAL, "saveKeyMap: could not write to %s %d bytes: %s", \
-		      KeyMapPath, (int)size, PHYSFS_getLastError());                    \
-		assert(false);                                                     \
-		return false;                                                      \
-	}
+	ini.setValue("version", 1);
 
-	// write out number of entries.
-	count = 0;
-	for (psMapping = keyMappings; psMapping; psMapping = psMapping->psNext)
+	ini.beginArray("mappings");
+	for (auto const &mapping : keyMappings)
 	{
-		count++;
-	}
-	WRITE(&count, sizeof(count));
-	WRITE(&keymapVersion, 8);
-
-	for (psMapping = keyMappings; psMapping; psMapping = psMapping->psNext)
-	{
-		// save this map.
-		// name
-		sstrcpy(name, psMapping->pName);
-		WRITE(&name, 128);
-
-		WRITE(&psMapping->status, sizeof(KEY_STATUS));	// status
-		WRITE(&psMapping->metaKeyCode, sizeof(KEY_CODE));	// metakey
-		WRITE(&psMapping->subKeyCode, sizeof(KEY_CODE)); // subkey
-		WRITE(&psMapping->action, sizeof(KEY_ACTION)); // action
-
-		// function to map to!
-		for (count = 0;  keyMapSaveTable[count] != NULL && keyMapSaveTable[count] != psMapping->function; count++) {}
-		if (keyMapSaveTable[count] == NULL)
+		ini.setValue("name", mapping.name.c_str());
+		ini.setValue("status", mapping.status);
+		ini.setValue("meta", mapping.metaKeyCode);
+		ini.setValue("sub", mapping.subKeyCode);
+		ini.setValue("action", mapping.action);
+		if (auto function = keymapEntryByFunction(mapping.function))
 		{
-			debug(LOG_FATAL, "can't find keymapped function %s in the keymap save table at %d!", name, count);
-			abort();
+			ini.setValue("function", function->name);
 		}
-		WRITE(&count, sizeof(count));
+
+		ini.nextArrayItem();
 	}
-	if (!PHYSFS_close(pfile))
-	{
-		debug(LOG_FATAL, "Error closing %s: %s", KeyMapPath, PHYSFS_getLastError());
-		assert(false);
-		return false;
-	}
+	ini.endArray();
+
 	debug(LOG_WZ, "Keymap written ok to %s.", KeyMapPath);
 	return true;	// saved ok.
-#undef WRITE
 }
 
 // ////////////////////////////////////////////////////////////////////////////
 // load keymaps from registry.
-bool loadKeyMap(void)
+bool loadKeyMap()
 {
-	KEY_STATUS	status;
-	KEY_CODE	metaCode;
-	KEY_CODE	subCode;
-	KEY_ACTION	action;
-	char		name[128];
-	SDWORD		count;
-	UDWORD		funcmap;
-	char		ver[8];
-	PHYSFS_file *pfile;
-	PHYSFS_sint64 filesize;
-	PHYSFS_sint64 countsize = 0;
-	PHYSFS_sint64 length_read;
-
 	// throw away any keymaps!!
-	keyClearMappings();
+	keyMappings.clear();
 
-	if (!PHYSFS_exists(KeyMapPath))
+	WzConfig ini(KeyMapPath, WzConfig::ReadOnly);
+	if (!ini.status())
 	{
 		debug(LOG_WZ, "%s not found", KeyMapPath);
 		return false;
 	}
-	pfile = PHYSFS_openRead(KeyMapPath);
-	if (!pfile)
+
+	for (ini.beginArray("mappings"); ini.remainingArrayItems(); ini.nextArrayItem())
 	{
-		// NOTE: Changed to LOG_FATAL, since we want to inform user via pop-up (windows only)
-		debug(LOG_FATAL, "loadKeyMap: [directory: %s] %s could not be opened: %s", PHYSFS_getRealDir(KeyMapPath),
-		      KeyMapPath, PHYSFS_getLastError());
-		assert(false);
-		return false;
-	}
-	filesize = PHYSFS_fileLength(pfile);
-
-#define READ(var, size)                                       \
-	length_read = PHYSFS_read(pfile, var, 1, size);             \
-	countsize += length_read;                                   \
-	if (length_read != size) {                                  \
-		debug(LOG_FATAL, "loadKeyMap: Reading %s short: %s",      \
-		      KeyMapPath, PHYSFS_getLastError());                 \
-		assert(false);                                            \
-		(void) PHYSFS_close(pfile);                               \
-		return false;                                             \
-	}
-
-	READ(&count, sizeof(count));
-	READ(&ver, 8);	// get version number.
-
-	if (strncmp(ver, keymapVersion, 8) != 0)
-	{
-		/* If wrong version, create a new one instead. */
-		PHYSFS_close(pfile);
-		return false;
-	}
-
-	for (; count > 0; count--)
-	{
-		READ(&name, 128);	// name
-		READ(&status, sizeof(KEY_STATUS));	// status
-		READ(&metaCode, sizeof(KEY_CODE));	// metakey
-		READ(&subCode, sizeof(KEY_CODE));	// subkey
-		READ(&action, sizeof(KEY_ACTION));	// action
-		READ(&funcmap, sizeof(funcmap));	// function
+		auto name = ini.value("name", "").toString();
+		auto status = (KEY_STATUS)ini.value("status", 0).toInt();
+		auto meta = (KEY_CODE)ini.value("meta", 0).toInt();
+		auto sub = (KEY_CODE)ini.value("sub", 0).toInt();
+		auto action = (KEY_ACTION)ini.value("action", 0).toInt();
+		auto functionName = ini.value("function", "").toString().toUtf8();
+		auto function = keymapEntryByName(functionName.constData());
+		if (function == nullptr)
+		{
+			debug(LOG_WARNING, "Skipping unknown keymap function \"%s\".", functionName.constData());
+			continue;
+		}
 
 		// add mapping
-		keyAddMapping(status, metaCode, subCode, action, keyMapSaveTable[funcmap], (char *)&name);
+		keyAddMapping(status, meta, sub, action, function->function, name.toUtf8().constData());
 	}
-
-	if (!PHYSFS_close(pfile))
-	{
-		debug(LOG_ERROR, "Error closing %s: %s", KeyMapPath, PHYSFS_getLastError());
-		assert(false);
-		return false;
-	}
-	if (countsize != filesize)
-	{
-		debug(LOG_FATAL, "File size different from bytes read!");
-		assert(false);
-	}
+	ini.endArray();
 	return true;
 }

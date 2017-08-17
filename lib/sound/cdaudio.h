@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,10 +28,10 @@ enum SONG_CONTEXT
 };
 
 bool cdAudio_Open(const char *user_musicdir);
-void cdAudio_Close(void);
+void cdAudio_Close();
 bool cdAudio_PlayTrack(SONG_CONTEXT context);
-void cdAudio_Stop(void);
-void cdAudio_Pause(void);
-void cdAudio_Resume(void);
+void cdAudio_Stop();
+void cdAudio_Pause();
+void cdAudio_Resume();
 
 #endif // __INCLUDED_LIB_SOUND_CDAUDIO_H__

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -124,10 +124,10 @@ extern ACTIVE_TRIGGER	*psCallbackList;
 extern SCRIPT_CONTEXT	*psContList;
 
 /* Initialise the event system */
-extern bool eventInitialise(void);
+extern bool eventInitialise();
 
 // Shutdown the event system
-extern void eventShutDown(void);
+extern void eventShutDown();
 
 // add a TR_PAUSE trigger to the event system.
 extern bool eventAddPauseTrigger(SCRIPT_CONTEXT *psContext, UDWORD event, UDWORD offset,

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -50,7 +50,6 @@ enum SELECTIONTYPE
 	DST_ALL_SAME
 };
 
-// EXTERNALLY REFERENCED FUNCTIONS
 unsigned int selDroidSelection(unsigned int player, SELECTION_CLASS droidClass, SELECTIONTYPE droidType, bool bOnScreen);
 unsigned int selDroidDeselect(unsigned int player);
 unsigned int selNumSelected(unsigned int player);

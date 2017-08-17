@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ Alex McLean, Pumpkin Studios, EIDOS Interactive, 1997
 */
 
 #include "lib/framework/frame.h"
+#include "lib/framework/math_ext.h"
 #include "map.h"
 #include "edit3d.h"
 #include "display3d.h"
@@ -46,7 +47,7 @@ bool quickQueueMode = false;
 
 // Initialisation function for statis & globals in this module.
 //
-void Edit3DInitVars(void)
+void Edit3DInitVars()
 {
 	buildState = BUILD3D_NONE;
 	brushSize = 1;
@@ -150,7 +151,7 @@ void init3DBuilding(BASE_STATS *psStats, BUILDCALLBACK CallBack, void *UserData)
 	}
 }
 
-void	kill3DBuilding(void)
+void	kill3DBuilding()
 {
 	//cancel the drag boxes
 	dragBox3D.status = DRAG_INACTIVE;
@@ -161,7 +162,7 @@ void	kill3DBuilding(void)
 
 // Call once per frame to handle structure positioning and callbacks.
 //
-bool process3DBuilding(void)
+bool process3DBuilding()
 {
 	//if not trying to build ignore
 	if (buildState == BUILD3D_NONE)
@@ -207,7 +208,7 @@ bool process3DBuilding(void)
 		buildSite.yBR = buildSite.yTL + sBuildDetails.width - 1;
 	}
 
-	if ((buildState == BUILD3D_FINISHED) && (sBuildDetails.CallBack != NULL))
+	if ((buildState == BUILD3D_FINISHED) && (sBuildDetails.CallBack != nullptr))
 	{
 		sBuildDetails.CallBack(sBuildDetails.x, sBuildDetails.y, sBuildDetails.UserData);
 		buildState = BUILD3D_NONE;
@@ -226,7 +227,7 @@ bool process3DBuilding(void)
 /* See if a structure location has been found */
 bool found3DBuilding(UDWORD *x, UDWORD *y)
 {
-	if (buildState != BUILD3D_FINISHED || x == NULL || y == NULL)
+	if (buildState != BUILD3D_FINISHED || x == nullptr || y == nullptr)
 	{
 		return false;
 	}
@@ -281,7 +282,7 @@ bool found3DBuildLocTwo(UDWORD *px1, UDWORD *py1, UDWORD *px2, UDWORD *py2)
 }
 
 /*returns true if the build state is not equal to BUILD3D_NONE*/
-bool tryingToGetLocation(void)
+bool tryingToGetLocation()
 {
 	if (buildState == BUILD3D_NONE)
 	{

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,28 +24,28 @@
 #ifndef __INCLUDED_SRC_INIT_H__
 #define __INCLUDED_SRC_INIT_H__
 
-#include "lib/ivis_opengl/ivisdef.h"
+struct IMAGEFILE;
 
 // the size of the file loading buffer
 // FIXME Totally inappropriate place for this.
 #define FILE_LOAD_BUFFER_SIZE (1024*1024*4)
 extern char fileLoadBuffer[];
 
-extern bool systemInitialise(void);
-extern void systemShutdown(void);
-extern bool frontendInitialise(const char *ResourceFile);
-extern bool frontendShutdown(void);
-extern bool stageOneInitialise(void);
-extern bool stageOneShutDown(void);
-extern bool stageTwoInitialise(void);
-extern bool stageTwoShutDown(void);
-extern bool stageThreeInitialise(void);
-extern bool stageThreeShutDown(void);
+bool systemInitialise();
+void systemShutdown();
+bool frontendInitialise(const char *ResourceFile);
+bool frontendShutdown();
+bool stageOneInitialise();
+bool stageOneShutDown();
+bool stageTwoInitialise();
+bool stageTwoShutDown();
+bool stageThreeInitialise();
+bool stageThreeShutDown();
 
 // Reset the game between campaigns
-extern bool campaignReset(void);
+bool campaignReset();
 // Reset the game when loading a save game
-extern bool saveGameReset(void);
+bool saveGameReset();
 
 struct wzSearchPath
 {
@@ -59,7 +59,7 @@ enum searchPathMode { mod_clean, mod_campaign, mod_multiplay, mod_override };
 void registerSearchPath(const char path[], unsigned int priority);
 bool rebuildSearchPath(searchPathMode mode, bool force, const char *current_map = NULL);
 
-bool buildMapList(void);
+bool buildMapList();
 bool CheckForMod(char *theMap);
 
 bool loadLevFile(const char *filename, searchPathMode datadir, bool ignoreWrf, char const *realFileName);

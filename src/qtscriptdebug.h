@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,15 +28,16 @@
 #include "featuredef.h"
 
 class QScriptEngine;
-class QStandardItemModel;
 class QModelIndex;
 class QLineEdit;
 
+#include <QtGui/QStandardItemModel>
 #include <QtCore/QHash>
 #include <QtCore/QSignalMapper>
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QTableWidget>
 #include <QtWidgets/QTreeView>
+#include <QtWidgets/QComboBox>
 
 typedef QHash<QScriptEngine *, QStandardItemModel *> MODELMAP;
 typedef QHash<QScriptEngine *, QLineEdit *> EDITMAP;
@@ -48,23 +49,60 @@ class ScriptDebugger : public QDialog
 public:
 	ScriptDebugger(const MODELMAP &models, QStandardItemModel *triggerModel);
 	~ScriptDebugger();
+	void selected(const BASE_OBJECT *psObj);
+	void updateMessages();
+	void update();
 
 private:
 	QTabWidget tab;
 	QStandardItemModel *labelModel;
+	QStandardItemModel selectedModel;
+	QStandardItemModel messageModel;
+	QStandardItemModel viewdataModel;
+	QStandardItemModel mainModel;
+	QStandardItemModel playerModel[MAX_PLAYERS];
+	QTreeView selectedView;
 	QTreeView labelView;
 	QTreeView triggerView;
+	QTreeView messageView;
+	QTreeView viewdataView;
+	QTreeView mainView;
+	QComboBox aiScriptComboBox;
+	QComboBox aiPlayerComboBox;
 	MODELMAP modelMap;
 	EDITMAP editMap;
+	int powerValue = 0;
+
+	QPushButton *createButton(const QString &text, const char *slot, QWidget *parent);
 
 protected slots:
 	void labelClickedIdx(const QModelIndex &idx);
 	void labelClicked();
+	void labelClickedAll();
+	void labelClickedActive();
+	void labelClear();
 	void runClicked(QObject *obj);
 	void updateModels();
+	void powerEditing(const QString &value);
+	void powerEditingFinished();
+	void playerButtonClicked(int value);
+	void droidButtonClicked();
+	void structButtonClicked();
+	void featButtonClicked();
+	void researchButtonClicked();
+	void sensorsButtonClicked();
+	void deityButtonClicked();
+	void gatewayButtonClicked();
+	void weatherButtonClicked();
+	void revealButtonClicked();
+	void shadowButtonClicked();
+	void fogButtonClicked();
+	void attachScriptClicked();
 };
 
 void jsDebugCreate(const MODELMAP &models, QStandardItemModel *triggerModel);
 bool jsDebugShutdown();
+
+// jsDebugSelected() and jsDebugMessageUpdate() defined in qtscript.h since it is used widely
 
 #endif

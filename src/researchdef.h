@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,6 +28,8 @@
 #include <QtCore/QJsonValue>
 #include "lib/framework/frame.h"
 #include "statsdef.h"
+
+struct VIEWDATA;
 
 /* Research struct type definitions */
 enum TECH_CODE
@@ -60,14 +62,14 @@ struct RESEARCH : public BASE_STATS
 	QList<COMPONENT_STATS *> componentResults;	///< List of Components that are possible after this research
 	QList<RES_COMP_REPLACEMENT> componentReplacement;	///< List of Components that are automatically replaced with new onew after research
 	QJsonValue		results;		///< Research upgrades
-	const struct VIEWDATA *pViewData;               // data used to display a message in the Intelligence Screen
+	VIEWDATA                *pViewData;             ///< Data used to display a message in the Intelligence Screen
 	UWORD			iconID;				/* the ID from 'Framer' for which graphic to draw in interface*/
 	BASE_STATS      *psStat;   /* A stat used to define which graphic is drawn instead of the two fields below */
 	iIMDShape		*pIMD;		/* the IMD to draw for this research topic */
 	iIMDShape		*pIMD2;		/* the 2nd IMD for base plates/turrets*/
 	int index;		///< Unique index for this research, set incrementally
 
-	RESEARCH() : pViewData(NULL), iconID(0), psStat(NULL), pIMD(NULL), pIMD2(NULL) {}
+	RESEARCH() : pViewData(nullptr), iconID(0), psStat(nullptr), pIMD(nullptr), pIMD2(nullptr) {}
 };
 
 struct PLAYER_RESEARCH

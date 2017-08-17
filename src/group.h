@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,7 +24,10 @@
 #ifndef __INCLUDED_SRC_GROUP_H__
 #define __INCLUDED_SRC_GROUP_H__
 
-#include "order.h"
+#include "orderdef.h"
+
+struct BASE_OBJECT;
+struct DROID;
 
 enum GROUP_TYPE
 {
@@ -58,10 +61,10 @@ public: // TODO: c++ design to members become private.
 };
 
 // initialise the group system
-bool grpInitialise(void);
+bool grpInitialise();
 
 // shutdown the group system
-void grpShutDown(void);
+void grpShutDown();
 
 /// create a new group, use -1 to generate a new ID. never use id != -1 unless loading from a savegame.
 DROID_GROUP *grpCreate(int id = -1);

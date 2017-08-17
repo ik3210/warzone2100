@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@
 #include "terrain.h"
 #include "multiplay.h"
 #include "display.h"
+#include "ai.h"
 
 /* The different types of terrain as far as the game is concerned */
 enum TYPE_OF_TERRAIN
@@ -254,7 +255,7 @@ WZ_DECL_ALWAYS_INLINE static inline void auxClearBlocking(int x, int y, int stat
  */
 static inline bool TileIsOccupied(const MAPTILE *tile)
 {
-	return tile->psObject != NULL;
+	return tile->psObject != nullptr;
 }
 
 static inline bool TileIsKnownOccupied(MAPTILE const *tile, unsigned player)
@@ -410,13 +411,13 @@ static inline void clip_world_offmap(int *worldX, int *worldY)
 #define map_round(coord) ((coord) & (TILE_UNITS - 1))
 
 /* Shutdown the map module */
-extern bool mapShutdown(void);
+bool mapShutdown();
 
 /* Load the map data */
-extern bool mapLoad(char *filename, bool preview);
+bool mapLoad(char *filename, bool preview);
 
 /* Save the map data */
-extern bool mapSave(char **ppFileData, UDWORD *pFileSize);
+bool mapSave(char **ppFileData, UDWORD *pFileSize);
 
 /** Return a pointer to the tile structure at x,y in map coordinates */
 static inline WZ_DECL_PURE MAPTILE *mapTile(int32_t x, int32_t y)
@@ -529,7 +530,7 @@ bool map_Intersect(int *Cx, int *Cy, int *Vx, int *Vy, int *Sx, int *Sy);
 unsigned map_LineIntersect(Vector3i src, Vector3i dst, unsigned tMax);
 
 /// The max height of the terrain and water at the specified world coordinates
-extern int32_t map_Height(int x, int y);
+int32_t map_Height(int x, int y);
 
 static inline int32_t map_Height(Vector2i const &v)
 {
@@ -543,18 +544,18 @@ bool mapObjIsAboveGround(const SIMPLE_OBJECT *psObj);
    in tile coords */
 void getTileMaxMin(int x, int y, int *pMax, int *pMin);
 
-extern bool readVisibilityData(const char *fileName);
-extern bool	writeVisibilityData(const char *fileName);
+bool readVisibilityData(const char *fileName);
+bool writeVisibilityData(const char *fileName);
 
 //scroll min and max values
-extern SDWORD		scrollMinX, scrollMaxX, scrollMinY, scrollMaxY;
+extern SDWORD scrollMinX, scrollMaxX, scrollMinY, scrollMaxY;
 
-void mapFloodFillContinents(void);
+void mapFloodFillContinents();
 
-extern void mapTest(void);
+void mapTest();
 
 void tileSetFire(int32_t x, int32_t y, uint32_t duration);
-extern bool fireOnLocation(unsigned int x, unsigned int y);
+bool fireOnLocation(unsigned int x, unsigned int y);
 
 /**
  * Transitive sensor check for tile. Has to be here rather than
@@ -565,7 +566,7 @@ WZ_DECL_ALWAYS_INLINE static inline bool hasSensorOnTile(MAPTILE *psTile, unsign
 	return ((player == selectedPlayer && godMode) || (alliancebits[selectedPlayer] & (satuplinkbits | psTile->sensorBits)));
 }
 
-void mapInit(void);
-void mapUpdate(void);
+void mapInit();
+void mapUpdate();
 
 #endif // __INCLUDED_SRC_MAP_H__

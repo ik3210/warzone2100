@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 2008  Giel van Schijndel
-	Copyright (C) 2008-2015  Warzone 2100 Project
+	Copyright (C) 2008-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -29,17 +29,17 @@ typedef HANDLE DumpFileHandle;
 typedef int DumpFileHandle;
 #endif
 
-extern void dbgDumpHeader(DumpFileHandle file);
+void dbgDumpHeader(DumpFileHandle file);
 
 /** Dump last several debug log calls into given file descriptor.
  *  For exception handler.
  *
  *  @param file file descriptor to write to.
  */
-extern void dbgDumpLog(DumpFileHandle file);
+void dbgDumpLog(DumpFileHandle file);
 
-extern void dbgDumpInit(int argc, const char **argv, const char *packageVersion);
+void dbgDumpInit(int argc, const char **argv, const char *packageVersion);
 
-extern void addDumpInfo(const char *inbuffer);
+void addDumpInfo(const char *inbuffer);
 
 #endif // __INCLUDED_LIB_EXCEPTIONHANDLER_DUMPINFO_H__

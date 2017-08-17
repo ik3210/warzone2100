@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -22,12 +22,9 @@
  */
 
 #include "listwidget.h"
-#if defined(WZ_CC_MSVC)
-#include "listwidget_moc.h"		// this is generated on the pre-build event.
-#endif
 #include "button.h"
 #include <QtCore/QSignalMapper>
-
+#include "lib/framework/math_ext.h"
 
 TabSelectionStyle::TabSelectionStyle(Image tab, Image tabDown, Image tabHighlight, Image prev, Image prevDown, Image prevHighlight, Image next, Image nextDown, Image nextHighlight, int gap)
 	: tabSize(tab.width(), tab.height())

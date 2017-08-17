@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -25,9 +25,6 @@
 #include "widget.h"
 #include "widgint.h"
 #include "button.h"
-#if defined(WZ_CC_MSVC)
-#include "button_moc.h"		// this is generated on the pre-build event.
-#endif
 #include "form.h"
 #include "tip.h"
 #include "lib/ivis_opengl/pieblitfunc.h"
@@ -35,7 +32,7 @@
 
 
 W_BUTINIT::W_BUTINIT()
-	: pText(NULL)
+	: pText(nullptr)
 	, FontID(font_regular)
 {}
 
@@ -222,22 +219,20 @@ void W_BUTTON::display(int xOffset, int yOffset)
 	if (haveText)
 	{
 		QByteArray textBytes = pText.toUtf8();
-
-		iV_SetFont(FontID);
-		int fw = iV_GetTextWidth(textBytes.constData());
+		int fw = iV_GetTextWidth(textBytes.constData(), FontID);
 		int fx = x0 + (width() - fw) / 2;
-		int fy = y0 + (height() - iV_GetTextLineSize()) / 2 - iV_GetTextAboveBase();
+		int fy = y0 + (height() - iV_GetTextLineSize(FontID)) / 2 - iV_GetTextAboveBase(FontID);
 		if (isDisabled)
 		{
 			iV_SetTextColour(WZCOL_FORM_LIGHT);
-			iV_DrawText(textBytes.constData(), fx + 1, fy + 1);
+			iV_DrawText(textBytes.constData(), fx + 1, fy + 1, FontID);
 			iV_SetTextColour(WZCOL_FORM_DISABLE);
 		}
 		else
 		{
 			iV_SetTextColour(WZCOL_FORM_TEXT);
 		}
-		iV_DrawText(textBytes.constData(), fx, fy);
+		iV_DrawText(textBytes.constData(), fx, fy, FontID);
 	}
 
 	if (isDisabled && !images.normal.isNull() && images.disabled.isNull())
@@ -263,7 +258,7 @@ void W_BUTTON::setImages(Image image, Image imageDown, Image imageHighlight, Ima
 	setImages(Images(image, imageDown, imageHighlight, imageDisabled));
 }
 
-void StateButton::setState(int state)
+void StateButton::setState(unsigned state)
 {
 	if (currentState == state)
 	{
@@ -283,7 +278,7 @@ void StateButton::setState(int state)
 	}
 }
 
-void StateButton::setTip(int state, QString string)
+void StateButton::setTip(int state, const QString& string)
 {
 	tips[state] = string;
 	if (currentState == state)

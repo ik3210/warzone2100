@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 struct CHEAT_ENTRY
 {
 	const char *pName;
-	void (*function)(void);	// pointer to void* function
+	void (*function)();  // pointer to void* function
 };
 
 bool Cheated = false;
@@ -46,7 +46,10 @@ static CHEAT_ENTRY cheatCodes[] =
 	{"templates", listTemplates}, // print templates
 	{"jsload", jsAutogame}, // load an AI script for selectedPlayer
 	{"jsdebug", jsShowDebug}, // show scripting states
-	{"clone wars", kf_CloneSelected}, // clone selected units
+	{"teach us", kf_TeachSelected}, // give experience to selected units
+	{"clone wars", []{ kf_CloneSelected(10); }}, // clone selected units
+	{"clone wars!", []{ kf_CloneSelected(40); }}, // clone selected units
+	{"clone wars!!", []{ kf_CloneSelected(135); }}, // clone selected units
 	{"noassert", kf_NoAssert}, // turn off asserts
 	{"count me", kf_ShowNumObjects}, // give a count of objects in the world
 	{"give all", kf_AllAvailable},	// give all
@@ -60,7 +63,6 @@ static CHEAT_ENTRY cheatCodes[] =
 	{"timedemo", kf_FrameRate},	 //timedemo
 	{"kill", kf_KillSelected},	//kill slected
 	{"john kettley", kf_ToggleWeather},	//john kettley
-	{"shakey", kf_ToggleShakeStatus},	//shakey
 	{"mouseflip", kf_ToggleMouseInvert},	//mouseflip
 	{"biffer baker", kf_SetKillerLevel},	//indestructive units
 	{"easy", kf_SetEasyLevel},	//easy

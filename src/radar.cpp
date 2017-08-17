@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 
 #include "lib/framework/frame.h"
 #include "lib/framework/fixedpoint.h"
+#include "lib/framework/math_ext.h"
 #include "lib/ivis_opengl/pieblitfunc.h"
 // FIXME Direct iVis implementation include!
 #include "lib/ivis_opengl/piematrix.h"
@@ -46,6 +47,7 @@
 #include "multiplay.h"
 #include "intdisplay.h"
 #include "texture.h"
+#include <glm/gtx/transform.hpp>
 
 #define HIT_NOTIFICATION	(GAME_TICKS_PER_SEC * 2)
 #define RADAR_FRAME_SKIP	10
@@ -56,7 +58,7 @@ bool rotateRadar; ///< Rotate the radar?
 
 static PIELIGHT		colRadarAlly, colRadarMe, colRadarEnemy;
 static PIELIGHT		tileColours[MAX_TILES];
-static UDWORD		*radarBuffer = NULL;
+static UDWORD		*radarBuffer = nullptr;
 static Vector3i		playerpos;
 
 PIELIGHT clanColours[] =
@@ -110,8 +112,8 @@ static int frameSkip = 0;
 
 static void DrawRadarTiles();
 static void DrawRadarObjects();
-static void DrawRadarExtras();
-static void DrawNorth();
+static void DrawRadarExtras(const glm::mat4 &modelViewProjectionMatrix);
+static void DrawNorth(const glm::mat4 &modelViewProjectionMatrix);
 static void setViewingWindow();
 
 static void radarSize(int ZoomLevel)
@@ -186,7 +188,7 @@ bool resizeRadar()
 bool ShutdownRadar()
 {
 	free(radarBuffer);
-	radarBuffer = NULL;
+	radarBuffer = nullptr;
 	return true;
 }
 
@@ -282,26 +284,23 @@ void drawRadar()
 	}
 	frameSkip--;
 	pie_SetRendMode(REND_ALPHA);
-	pie_MatBegin();
-	pie_TRANSLATE(radarCenterX, radarCenterY, 0);
+	glm::mat4 radarMatrix = glm::translate(radarCenterX, radarCenterY, 0);
+	glm::mat4 orthoMatrix = glm::ortho(0.f, static_cast<float>(pie_GetVideoBufferWidth()), static_cast<float>(pie_GetVideoBufferHeight()), 0.f);
 	if (rotateRadar)
 	{
 		// rotate the map
-		pie_MatRotZ(player.r.y);
-		DrawNorth();
+		radarMatrix *= glm::rotate(UNDEG(player.r.y), glm::vec3(0.f, 0.f, 1.f));
+		DrawNorth(orthoMatrix * radarMatrix);
 	}
-	pie_RenderRadar();
-	pie_MatBegin();
-	pie_TRANSLATE(-radarWidth / 2 - 1, -radarHeight / 2 - 1, 0);
-	DrawRadarExtras();
-	pie_MatEnd();
-	drawRadarBlips(-radarWidth / 2.0 - 1, -radarHeight / 2.0 - 1, pixSizeH, pixSizeV);
-	pie_MatEnd();
+
+	pie_RenderRadar(orthoMatrix * radarMatrix);
+	DrawRadarExtras(orthoMatrix * radarMatrix * glm::translate(-radarWidth / 2.f - 1.f, -radarHeight / 2.f - 1.f, 0.f));
+	drawRadarBlips(-radarWidth / 2.0 - 1, -radarHeight / 2.0 - 1, pixSizeH, pixSizeV, orthoMatrix * radarMatrix);
 }
 
-static void DrawNorth()
+static void DrawNorth(const glm::mat4 &modelViewProjectionMatrix)
 {
-	iV_DrawImage(IntImages, RADAR_NORTH, -((radarWidth / 2.0) + iV_GetImageWidth(IntImages, RADAR_NORTH) + 1), -(radarHeight / 2.0));
+	iV_DrawImage(IntImages, RADAR_NORTH, -((radarWidth / 2.0) + iV_GetImageWidth(IntImages, RADAR_NORTH) + 1), -(radarHeight / 2.0), modelViewProjectionMatrix);
 }
 
 static PIELIGHT appliedRadarColour(RADAR_DRAW_MODE radarDrawMode, MAPTILE *WTile)
@@ -452,7 +451,7 @@ static void DrawRadarObjects()
 		flashCol = flashColours[getPlayerColour(clan)];
 
 		/* Go through all droids */
-		for (psDroid = apsDroidLists[clan]; psDroid != NULL; psDroid = psDroid->psNext)
+		for (psDroid = apsDroidLists[clan]; psDroid != nullptr; psDroid = psDroid->psNext)
 		{
 			if (psDroid->pos.x < world_coord(scrollMinX) || psDroid->pos.y < world_coord(scrollMinY)
 			    || psDroid->pos.x >= world_coord(scrollMaxX) || psDroid->pos.y >= world_coord(scrollMaxY))
@@ -559,14 +558,14 @@ static void RotateVector2D(Vector3i *Vector, Vector3i *TVector, Vector3i *Pos, i
 	}
 }
 
-static SDWORD getDistanceAdjust(void)
+static SDWORD getDistanceAdjust()
 {
 	int dif = std::max<int>(MAXDISTANCE - getViewDistance(), 0);
 
 	return dif / 100;
 }
 
-static SDWORD getLengthAdjust(void)
+static SDWORD getLengthAdjust()
 {
 	const int pitch = 360 - (player.r.x / DEG_1);
 
@@ -631,9 +630,10 @@ static void setViewingWindow()
 	case 3:
 		// greenish
 		colour.byte.r = 0x3f;
-		colour.byte.a = 0x3f;
 		colour.byte.g = UBYTE_MAX;
 		colour.byte.b = 0x3f;
+		colour.byte.a = 0x3f;
+		break;
 	default:
 		// black
 		colour.rgba = 0;
@@ -645,10 +645,10 @@ static void setViewingWindow()
 	pie_SetViewingWindow(tv, colour);
 }
 
-static void DrawRadarExtras()
+static void DrawRadarExtras(const glm::mat4 &modelViewProjectionMatrix)
 {
-	pie_DrawViewingWindow();
-	RenderWindowFrame(FRAME_RADAR, -1, -1, radarWidth + 2, radarHeight + 2);
+	pie_DrawViewingWindow(modelViewProjectionMatrix);
+	RenderWindowFrame(FRAME_RADAR, -1, -1, radarWidth + 2, radarHeight + 2, modelViewProjectionMatrix);
 }
 
 /** Does a screen coordinate lie within the radar area? */

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -23,14 +23,8 @@
  *
  */
 
-#include <ctype.h>
 #include <physfs.h>
 #include <time.h>
-#ifndef WIN32
-#include <dirent.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#endif
 
 #include <QtCore/QTime>
 #include "lib/framework/frame.h"
@@ -47,7 +41,6 @@
 #include "intdisplay.h"
 #include "loadsave.h"
 #include "multiplay.h"
-#include "scores.h"
 #include "mission.h"
 
 #define totalslots 36			// challenge slots
@@ -139,16 +132,14 @@ static void displayLoadSlot(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	{
 		sstrcpy(butString, ((W_BUTTON *)psWidget)->pText.toUtf8().constData());
 
-		iV_SetFont(font_regular);									// font
 		iV_SetTextColour(WZCOL_FORM_TEXT);
 
-		while (iV_GetTextWidth(butString) > psWidget->width())
+		while (iV_GetTextWidth(butString, font_regular) > psWidget->width())
 		{
 			butString[strlen(butString) - 1] = '\0';
 		}
 
-		//draw text
-		iV_DrawText(butString, x + 4, y + 17);
+		iV_DrawText(butString, x + 4, y + 17, font_regular);
 	}
 }
 
@@ -257,7 +248,7 @@ bool addChallenges()
 
 	// add challenges to buttons
 	files = PHYSFS_enumerateFiles(sSearchPath);
-	for (i = files; *i != NULL; ++i)
+	for (i = files; *i != nullptr; ++i)
 	{
 		W_BUTTON *button;
 		QString name, map, difficulty, highscore, description;
@@ -328,7 +319,7 @@ bool addChallenges()
 bool closeChallenges()
 {
 	delete psRequestScreen;
-	psRequestScreen = NULL;
+	psRequestScreen = nullptr;
 	// need to "eat" up the return key so it don't pass back to game.
 	inputLoseFocus();
 	challengesUp = false;
@@ -339,12 +330,12 @@ bool closeChallenges()
 // Returns true if cancel pressed or a valid game slot was selected.
 // if when returning true strlen(sRequestResult) != 0 then a valid game
 // slot was selected otherwise cancel was selected..
-bool runChallenges(void)
+bool runChallenges()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psRequestScreen);
-	for (WidgetTriggers::const_iterator trigger = triggers.begin(); trigger != triggers.end(); ++trigger)
+	for (const auto trigger : triggers)
 	{
-		unsigned id = trigger->widget->id;
+		unsigned id = trigger.widget->id;
 
 		sstrcpy(sRequestResult, "");  // set returned filename to null;
 

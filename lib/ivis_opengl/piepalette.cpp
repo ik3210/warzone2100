@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 
 PIELIGHT psPalette[WZCOL_MAX];
 
-void pal_Init(void)
+void pal_Init()
 {
 	char *pFileData, *ptr;
 	UDWORD fileSize;
@@ -53,7 +53,7 @@ void pal_Init(void)
 	free(pFileData);
 }
 
-void pal_ShutDown(void)
+void pal_ShutDown()
 {
 	// placeholder
 }

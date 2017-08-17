@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 2007  Giel van Schijndel
-	Copyright (C) 2007-2015  Warzone 2100 Project
+	Copyright (C) 2007-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 # include <AL/alc.h>
 #endif
 
-extern ALenum __sound_GetError(const char *location_description);
-extern ALenum __sound_GetContextError(ALCdevice *device, const char *location_description);
+ALenum __sound_GetError(const char *location_description);
+ALenum __sound_GetContextError(ALCdevice *device, const char *location_description);
 
 /** Check whether an error occurred in OpenAL's current sound context. If one
  *  did occur, print an error message and return the error code.

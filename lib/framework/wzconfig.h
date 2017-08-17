@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -49,7 +49,7 @@ private:
 	warning mWarning;
 
 public:
-	WzConfig(const QString &name, WzConfig::warning warning, QObject *parent = 0);
+	WzConfig(const QString &name, WzConfig::warning warning, QObject *parent = nullptr);
 	~WzConfig();
 
 	Vector3f vector3f(const QString &name);
@@ -84,6 +84,7 @@ public:
 	}
 
 	void setValue(const QString &key, const QVariant &value);
+	void set(const QString &key, const QJsonValue &value);
 
 	QString group()
 	{

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -29,9 +29,6 @@
 #include "widget.h"
 #include "widgint.h"
 #include "editbox.h"
-#if defined(WZ_CC_MSVC)
-#include "editbox_moc.h"		// this is generated on the pre-build event.
-#endif
 #include "form.h"
 #include "lib/ivis_opengl/pieblitfunc.h"
 
@@ -55,9 +52,9 @@
 #define EB_MAX_STRINGSIZE 72
 
 W_EDBINIT::W_EDBINIT()
-	: pText(NULL)
+	: pText(nullptr)
 	, FontID(font_regular)
-	, pBoxDisplay(NULL)
+	, pBoxDisplay(nullptr)
 {}
 
 W_EDITBOX::W_EDITBOX(W_EDBINIT const *init)
@@ -116,7 +113,6 @@ void W_EDITBOX::initialise()
 	state = WEDBS_FIXED;
 	printStart = 0;
 	maxStringSize = EB_MAX_STRINGSIZE;
-	iV_SetFont(FontID);
 	fitStringStart();
 }
 
@@ -124,7 +120,7 @@ void W_EDITBOX::initialise()
 /* Insert a character into a text buffer */
 void W_EDITBOX::insertChar(QChar ch)
 {
-	if (ch == '\0')
+	if (ch == QChar('\0'))
 	{
 		return;
 	}
@@ -150,7 +146,7 @@ void W_EDITBOX::insertChar(QChar ch)
 /* Put a character into a text buffer overwriting any text under the cursor */
 void W_EDITBOX::overwriteChar(QChar ch)
 {
-	if (ch == '\0')
+	if (ch == QChar('\0'))
 	{
 		return;
 	}
@@ -210,7 +206,7 @@ void W_EDITBOX::fitStringStart()
 
 	while (!tmp.isEmpty())
 	{
-		int pixelWidth = iV_GetTextWidth(tmp.toUtf8().constData());
+		int pixelWidth = iV_GetTextWidth(tmp.toUtf8().constData(), FontID);
 
 		if (pixelWidth <= width() - (WEDB_XGAP * 2 + WEDB_CURSORSIZE))
 		{
@@ -236,7 +232,7 @@ void W_EDITBOX::fitStringEnd()
 
 	while (!tmp.isEmpty())
 	{
-		int pixelWidth = iV_GetTextWidth(tmp.toUtf8().constData());
+		int pixelWidth = iV_GetTextWidth(tmp.toUtf8().constData(), FontID);
 
 		if (pixelWidth <= width() - (WEDB_XGAP * 2 + WEDB_CURSORSIZE))
 		{
@@ -263,7 +259,7 @@ void W_EDITBOX::setCursorPosPixels(int xPos)
 	int prevPos = printStart + tmp.length();
 	while (!tmp.isEmpty())
 	{
-		int pixelWidth = iV_GetTextWidth(tmp.toUtf8().constData());
+		int pixelWidth = iV_GetTextWidth(tmp.toUtf8().constData(), FontID);
 		int delta = pixelWidth - (xPos - (WEDB_XGAP + WEDB_CURSORSIZE / 2));
 		int pos = printStart + tmp.length();
 
@@ -304,9 +300,6 @@ void W_EDITBOX::run(W_CONTEXT *psContext)
 		screenPointer->setFocus(nullptr);
 		return;
 	}
-
-	/* note the widget state */
-	iV_SetFont(FontID);
 
 	/* Loop through the characters in the input buffer */
 	bool done = false;
@@ -502,7 +495,6 @@ void W_EDITBOX::clicked(W_CONTEXT *psContext, WIDGET_KEY)
 	}
 
 	// Set cursor position to the click location.
-	iV_SetFont(FontID);
 	setCursorPosPixels(psContext->mx - x());
 
 	// Cursor should be visible instantly.
@@ -590,7 +582,7 @@ void W_EDITBOX::display(int xOffset, int yOffset)
 	int x1 = x0 + width();
 	int y1 = y0 + height();
 
-	if (pBoxDisplay != NULL)
+	if (pBoxDisplay != nullptr)
 	{
 		pBoxDisplay(this, xOffset, yOffset);
 	}
@@ -601,17 +593,16 @@ void W_EDITBOX::display(int xOffset, int yOffset)
 
 	int fx = x0 + WEDB_XGAP;// + (psEdBox->width - fw) / 2;
 
-	iV_SetFont(FontID);
 	iV_SetTextColour(WZCOL_FORM_TEXT);
 
-	int fy = y0 + (height() - iV_GetTextLineSize()) / 2 - iV_GetTextAboveBase();
+	int fy = y0 + (height() - iV_GetTextLineSize(FontID)) / 2 - iV_GetTextAboveBase(FontID);
 
 	/* If there is more text than will fit into the box, display the bit with the cursor in it */
 	QString tmp = aText;
 	tmp.remove(0, printStart);  // Erase anything there isn't room to display.
 	tmp.remove(printChars, tmp.length());
 
-	iV_DrawText(tmp.toUtf8().constData(), fx, fy);
+	iV_DrawText(tmp.toUtf8().constData(), fx, fy, FontID);
 
 	// Display the cursor if editing
 #if CURSOR_BLINK
@@ -626,10 +617,10 @@ void W_EDITBOX::display(int xOffset, int yOffset)
 		tmp.remove(insPos, tmp.length());         // Erase from the cursor on, to find where the cursor should be.
 		tmp.remove(0, printStart);
 
-		int cx = x0 + WEDB_XGAP + iV_GetTextWidth(tmp.toUtf8().constData());
-		cx += iV_GetTextWidth("-");
+		int cx = x0 + WEDB_XGAP + iV_GetTextWidth(tmp.toUtf8().constData(), FontID);
+		cx += iV_GetTextWidth("-", FontID);
 		int cy = fy;
-		iV_Line(cx, cy + iV_GetTextAboveBase(), cx, cy - iV_GetTextBelowBase(), WZCOL_FORM_CURSOR);
+		iV_Line(cx, cy + iV_GetTextAboveBase(FontID), cx, cy - iV_GetTextBelowBase(FontID), WZCOL_FORM_CURSOR);
 	}
 #if CURSOR_BLINK
 	else if ((state & WEDBS_MASK) == WEDBS_OVER && blink)
@@ -642,12 +633,12 @@ void W_EDITBOX::display(int xOffset, int yOffset)
 		tmp.remove(insPos, tmp.length());         // Erase from the cursor on, to find where the cursor should be.
 		tmp.remove(0, printStart);
 
-		int cx = x0 + WEDB_XGAP + iV_GetTextWidth(tmp.toUtf8().constData());
+		int cx = x0 + WEDB_XGAP + iV_GetTextWidth(tmp.toUtf8().constData(), FontID);
 		int cy = fy;
 		iV_Line(cx, cy, cx + WEDB_CURSORSIZE, cy, WZCOL_FORM_CURSOR);
 	}
 
-	if (pBoxDisplay == NULL)
+	if (pBoxDisplay == nullptr)
 	{
 		if ((state & WEDBS_HILITE) != 0)
 		{

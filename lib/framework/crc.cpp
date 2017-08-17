@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -19,15 +19,16 @@
 */
 
 #include "crc.h"
-#include "lib/netplay/netsocket.h"  // For htonl
 #include <openssl/sha.h>
-#include <openssl/err.h>
 
-#if defined(OPENSSL_NO_EC) || defined(OPENSSL_NO_ECDSA)
+#include <functional>
+
+#if defined(OPENSSL_NO_EC2M) || defined(OPENSSL_NO_ECDSA)
 # define MATH_IS_ALCHEMY
 #endif
 
 #ifndef MATH_IS_ALCHEMY
+#include <openssl/err.h>
 # include <openssl/ec.h>
 # include <openssl/ecdsa.h>
 # include <openssl/obj_mac.h>
@@ -43,6 +44,17 @@ struct EC_KEY
 };
 struct ECDSA_SIG {};
 
+unsigned long ERR_get_error()
+{
+	return 1;
+}
+
+static const char *ERR_error_string(unsigned long e, const char *buf)
+{
+	(void)buf;
+	return "";
+}
+
 EC_KEY *EC_KEY_new_by_curve_name(int)
 {
 	return new EC_KEY;
@@ -53,7 +65,7 @@ void EC_KEY_free(EC_KEY *key)
 }
 EC_KEY *EC_KEY_dup(EC_KEY const *key)
 {
-	return key != nullptr ? new EC_KEY(*key) : nullptr;
+	return new EC_KEY(*key);
 }
 int EC_KEY_generate_key(EC_KEY *)
 {
@@ -243,7 +255,7 @@ EcKey::EcKey()
 
 EcKey::EcKey(EcKey const &b)
 {
-	vKey = (void *)EC_KEY_dup((EC_KEY *)b.vKey);
+	vKey = b.vKey != nullptr ? (void *)EC_KEY_dup((EC_KEY *)b.vKey) : nullptr;
 }
 
 EcKey::EcKey(EcKey &&b)
@@ -260,7 +272,7 @@ EcKey::~EcKey()
 EcKey &EcKey::operator =(EcKey const &b)
 {
 	clear();
-	vKey = (void *)EC_KEY_dup((EC_KEY *)b.vKey);
+	vKey = b.vKey != nullptr ? (void *)EC_KEY_dup((EC_KEY *)b.vKey) : nullptr;
 	return *this;
 }
 
@@ -331,7 +343,7 @@ bool EcKey::verify(Sig const &sig, void const *data, size_t dataLen) const
 
 EcKey::Key EcKey::toBytes(Privacy privacy) const
 {
-	int (*toBytesFunc)(EC_KEY * key, unsigned char **out) = nullptr;
+	std::function<int (EC_KEY *key, unsigned char **out)> toBytesFunc = nullptr;  // int (EC_KEY const? *key, unsigned char **out), "const" only on i2o_ECPublicKey in OpenSSL 1.1.0+
 	switch (privacy)
 	{
 	case Private: toBytesFunc = i2d_ECPrivateKey; break;  // Note that the format for private keys is somewhat bloated, and even contains the public key which could be (efficiently) computed from the private key.
@@ -358,7 +370,7 @@ EcKey::Key EcKey::toBytes(Privacy privacy) const
 
 void EcKey::fromBytes(EcKey::Key const &key, EcKey::Privacy privacy)
 {
-	EC_KEY *(*fromBytesFunc)(EC_KEY **key, unsigned char const **in, long len) = nullptr;
+	std::function<EC_KEY *(EC_KEY **key, unsigned char const **in, long len)> fromBytesFunc = nullptr;  // EC_KEY *(EC_KEY **key, unsigned char const **in, long len)
 	switch (privacy)
 	{
 	case Private: fromBytesFunc = d2i_ECPrivateKey; break;

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -27,9 +27,6 @@
 #include "widget.h"
 #include "widgint.h"
 #include "form.h"
-#if defined(WZ_CC_MSVC)
-#include "form_moc.h"		// this is generated on the pre-build event.
-#endif
 #include "tip.h"
 #include "lib/ivis_opengl/pieblitfunc.h"
 #include "lib/ivis_opengl/piepalette.h"
@@ -120,7 +117,7 @@ void W_CLICKFORM::clicked(W_CONTEXT *psContext, WIDGET_KEY key)
 			state |= WBUT_DOWN;
 			dirty = true;
 
-			if (AudioCallback != NULL)
+			if (AudioCallback != nullptr)
 			{
 				AudioCallback(ClickedAudioID);
 			}
@@ -155,7 +152,7 @@ void W_CLICKFORM::highlight(W_CONTEXT *psContext)
 		tipStart(this, pTip, screenPointer->TipFontID, x() + psContext->xOffset, y() + psContext->yOffset, width(), height());
 	}
 
-	if (AudioCallback != NULL)
+	if (AudioCallback != nullptr)
 	{
 		AudioCallback(HilightAudioID);
 	}

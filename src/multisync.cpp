@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@
 // ////////////////////////////////////////////////////////////////////////////
 // function definitions
 
-static UDWORD averagePing(void);
+static UDWORD averagePing();
 
 #define AV_PING_FREQUENCY       20000                           // how often to update average pingtimes. in approx millisecs.
 #define PING_FREQUENCY          4000                            // how often to update pingtimes. in approx millisecs.
@@ -55,7 +55,7 @@ static uint8_t pingChallenge[8];                                // Random data s
 // ////////////////////////////////////////////////////////////////////////
 // Score
 // We use setMultiStats() to broadcast the score when needed.
-bool sendScoreCheck(void)
+bool sendScoreCheck()
 {
 	// Broadcast any changes in other players, but not in FRONTEND!!!
 	if (titleMode != MULTIOPTION && titleMode != MULTILIMIT)
@@ -80,7 +80,7 @@ bool sendScoreCheck(void)
 // ////////////////////////////////////////////////////////////////////////
 // Pings
 
-static UDWORD averagePing(void)
+static UDWORD averagePing()
 {
 	UDWORD i, count = 0, total = 0;
 
@@ -95,7 +95,7 @@ static UDWORD averagePing(void)
 	return total / MAX(count, 1);
 }
 
-bool sendPing(void)
+bool sendPing()
 {
 	bool			isNew = true;
 	uint8_t			player = selectedPlayer;

@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -57,7 +57,7 @@ class MessageWriter
 public:
 	enum { Read, Write, Direction = Write };
 
-	MessageWriter(NetMessage *m = NULL) : message(m) {}
+	MessageWriter(NetMessage *m = nullptr) : message(m) {}
 	MessageWriter(NetMessage &m) : message(&m) {}
 	void byte(uint8_t v) const
 	{
@@ -75,7 +75,7 @@ class MessageReader
 public:
 	enum { Read, Write, Direction = Read };
 
-	MessageReader(const NetMessage *m = NULL) : message(m), index(0) {}
+	MessageReader(const NetMessage *m = nullptr) : message(m), index(0) {}
 	MessageReader(const NetMessage &m) : message(&m), index(0) {}
 	void byte(uint8_t &v) const
 	{

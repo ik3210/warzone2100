@@ -2,7 +2,19 @@
 include("script/campaign/libcampaign.js");
 include("script/campaign/templates.js");
 
-var NPDefenseGroup; // no particular orders, just stay near factories
+const NEW_PARADIGM_RES = [
+	"R-Wpn-MG-Damage03", "R-Wpn-MG-ROF01", "R-Defense-WallUpgrade02",
+	"R-Struc-Materials02", "R-Struc-Factory-Upgrade01",
+	"R-Struc-Factory-Cyborg-Upgrade01", "R-Vehicle-Engine02",
+	"R-Vehicle-Metals01", "R-Cyborg-Metals01", "R-Wpn-Cannon-Damage02",
+	"R-Wpn-Flamer-Damage03", "R-Wpn-Flamer-ROF01",
+	"R-Wpn-Mortar-Damage01", "R-Wpn-Rocket-Accuracy02",
+	"R-Wpn-Rocket-Damage02", "R-Wpn-Rocket-ROF01",
+	"R-Wpn-RocketSlow-Damage01", "R-Struc-RprFac-Upgrade03",
+];
+const SCAVENGER_RES = [
+	"R-Wpn-MG-Damage02", "R-Wpn-Rocket-Damage02", "R-Wpn-Cannon-Damage01",
+];
 
 function sendRocketForce()
 {
@@ -51,7 +63,7 @@ function enableNPFactory()
 
 camAreaEvent("RemoveBeacon", function()
 {
-	hackRemoveMessage("C1C_OBJ1", PROX_MSG, 0);
+	hackRemoveMessage("C1C_OBJ1", PROX_MSG, CAM_HUMAN_PLAYER);
 });
 
 camAreaEvent("AmbushTrigger", function()
@@ -101,17 +113,28 @@ function camEnemyBaseEliminated_NPCentralFactory()
 
 function getDroidsForNPLZ(args)
 {
+	var scouts;
+	var heavies;
+
 	with (camTemplates) {
-		var scouts = [ npsens, nppod, nphmg ];
-		var heavies = [ npslc, npsmct, npmor ];
+		scouts = [ npsens, nppod, nphmg ];
+		heavies = [ npslc, npsmct, npmor ];
 	}
+
 	var numScouts = camRand(5) + 1;
-	var list = [];
-	for (var i = 0; i < numScouts; ++i)
-		list[list.length] = scouts[camRand(scouts.length)];
 	var heavy = heavies[camRand(heavies.length)];
+	var list = [];
+
+	for (var i = 0; i < numScouts; ++i)
+	{
+		list[list.length] = scouts[camRand(scouts.length)];
+	}
+
 	for (var i = numScouts; i < 8; ++i)
+	{
 		list[list.length] = heavy;
+	}
+
 	return list;
 }
 
@@ -119,10 +142,10 @@ camAreaEvent("NPLZ1Trigger", function()
 {
 	// Message4 here, Message3 for the second LZ, and
 	// please don't ask me why they did it this way
-	hackAddMessage("MB1C4_MSG", MISS_MSG, 0, true);
+	hackAddMessage("MB1C4_MSG", MISS_MSG, CAM_HUMAN_PLAYER, true);
 	camDetectEnemyBase("NPLZ1Group");
 
-	camSetBaseReinforcements("NPLZ1Group", 300000, "getDroidsForNPLZ",
+	camSetBaseReinforcements("NPLZ1Group", camChangeOnDiff(300000), "getDroidsForNPLZ",
 		CAM_REINFORCE_TRANSPORT, {
 			entry: { x: 126, y: 76 },
 			exit: { x: 126, y: 36 }
@@ -135,7 +158,7 @@ camAreaEvent("NPLZ2Trigger", function()
 	hackAddMessage("MB1C3_MSG", MISS_MSG, 0, true);
 	camDetectEnemyBase("NPLZ2Group");
 
-	camSetBaseReinforcements("NPLZ2Group", 300000, "getDroidsForNPLZ",
+	camSetBaseReinforcements("NPLZ2Group", camChangeOnDiff(300000), "getDroidsForNPLZ",
 		CAM_REINFORCE_TRANSPORT, {
 			entry: { x: 126, y: 76 },
 			exit: { x: 126, y: 36 }
@@ -143,18 +166,9 @@ camAreaEvent("NPLZ2Trigger", function()
 	);
 });
 
-function eventDroidBuilt(droid, structure)
-{
-	if (!camDef(structure) || !structure || structure.player !== 1
-                           || droid.droidType === DROID_CONSTRUCT)
-		return;
-	if (groupSize(NPDefenseGroup) < 4)
-		groupAdd(NPDefenseGroup, droid);
-}
-
 function playSecondVideo()
 {
-	hackAddMessage("MB1C2_MSG", MISS_MSG, 0, true);
+	hackAddMessage("MB1C2_MSG", MISS_MSG, CAM_HUMAN_PLAYER, true);
 }
 
 function eventVideoDone()
@@ -168,7 +182,7 @@ function eventStartLevel()
 	var startpos = getObject("startPosition");
 	var lz = getObject("landingZone");
 	centreView(startpos.x, startpos.y);
-	setNoGoArea(lz.x, lz.y, lz.x2, lz.y2, 0);
+	setNoGoArea(lz.x, lz.y, lz.x2, lz.y2, CAM_HUMAN_PLAYER);
 
 	// make sure player doesn't build on enemy LZs of the next level
 	for (var i = 1; i <= 5; ++i)
@@ -180,11 +194,13 @@ function eventStartLevel()
 	}
 
 	setReinforcementTime(-1);
-	setMissionTime(7200);
-	setAlliance(1, 7, true);
+	setMissionTime(camChangeOnDiff(7200));
+	setAlliance(NEW_PARADIGM, 7, true);
+	camCompleteRequiredResearch(NEW_PARADIGM_RES, NEW_PARADIGM);
+	camCompleteRequiredResearch(SCAVENGER_RES, 7);
 
-	setPower(5000, 1);
-	setPower(100, 7);
+	setPower(camChangeOnDiff(10000, true), NEW_PARADIGM);
+	setPower(camChangeOnDiff(2500, true), 7);
 
 	camSetEnemyBases({
 		"ScavSouthDerrickGroup": {
@@ -247,24 +263,24 @@ function eventStartLevel()
 			detectMsg: "C1C_BASE10",
 			detectSnd: "pcv379.ogg",
 			eliminateSnd: "pcv394.ogg",
-			player: 1 // hence discriminate by player filter
+			player: NEW_PARADIGM // hence discriminate by player filter
 		},
 		"NPLZ1Group": {
 			cleanup: "NPLZ1", // kill the four towers to disable LZ
 			detectMsg: "C1C_LZ1",
 			eliminateSnd: "pcv394.ogg",
-			player: 1 // required for LZ-type bases
+			player: NEW_PARADIGM // required for LZ-type bases
 		},
 		"NPLZ2Group": {
 			cleanup: "NPLZ2", // kill the four towers to disable LZ
 			detectMsg: "C1C_LZ2",
 			eliminateSnd: "pcv394.ogg",
-			player: 1 // required for LZ-type bases
+			player: NEW_PARADIGM // required for LZ-type bases
 		},
 	});
 
-	hackAddMessage("C1C_OBJ1", PROX_MSG, 0, false); // initial beacon
-	hackAddMessage("MB1C_MSG", MISS_MSG, 0, true);
+	hackAddMessage("C1C_OBJ1", PROX_MSG, CAM_HUMAN_PLAYER, false); // initial beacon
+	hackAddMessage("MB1C_MSG", MISS_MSG, CAM_HUMAN_PLAYER, true);
 
 	camSetArtifacts({
 		"ScavSouthFactory": { tech: "R-Wpn-Rocket05-MiniPod" },
@@ -278,28 +294,28 @@ function eventStartLevel()
 			assembly: "ScavSouthFactoryAssembly",
 			order: CAM_ORDER_ATTACK,
 			groupSize: 4,
-			throttle: 90000,
+			throttle: camChangeOnDiff(90000),
 			templates: [ buscan, rbjeep, trike, buggy ]
 		},
 		"ScavCentralFactory": {
 			// no assembly was defined in wzcam for this factory
 			order: CAM_ORDER_ATTACK,
 			groupSize: 4,
-			throttle: 60000,
+			throttle: camChangeOnDiff(60000),
 			templates: [ firecan, rbuggy, bjeep, bloke ]
 		},
 		"ScavNorthFactory": {
 			assembly: "ScavNorthFactoryAssembly",
 			order: CAM_ORDER_ATTACK,
 			groupSize: 4,
-			throttle: 30000,
+			throttle: camChangeOnDiff(30000),
 			templates: [ firecan, rbuggy, buscan, trike ]
 		},
 		"NPCentralFactory": {
 			assembly: "NPCentralFactoryAssembly",
 			order: CAM_ORDER_ATTACK,
 			groupSize: 4,
-			throttle: 60000,
+			throttle: camChangeOnDiff(60000),
 			regroup: true,
 			repair: 40,
 			templates: [ npmor, npsens, npslc ]
@@ -308,16 +324,16 @@ function eventStartLevel()
 			assembly: "NPNorthFactoryAssembly",
 			order: CAM_ORDER_ATTACK,
 			groupSize: 4,
-			throttle: 30000,
+			throttle: camChangeOnDiff(30000),
 			regroup: true,
 			repair: 40,
 			templates: [ nppod, npsmct, npmor ]
 		},
 	});
 
-	camManageTrucks(1);
+	camManageTrucks(NEW_PARADIGM);
+	replaceTexture("page-7-barbarians-arizona.png", "page-7-barbarians-kevlar.png");
 
-	NPDefenseGroup = newGroup();
 	camEnableFactory("ScavSouthFactory");
 	camManageGroup(camMakeGroup("RocketScoutForce"), CAM_ORDER_ATTACK, {
 		regroup: true,

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,13 +24,11 @@
 
 #include "lib/ivis_opengl/ivisdef.h"
 #include "lib/ivis_opengl/piematrix.h"
-#include "lib/gamelib/gtime.h"
+#include "lib/ivis_opengl/pieclip.h"
 
 #include "geometry.h"
 #include "objectdef.h"
 #include "map.h"
-#include "display3d.h"
-#include "hci.h"
 #include "display.h"
 
 uint16_t calcDirection(int32_t x0, int32_t y0, int32_t x1, int32_t y1)
@@ -53,7 +51,7 @@ DROID	*getNearestDroid(UDWORD x, UDWORD y, bool bSelected)
 	UDWORD	bestSoFar;
 
 	/* Go thru' all the droids  - how often have we seen this - a MACRO maybe? */
-	for (psDroid = apsDroidLists[selectedPlayer], psBestUnit = NULL, bestSoFar = UDWORD_MAX;
+	for (psDroid = apsDroidLists[selectedPlayer], psBestUnit = nullptr, bestSoFar = UDWORD_MAX;
 	     psDroid; psDroid = psDroid->psNext)
 	{
 		if (!isVtolDroid(psDroid))

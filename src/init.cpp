@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,16 +28,15 @@
 #include <string.h>
 
 #include "lib/framework/frameresource.h"
-#include "lib/framework/input.h"
 #include "lib/framework/file.h"
 #include "lib/framework/physfs_ext.h"
-#include "lib/framework/strres.h"
 #include "lib/framework/wzapp.h"
 #include "lib/ivis_opengl/piemode.h"
 #include "lib/ivis_opengl/piestate.h"
 #include "lib/ivis_opengl/screen.h"
 #include "lib/ivis_opengl/pieblitfunc.h"
 #include "lib/ivis_opengl/tex.h"
+#include "lib/ivis_opengl/imd.h"
 #include "lib/netplay/netplay.h"
 #include "lib/script/script.h"
 #include "lib/sound/audio_id.h"
@@ -51,13 +50,11 @@
 #include "challenge.h"
 #include "cluster.h"
 #include "cmddroid.h"
-#include "component.h"
 #include "configuration.h"
 #include "console.h"
 #include "data.h"
 #include "display.h"
 #include "display3d.h"
-#include "drive.h"
 #include "edit3d.h"
 #include "effects.h"
 #include "fpath.h"
@@ -80,6 +77,7 @@
 #include "multigifts.h"
 #include "multiplay.h"
 #include "projectile.h"
+#include "order.h"
 #include "radar.h"
 #include "research.h"
 #include "lib/framework/cursors.h"
@@ -88,7 +86,6 @@
 #include "scripttabs.h"
 #include "scriptvals.h"
 #include "text.h"
-#include "texture.h"
 #include "transporter.h"
 #include "warzoneconfig.h"
 #include "main.h"
@@ -107,13 +104,13 @@ char fileLoadBuffer[FILE_LOAD_BUFFER_SIZE];
 
 IMAGEFILE *FrontImages;
 
-static wzSearchPath *searchPathRegistry = NULL;
+static wzSearchPath *searchPathRegistry = nullptr;
 
 // Each module in the game should have a call from here to initialise
 // any globals and statics to there default values each time the game
 // or frontend restarts.
 //
-static bool InitialiseGlobals(void)
+static bool InitialiseGlobals()
 {
 	frontendInitVars();	// Initialise frontend globals and statics.
 	statsInitVars();
@@ -130,8 +127,6 @@ static bool InitialiseGlobals(void)
 	radarInitVars();
 	Edit3DInitVars();
 
-	driveInitVars(true);
-
 	return true;
 }
 
@@ -141,7 +136,7 @@ bool loadLevFile(const char *filename, searchPathMode datadir, bool ignoreWrf, c
 	char *pBuffer;
 	UDWORD size;
 
-	if (realFileName == NULL)
+	if (realFileName == nullptr)
 	{
 		debug(LOG_WZ, "Loading lev file: \"%s\", builtin\n", filename);
 	}
@@ -168,7 +163,7 @@ bool loadLevFile(const char *filename, searchPathMode datadir, bool ignoreWrf, c
 
 static void cleanSearchPath()
 {
-	wzSearchPath *curSearchPath = searchPathRegistry, * tmpSearchPath = NULL;
+	wzSearchPath *curSearchPath = searchPathRegistry, * tmpSearchPath = nullptr;
 
 	// Start at the lowest priority
 	while (curSearchPath->lowerPriority)
@@ -182,7 +177,7 @@ static void cleanSearchPath()
 		free(curSearchPath);
 		curSearchPath = tmpSearchPath;
 	}
-	searchPathRegistry = NULL;
+	searchPathRegistry = nullptr;
 }
 
 
@@ -192,7 +187,7 @@ static void cleanSearchPath()
  */
 void registerSearchPath(const char path[], unsigned int priority)
 {
-	wzSearchPath *curSearchPath = searchPathRegistry, * tmpSearchPath = NULL;
+	wzSearchPath *curSearchPath = searchPathRegistry, * tmpSearchPath = nullptr;
 
 	tmpSearchPath = (wzSearchPath *)malloc(sizeof(*tmpSearchPath));
 	sstrcpy(tmpSearchPath->path, path);
@@ -206,8 +201,8 @@ void registerSearchPath(const char path[], unsigned int priority)
 	if (!curSearchPath)
 	{
 		searchPathRegistry = tmpSearchPath;
-		searchPathRegistry->lowerPriority = NULL;
-		searchPathRegistry->higherPriority = NULL;
+		searchPathRegistry->lowerPriority = nullptr;
+		searchPathRegistry->higherPriority = nullptr;
 		return;
 	}
 
@@ -255,8 +250,8 @@ bool rebuildSearchPath(searchPathMode mode, bool force, const char *current_map)
 	wzSearchPath *curSearchPath = searchPathRegistry;
 	char tmpstr[PATH_MAX] = "\0";
 
-	if (mode != current_mode || (current_map != NULL ? current_map : "") != current_current_map || force ||
-	    (use_override_mods && strcmp(override_mod_list, getModList())))
+	if (mode != current_mode || (current_map != nullptr ? current_map : "") != current_current_map || force ||
+	    (use_override_mods && override_mod_list != getModList()))
 	{
 		if (mode != mod_clean)
 		{
@@ -264,7 +259,7 @@ bool rebuildSearchPath(searchPathMode mode, bool force, const char *current_map)
 		}
 
 		current_mode = mode;
-		current_current_map = current_map != NULL ? current_map : "";
+		current_current_map = current_map != nullptr ? current_map : "";
 
 		// Start at the lowest priority
 		while (curSearchPath->lowerPriority)
@@ -284,12 +279,14 @@ bool rebuildSearchPath(searchPathMode mode, bool force, const char *current_map)
 				debug(LOG_WZ, "Removing [%s] from search path", curSearchPath->path);
 #endif // DEBUG
 				// Remove maps and mods
-				removeSubdirs(curSearchPath->path, "maps", NULL);
-				removeSubdirs(curSearchPath->path, "mods/music", NULL);
-				removeSubdirs(curSearchPath->path, "mods/global", NULL);
-				removeSubdirs(curSearchPath->path, "mods/campaign", NULL);
-				removeSubdirs(curSearchPath->path, "mods/multiplay", NULL);
-				removeSubdirs(curSearchPath->path, "mods/autoload", NULL);
+				removeSubdirs(curSearchPath->path, "maps");
+				removeSubdirs(curSearchPath->path, "mods/music");
+				removeSubdirs(curSearchPath->path, "mods/global");
+				removeSubdirs(curSearchPath->path, "mods");
+				removeSubdirs(curSearchPath->path, "mods/autoload");
+				removeSubdirs(curSearchPath->path, "mods/campaign");
+				removeSubdirs(curSearchPath->path, "mods/multiplay");
+				removeSubdirs(curSearchPath->path, "mods/downloads");
 
 				// Remove multiplay patches
 				sstrcpy(tmpstr, curSearchPath->path);
@@ -342,11 +339,11 @@ bool rebuildSearchPath(searchPathMode mode, bool force, const char *current_map)
 				// Add global and campaign mods
 				PHYSFS_addToSearchPath(curSearchPath->path, PHYSFS_APPEND);
 
-				addSubdirs(curSearchPath->path, "mods/music", PHYSFS_APPEND, NULL, false);
-				addSubdirs(curSearchPath->path, "mods/global", PHYSFS_APPEND, use_override_mods ? override_mods : global_mods, true);
-				addSubdirs(curSearchPath->path, "mods", PHYSFS_APPEND, use_override_mods ? override_mods : global_mods, true);
-				addSubdirs(curSearchPath->path, "mods/autoload", PHYSFS_APPEND, use_override_mods ? override_mods : NULL, true);
-				addSubdirs(curSearchPath->path, "mods/campaign", PHYSFS_APPEND, use_override_mods ? override_mods : campaign_mods, true);
+				addSubdirs(curSearchPath->path, "mods/music", PHYSFS_APPEND, nullptr, false);
+				addSubdirs(curSearchPath->path, "mods/global", PHYSFS_APPEND, use_override_mods ? &override_mods : &global_mods, true);
+				addSubdirs(curSearchPath->path, "mods", PHYSFS_APPEND, use_override_mods ? &override_mods : &global_mods, true);
+				addSubdirs(curSearchPath->path, "mods/autoload", PHYSFS_APPEND, use_override_mods ? &override_mods : nullptr, true);
+				addSubdirs(curSearchPath->path, "mods/campaign", PHYSFS_APPEND, use_override_mods ? &override_mods : &campaign_mods, true);
 				if (!PHYSFS_removeFromSearchPath(curSearchPath->path))
 				{
 					debug(LOG_WZ, "* Failed to remove path %s again", curSearchPath->path);
@@ -379,7 +376,7 @@ bool rebuildSearchPath(searchPathMode mode, bool force, const char *current_map)
 				curSearchPath = curSearchPath->higherPriority;
 			}
 			// Add the selected map first, for mapmod support
-			if (current_map != NULL)
+			if (current_map != nullptr)
 			{
 				QString realPathAndDir = QString::fromUtf8(PHYSFS_getRealDir(current_map)) + current_map;
 				realPathAndDir.replace('/', PHYSFS_getDirSeparator()); // Windows fix
@@ -397,11 +394,23 @@ bool rebuildSearchPath(searchPathMode mode, bool force, const char *current_map)
 #endif // DEBUG
 				// Add global and multiplay mods
 				PHYSFS_addToSearchPath(curSearchPath->path, PHYSFS_APPEND);
-				addSubdirs(curSearchPath->path, "mods/music", PHYSFS_APPEND, NULL, false);
-				addSubdirs(curSearchPath->path, "mods/global", PHYSFS_APPEND, use_override_mods ? override_mods : global_mods, true);
-				addSubdirs(curSearchPath->path, "mods", PHYSFS_APPEND, use_override_mods ? override_mods : global_mods, true);
-				addSubdirs(curSearchPath->path, "mods/autoload", PHYSFS_APPEND, use_override_mods ? override_mods : NULL, true);
-				addSubdirs(curSearchPath->path, "mods/multiplay", PHYSFS_APPEND, use_override_mods ? override_mods : multiplay_mods, true);
+				addSubdirs(curSearchPath->path, "mods/music", PHYSFS_APPEND, nullptr, false);
+				if (NetPlay.isHost || !NetPlay.bComms)
+				{
+					addSubdirs(curSearchPath->path, "mods/global", PHYSFS_APPEND, use_override_mods ? &override_mods : &global_mods, true);
+					addSubdirs(curSearchPath->path, "mods", PHYSFS_APPEND, use_override_mods ? &override_mods : &global_mods, true);
+					addSubdirs(curSearchPath->path, "mods/autoload", PHYSFS_APPEND, use_override_mods ? &override_mods : nullptr, true);
+					addSubdirs(curSearchPath->path, "mods/multiplay", PHYSFS_APPEND, use_override_mods ? &override_mods : &multiplay_mods, true);
+				}
+				else
+				{
+					std::vector<std::string> hashList;
+					for (Sha256 &hash : game.modHashes)
+					{
+						hashList = {hash.toString()};
+						addSubdirs(curSearchPath->path, "mods/downloads", PHYSFS_APPEND, &hashList, true);
+					}
+				}
 				PHYSFS_removeFromSearchPath(curSearchPath->path);
 
 				// Add multiplay patches
@@ -432,15 +441,15 @@ bool rebuildSearchPath(searchPathMode mode, bool force, const char *current_map)
 		}
 		if (use_override_mods && mode != mod_clean)
 		{
-			if (strcmp(getModList(), override_mod_list))
+			if (getModList() != override_mod_list)
 			{
-				debug(LOG_POPUP, _("The required mod could not be loaded: %s\n\nWarzone will try to load the game without it."), override_mod_list);
+				debug(LOG_POPUP, _("The required mod could not be loaded: %s\n\nWarzone will try to load the game without it."), override_mod_list.c_str());
 			}
 			clearOverrideMods();
 			current_mode = mod_override;
 		}
 
-		// User's home dir must be first so we allways see what we write
+		// User's home dir must be first so we always see what we write
 		PHYSFS_removeFromSearchPath(PHYSFS_getWriteDir());
 		PHYSFS_addToSearchPath(PHYSFS_getWriteDir(), PHYSFS_PREPEND);
 
@@ -463,10 +472,10 @@ static MapFileList listMapFiles()
 
 	char **subdirlist = PHYSFS_enumerateFiles("maps");
 
-	for (char **i = subdirlist; *i != NULL; ++i)
+	for (char **i = subdirlist; *i != nullptr; ++i)
 	{
 		std::string wzfile = *i;
-		if (*i[0] == '.' || wzfile.substr(wzfile.find_last_of(".") + 1) != "wz")
+		if (*i[0] == '.' || wzfile.substr(wzfile.find_last_of('.') + 1) != "wz")
 		{
 			continue;
 		}
@@ -478,7 +487,7 @@ static MapFileList listMapFiles()
 	// save our current search path(s)
 	debug(LOG_WZ, "Map search paths:");
 	char **searchPath = PHYSFS_getSearchPath();
-	for (char **i = searchPath; *i != NULL; i++)
+	for (char **i = searchPath; *i != nullptr; i++)
 	{
 		debug(LOG_WZ, "    [%s]", *i);
 		oldSearchPath.push_back(*i);
@@ -486,15 +495,15 @@ static MapFileList listMapFiles()
 	}
 	PHYSFS_freeList(searchPath);
 
-	for (MapFileList::iterator realFileName = ret.begin(); realFileName != ret.end(); ++realFileName)
+	for (const auto &realFileName : ret)
 	{
-		std::string realFilePathAndName = PHYSFS_getWriteDir() + *realFileName;
+		std::string realFilePathAndName = PHYSFS_getWriteDir() + realFileName;
 		if (PHYSFS_addToSearchPath(realFilePathAndName.c_str(), PHYSFS_APPEND))
 		{
 			int unsafe = 0;
 			char **filelist = PHYSFS_enumerateFiles("multiplay/maps");
 
-			for (char **file = filelist; *file != NULL; ++file)
+			for (char **file = filelist; *file != nullptr; ++file)
 			{
 				std::string isDir = std::string("multiplay/maps/") + *file;
 				if (PHYSFS_isDirectory(isDir.c_str()))
@@ -503,7 +512,7 @@ static MapFileList listMapFiles()
 				}
 				std::string checkfile = *file;
 				debug(LOG_WZ, "checking ... %s", *file);
-				if (checkfile.substr(checkfile.find_last_of(".") + 1) == "gam")
+				if (checkfile.substr(checkfile.find_last_of('.') + 1) == "gam")
 				{
 					if (unsafe++ > 1)
 					{
@@ -515,7 +524,7 @@ static MapFileList listMapFiles()
 			PHYSFS_freeList(filelist);
 			if (unsafe < 2)
 			{
-				filtered.push_back(realFileName->c_str());
+				filtered.push_back(realFileName);
 			}
 			PHYSFS_removeFromSearchPath(realFilePathAndName.c_str());
 		}
@@ -526,9 +535,9 @@ static MapFileList listMapFiles()
 	}
 
 	// restore our search path(s) again
-	for (MapFileList::iterator restorePaths = oldSearchPath.begin(); restorePaths != oldSearchPath.end(); ++restorePaths)
+	for (const auto &restorePaths : oldSearchPath)
 	{
-		PHYSFS_addToSearchPath(restorePaths->c_str(), PHYSFS_APPEND);
+		PHYSFS_addToSearchPath(restorePaths.c_str(), PHYSFS_APPEND);
 	}
 	debug(LOG_WZ, "Search paths restored");
 	printSearchPath();
@@ -558,7 +567,7 @@ struct FindMap
 bool CheckForMod(char *theMap)
 {
 	std::vector<struct WZmaps>::iterator it;
-	if (theMap == NULL)
+	if (theMap == nullptr)
 	{
 		return false;
 	}
@@ -587,13 +596,13 @@ static bool CheckInMap(const char *archive, const char *mountpoint, const char *
 	std::string checkpath = lookin;
 	checkpath.append("/");
 	char **filelist = PHYSFS_enumerateFiles(lookin);
-	for (char **file = filelist; *file != NULL; ++file)
+	for (char **file = filelist; *file != nullptr; ++file)
 	{
 		std::string checkfile = *file;
 		if (PHYSFS_isDirectory((checkpath + checkfile).c_str()))
 		{
 			if (checkfile.compare("wrf") == 0 || checkfile.compare("stats") == 0 || checkfile.compare("components") == 0
-			    || checkfile.compare("anims") == 0 || checkfile.compare("effects") == 0 || checkfile.compare("messages") == 0
+			    || checkfile.compare("effects") == 0 || checkfile.compare("messages") == 0
 			    || checkfile.compare("audio") == 0 || checkfile.compare("sequenceaudio") == 0 || checkfile.compare("misc") == 0
 			    || checkfile.compare("features") == 0 || checkfile.compare("script") == 0 || checkfile.compare("structs") == 0
 			    || checkfile.compare("tileset") == 0 || checkfile.compare("images") == 0 || checkfile.compare("texpages") == 0
@@ -616,34 +625,34 @@ static bool CheckInMap(const char *archive, const char *mountpoint, const char *
 
 bool buildMapList()
 {
-	if (!loadLevFile("gamedesc.lev", mod_campaign, false, NULL))
+	if (!loadLevFile("gamedesc.lev", mod_campaign, false, nullptr))
 	{
 		return false;
 	}
-	loadLevFile("addon.lev", mod_multiplay, false, NULL);
+	loadLevFile("addon.lev", mod_multiplay, false, nullptr);
 	WZ_Maps.clear();
 	MapFileList realFileNames = listMapFiles();
-	for (MapFileList::iterator realFileName = realFileNames.begin(); realFileName != realFileNames.end(); ++realFileName)
+	for (auto &realFileName : realFileNames)
 	{
 		bool mapmod = false;
 		struct WZmaps CurrentMap;
-		std::string realFilePathAndName = PHYSFS_getRealDir(realFileName->c_str()) + *realFileName;
+		std::string realFilePathAndName = PHYSFS_getRealDir(realFileName.c_str()) + realFileName;
 
 		PHYSFS_addToSearchPath(realFilePathAndName.c_str(), PHYSFS_APPEND);
 
 		char **filelist = PHYSFS_enumerateFiles("");
-		for (char **file = filelist; *file != NULL; ++file)
+		for (char **file = filelist; *file != nullptr; ++file)
 		{
 			std::string checkfile = *file;
 			size_t len = strlen(*file);
 			if (len > 10 && !strcasecmp(*file + (len - 10), ".addon.lev"))  // Do not add addon.lev again
 			{
-				loadLevFile(*file, mod_multiplay, true, realFileName->c_str());
+				loadLevFile(*file, mod_multiplay, true, realFileName.c_str());
 			}
 			// add support for X player maps using a new name to prevent conflicts.
 			if (len > 13 && !strcasecmp(*file + (len - 13), ".xplayers.lev"))
 			{
-				loadLevFile(*file, mod_multiplay, true, realFileName->c_str());
+				loadLevFile(*file, mod_multiplay, true, realFileName.c_str());
 			}
 		}
 		PHYSFS_freeList(filelist);
@@ -659,7 +668,7 @@ bool buildMapList()
 			mapmod = CheckInMap(realFilePathAndName.c_str(), "WZMap", "WZMap/multiplay");
 		}
 
-		CurrentMap.MapName = realFileName->c_str();
+		CurrentMap.MapName = realFileName;
 		CurrentMap.isMapMod = mapmod;
 		WZ_Maps.push_back(CurrentMap);
 	}
@@ -671,7 +680,7 @@ bool buildMapList()
 // ////////////////////////////////////////////////////////////////////////////
 // Called once on program startup.
 //
-bool systemInitialise(void)
+bool systemInitialise()
 {
 	if (!widgInitialise())
 	{
@@ -725,15 +734,10 @@ bool systemInitialise(void)
 // ////////////////////////////////////////////////////////////////////////////
 // Called once at program shutdown.
 //
-extern char *mod_list;
-
-void systemShutdown(void)
+void systemShutdown()
 {
 	pie_ShutdownRadar();
-	if (mod_list)
-	{
-		free(mod_list);
-	}
+	clearLoadedMods();
 
 	shutdownEffectsSystem();
 	wzSceneEnd(nullptr);  // Might want to end the "Main menu loop" or "Main game loop".
@@ -805,16 +809,6 @@ bool frontendInitialise(const char *ResourceFile)
 		return false;
 	}
 
-	if (!anim_Init())
-	{
-		return false;
-	}
-
-	if (!animObj_Init())
-	{
-		return false;
-	}
-
 	if (!allocPlayerPower())	 //set up the PlayerPower for each player - this should only be done ONCE now
 	{
 		return false;
@@ -862,7 +856,7 @@ bool frontendInitialise(const char *ResourceFile)
 }
 
 
-bool frontendShutdown(void)
+bool frontendShutdown()
 {
 	debug(LOG_WZ, "== Shuting down frontend ==");
 
@@ -886,16 +880,6 @@ bool frontendShutdown(void)
 
 	ResearchRelease();
 
-	if (!anim_Shutdown())
-	{
-		return false;
-	}
-
-	if (!animObj_Shutdown())
-	{
-		return false;
-	}
-
 	debug(LOG_TEXTURE, "=== frontendShutdown ===");
 	modelShutdown();
 	pie_TexShutDown();
@@ -912,9 +896,9 @@ bool frontendShutdown(void)
 
 
 
-bool stageOneInitialise(void)
+bool stageOneInitialise()
 {
-	debug(LOG_WZ, "== stageOneInitalise ==");
+	debug(LOG_WZ, "== stageOneInitialise ==");
 	wzSceneEnd("Main menu loop");
 	wzSceneBegin("Main game loop");
 
@@ -950,16 +934,6 @@ bool stageOneInitialise(void)
 	}
 
 	if (!aiInitialise())		/* Initialise the AI system */ // pregame
-	{
-		return false;
-	}
-
-	if (!anim_Init())
-	{
-		return false;
-	}
-
-	if (!animObj_Init())
 	{
 		return false;
 	}
@@ -1007,7 +981,7 @@ bool stageOneInitialise(void)
 /******************************************************************************/
 /*                       Shutdown after data is released                      */
 
-bool stageOneShutDown(void)
+bool stageOneShutDown()
 {
 	debug(LOG_WZ, "== stageOneShutDown ==");
 
@@ -1052,17 +1026,7 @@ bool stageOneShutDown(void)
 	scrShutDown();
 	gridShutDown();
 
-	if (!anim_Shutdown())
-	{
-		return false;
-	}
-
-	if (!animObj_Shutdown())
-	{
-		return false;
-	}
-
-	debug(LOG_TEXTURE, "=== stageOneShutDown ===");
+	debug(LOG_TEXTURE, "== stageOneShutDown ==");
 	modelShutdown();
 	pie_TexShutDown();
 
@@ -1081,11 +1045,11 @@ bool stageOneShutDown(void)
 // ////////////////////////////////////////////////////////////////////////////
 // Initialise after the base data is loaded but before final level data is loaded
 
-bool stageTwoInitialise(void)
+bool stageTwoInitialise()
 {
 	int i;
 
-	debug(LOG_WZ, "== stageTwoInitalise ==");
+	debug(LOG_WZ, "== stageTwoInitialise ==");
 
 	// make sure we clear on loading; this a bad hack to fix a bug when
 	// loading a savegame where we are building a lassat
@@ -1167,7 +1131,7 @@ bool stageTwoInitialise(void)
 // ////////////////////////////////////////////////////////////////////////////
 // Free up after level specific data has been released but before base data is released
 //
-bool stageTwoShutDown(void)
+bool stageTwoShutDown()
 {
 	debug(LOG_WZ, "== stageTwoShutDown ==");
 
@@ -1209,13 +1173,13 @@ bool stageTwoShutDown(void)
 	return true;
 }
 
-bool stageThreeInitialise(void)
+bool stageThreeInitialise()
 {
 	STRUCTURE *psStr;
 	UDWORD i;
 	DROID		*psDroid;
 
-	debug(LOG_WZ, "== stageThreeInitalise ==");
+	debug(LOG_WZ, "== stageThreeInitialise ==");
 
 	loopMissionState = LMS_NORMAL;
 
@@ -1238,16 +1202,11 @@ bool stageThreeInitialise(void)
 
 	if (bMultiPlayer)
 	{
-		// FIXME Is this really needed?
-		debug(LOG_WZ, "multiGameInit()\n");
 		multiGameInit();
-		cmdDroidMultiExpBoost(true);
+		initTemplates();
 	}
 
 	preProcessVisibility();
-
-	// Load any stored templates; these need to be available ASAP
-	initTemplates();
 
 	prepareScripts(getLevelLoadType() == GTYPE_SAVE_MIDMISSION || getLevelLoadType() == GTYPE_SAVE_START);
 
@@ -1268,7 +1227,6 @@ bool stageThreeInitialise(void)
 
 	// Re-inititialise some static variables.
 
-	driveInitVars(false);
 	resizeRadar();
 
 	setAllPauseStates(false);
@@ -1320,9 +1278,11 @@ bool stageThreeInitialise(void)
 /*****************************************************************************/
 /*      Shutdown before any data is released                                 */
 
-bool stageThreeShutDown(void)
+bool stageThreeShutDown()
 {
 	debug(LOG_WZ, "== stageThreeShutDown ==");
+
+	hostlaunch = 0;
 
 	removeSpotters();
 
@@ -1349,8 +1309,6 @@ bool stageThreeShutDown(void)
 		multiGameShutdown();
 	}
 
-	cmdDroidMultiExpBoost(false);
-
 	eventReset();
 
 	// reset the script values system
@@ -1375,7 +1333,7 @@ bool stageThreeShutDown(void)
 }
 
 // Reset the game between campaigns
-bool campaignReset(void)
+bool campaignReset()
 {
 	debug(LOG_MAIN, "campaignReset");
 	gwShutDown();
@@ -1389,7 +1347,7 @@ bool campaignReset(void)
 }
 
 // Reset the game when loading a save game
-bool saveGameReset(void)
+bool saveGameReset()
 {
 	debug(LOG_MAIN, "saveGameReset");
 

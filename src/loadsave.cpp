@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@
 #include <time.h>
 
 #include "lib/framework/frame.h"
-#include "lib/framework/strres.h"
 #include "lib/framework/input.h"
 #include "lib/framework/stdio_ext.h"
 #include "lib/widget/button.h"
@@ -49,11 +48,6 @@
 #include "main.h"
 #include "display3d.h"
 #include "display.h"
-#ifndef WIN32
-#include <dirent.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#endif
 #include "lib/netplay/netplay.h"
 #include "loop.h"
 #include "intdisplay.h"
@@ -107,14 +101,14 @@ static const char *sExt = ".gam";
 
 // ////////////////////////////////////////////////////////////////////////////
 // return whether the save screen was displayed in the mission results screen
-bool saveInMissionRes(void)
+bool saveInMissionRes()
 {
 	return bLoadSaveMode == SAVE_MISSIONEND;
 }
 
 // ////////////////////////////////////////////////////////////////////////////
 // return whether the save screen was displayed in the middle of a mission
-bool saveMidMission(void)
+bool saveMidMission()
 {
 	return bLoadSaveMode == SAVE_INGAME_MISSION;
 }
@@ -281,7 +275,7 @@ bool addLoadSave(LOADSAVE_MODE savemode, const char *title)
 
 	// add savegame filenames minus extensions to buttons
 	files = PHYSFS_enumerateFiles(NewSaveGamePath);
-	for (i = files; *i != NULL; ++i)
+	for (i = files; *i != nullptr; ++i)
 	{
 		W_BUTTON *button;
 		char savefile[256];
@@ -325,7 +319,7 @@ bool addLoadSave(LOADSAVE_MODE savemode, const char *title)
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-bool closeLoadSave(void)
+bool closeLoadSave()
 {
 	bLoadSaveUp = false;
 
@@ -348,7 +342,7 @@ bool closeLoadSave(void)
 
 	}
 	delete psRequestScreen;
-	psRequestScreen = NULL;
+	psRequestScreen = nullptr;
 	// need to "eat" up the return key so it don't pass back to game.
 	inputLoseFocus();
 	return true;
@@ -374,7 +368,7 @@ void deleteSaveGame(char *saveGameName)
 
 	// check for a directory and remove that too.
 	files = PHYSFS_enumerateFiles(saveGameName);
-	for (i = files; *i != NULL; ++i)
+	for (i = files; *i != nullptr; ++i)
 	{
 		char del_file[PATH_MAX];
 
@@ -542,7 +536,7 @@ bool runLoadSave(bool bResetMissionWidgets)
 cleanup:
 	closeLoadSave();
 	bRequestLoad = false;
-	if (bResetMissionWidgets && widgGetFromID(psWScreen, IDMISSIONRES_FORM) == NULL)
+	if (bResetMissionWidgets && widgGetFromID(psWScreen, IDMISSIONRES_FORM) == nullptr)
 	{
 		resetMissionWidgets();			//reset the mission widgets here if necessary
 	}
@@ -560,7 +554,7 @@ success:
 
 // ////////////////////////////////////////////////////////////////////////////
 // should be done when drawing the other widgets.
-bool displayLoadSave(void)
+bool displayLoadSave()
 {
 	widgDisplayScreen(psRequestScreen);	// display widgets.
 	return true;
@@ -661,16 +655,13 @@ static void displayLoadSlot(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	{
 		sstrcpy(butString, ((W_BUTTON *)psWidget)->pText.toUtf8().constData());
 
-		iV_SetFont(font_regular);									// font
 		iV_SetTextColour(WZCOL_FORM_TEXT);
-
-		while (iV_GetTextWidth(butString) > psWidget->width())
+		while (iV_GetTextWidth(butString, font_regular) > psWidget->width())
 		{
 			butString[strlen(butString) - 1] = '\0';
 		}
 
-		//draw text
-		iV_DrawText(butString, x + 4, y + 17);
+		iV_DrawText(butString, x + 4, y + 17, font_regular);
 	}
 }
 

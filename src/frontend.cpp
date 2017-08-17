@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -47,10 +47,13 @@
 #include "configuration.h"
 #include "difficulty.h"
 #include "display.h"
+#include "droid.h"
 #include "frend.h"
 #include "frontend.h"
+#include "group.h"
 #include "hci.h"
 #include "init.h"
+#include "levels.h"
 #include "intdisplay.h"
 #include "keyedit.h"
 #include "loadsave.h"
@@ -89,10 +92,17 @@ bool			bLimiterLoaded = false;
 
 #define TUTORIAL_LEVEL "TUTORIAL3"
 
+// ////////////////////////////////////////////////////////////////////////////
+// Forward definitions
+
+static void addSmallTextButton(UDWORD id, UDWORD PosX, UDWORD PosY, const char *txt, unsigned int style);
+
+// ////////////////////////////////////////////////////////////////////////////
+// Helper functions
 
 // Returns true if escape key pressed.
 //
-bool CancelPressed(void)
+bool CancelPressed()
 {
 	const bool cancel = keyPressed(KEY_ESC);
 	if (cancel)
@@ -116,14 +126,14 @@ template <typename T>
 static T pow2Cycle(T value, T min, T max)
 {
 	return !mouseReleased(MOUSE_RMB) ?
-	       value < max ? value * 2 : min :  // Cycle forwards.
-	       min < value ? value / 2 : max;  // Cycle backwards.
+	       value < max ? std::max<T>(1, value) * 2 : min :  // Cycle forwards.
+	       min < value ? (value / 2 > 1 ? value / 2 : 0) : max;  // Cycle backwards.
 }
 
 
 // ////////////////////////////////////////////////////////////////////////////
 // Title Screen
-static bool startTitleMenu(void)
+static bool startTitleMenu()
 {
 	intRemoveReticule();
 
@@ -151,68 +161,61 @@ static bool startTitleMenu(void)
 	widgSetTip(psWScreen, FRONTEND_HYPERLINK, _("Come visit the forums and all Warzone 2100 news! Click this link."));
 	addSmallTextButton(FRONTEND_DONATELINK, FRONTEND_POS8X + 360, FRONTEND_POS8Y, _("Donate: http://donations.wz2100.net/"), 0);
 	widgSetTip(psWScreen, FRONTEND_DONATELINK, _("Help support the project with our server costs, Click this link."));
+	addSmallTextButton(FRONTEND_CHATLINK, FRONTEND_POS8X + 360, 0, _("Chat with players on #warzone2100"), 0);
+	widgSetTip(psWScreen, FRONTEND_CHATLINK, _("Connect to Freenode through webchat by clicking this link."));
 	addMultiBut(psWScreen, FRONTEND_BOTFORM, FRONTEND_UPGRDLINK, 7, 7, MULTIOP_BUTW, MULTIOP_BUTH, _("Check for a newer version"), IMAGE_GAMEVERSION, IMAGE_GAMEVERSION_HI, true);
 
 	return true;
 }
 
-static void runUpgrdHyperlink(void)
+static void runLink(char const *link)
 {
 	//FIXME: There is no decent way we can re-init the display to switch to window or fullscreen within game. refs: screenToggleMode().
+#if defined(WZ_OS_WIN)
+	wchar_t  wszDest[250] = {'/0'};
+	MultiByteToWideChar(CP_UTF8, 0, link, -1, wszDest, 250);
+
+	ShellExecuteW(NULL, L"open", wszDest, NULL, NULL, SW_SHOWNORMAL);
+#elif defined (WZ_OS_MAC)
+	char lbuf[250] = {'\0'};
+	ssprintf(lbuf, "open %s &", link);
+	system(lbuf);
+#else
+	// for linux
+	char lbuf[250] = {'\0'};
+	ssprintf(lbuf, "xdg-open %s &", link);
+	int stupidWarning = system(lbuf);
+	(void)stupidWarning;  // Why is system() a warn_unused_result function..?
+#endif
+}
+
+static void runUpgrdHyperlink()
+{
 	std::string link = "http://gamecheck.wz2100.net/";
 	std::string version = version_getVersionString();
 	for (char ch : version)
 	{
 		link += ch == ' '? '_' : ch;
 	}
-
-#if defined(WZ_OS_WIN)
-	wchar_t  wszDest[250] = {'/0'};
-	MultiByteToWideChar(CP_UTF8, 0, link.c_str(), -1, wszDest, 250);
-
-	ShellExecuteW(NULL, L"open", wszDest, NULL, NULL, SW_SHOWNORMAL);
-#elif defined (WZ_OS_MAC)
-	char lbuf[250] = {'\0'};
-	ssprintf(lbuf, "open %s &", link.c_str());
-	system(lbuf);
-#else
-	// for linux
-	char lbuf[250] = {'\0'};
-	ssprintf(lbuf, "xdg-open %s &", link.c_str());
-	int stupidWarning = system(lbuf);
-	(void)stupidWarning;  // Why is system() a warn_unused_result function..?
-#endif
+	runLink(link.c_str());
 }
 
-static void runHyperlink(void)
+static void runHyperlink()
 {
-#if defined(WZ_OS_WIN)
-	ShellExecuteW(NULL, L"open", L"http://wz2100.net/", NULL, NULL, SW_SHOWNORMAL);
-#elif defined (WZ_OS_MAC)
-	// For the macs
-	system("open http://wz2100.net");
-#else
-	// for linux
-	int stupidWarning = system("xdg-open http://wz2100.net &");
-	(void)stupidWarning;  // Why is system() a warn_unused_result function..?
-#endif
+	runLink("http://wz2100.net/");
 }
 
-static void rundonatelink(void)
+static void rundonatelink()
 {
-#if defined(WZ_OS_WIN)
-	ShellExecuteW(NULL, L"open", L"http://donations.wz2100.net/", NULL, NULL, SW_SHOWNORMAL);
-#elif defined (WZ_OS_MAC)
-	// For the macs
-	system("open http://donations.wz2100.net");
-#else
-	// for linux
-	int stupidWarning = system("xdg-open http://donations.wz2100.net &");
-	(void)stupidWarning;  // Why is system() a warn_unused_result function..?
-#endif
+	runLink("http://donations.wz2100.net/");
 }
 
-bool runTitleMenu(void)
+static void runchatlink()
+{
+	runLink("http://webchat.freenode.net?channels=%23warzone2100%2C%23warzone2100-games&uio=d4");
+}
+
+bool runTitleMenu()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
@@ -246,6 +249,9 @@ bool runTitleMenu(void)
 	case FRONTEND_DONATELINK:
 		rundonatelink();
 		break;
+	case FRONTEND_CHATLINK:
+		runchatlink();
+		break;
 
 	default:
 		break;
@@ -259,7 +265,7 @@ bool runTitleMenu(void)
 
 // ////////////////////////////////////////////////////////////////////////////
 // Tutorial Menu
-static bool startTutorialMenu(void)
+static bool startTutorialMenu()
 {
 	addBackdrop();
 	addTopForm();
@@ -275,7 +281,7 @@ static bool startTutorialMenu(void)
 	return true;
 }
 
-bool runTutorialMenu(void)
+bool runTutorialMenu()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
@@ -319,7 +325,7 @@ bool runTutorialMenu(void)
 
 // ////////////////////////////////////////////////////////////////////////////
 // Single Player Menu
-static void startSinglePlayerMenu(void)
+static void startSinglePlayerMenu()
 {
 	challengeActive = false;
 	addBackdrop();
@@ -345,7 +351,7 @@ static QList<CAMPAIGN_FILE> readCampaignFiles()
 {
 	QList<CAMPAIGN_FILE> result;
 	char **files = PHYSFS_enumerateFiles("campaigns");
-	for (char **i = files; *i != NULL; ++i)
+	for (char **i = files; *i != nullptr; ++i)
 	{
 		CAMPAIGN_FILE c;
 		QString filename("campaigns/");
@@ -369,8 +375,6 @@ static QList<CAMPAIGN_FILE> readCampaignFiles()
 
 static void startCampaignSelector()
 {
-	static char hackList[10][100]; // sigh...
-
 	addBackdrop();
 	addTopForm();
 	addBottomForm();
@@ -378,8 +382,7 @@ static void startCampaignSelector()
 	QList<CAMPAIGN_FILE> list = readCampaignFiles();
 	for (int i = 0; i < list.size(); i++)
 	{
-		ssprintf(hackList[i], "%s", list[i].name.toUtf8().constData()); // since widget system is crazy and takes pointers not copies
-		addTextButton(FRONTEND_CAMPAIGN_1 + i,  FRONTEND_POS1X, FRONTEND_POS2Y + 40 * i, hackList[i], WBUT_TXTCENTRE);
+		addTextButton(FRONTEND_CAMPAIGN_1 + i, FRONTEND_POS1X, FRONTEND_POS2Y + 40 * i, gettext(list[i].name.toUtf8().constData()), WBUT_TXTCENTRE);
 	}
 	addSideText(FRONTEND_SIDETEXT, FRONTEND_SIDEX, FRONTEND_SIDEY, _("CAMPAIGNS"));
 	addMultiBut(psWScreen, FRONTEND_BOTFORM, FRONTEND_QUIT, 10, 10, 30, 29, P_("menu", "Return"), IMAGE_RETURN, IMAGE_RETURN_HI, IMAGE_RETURN_HI);
@@ -397,7 +400,7 @@ static void frontEndNewGame(int which)
 	if (!list[which].video.isEmpty())
 	{
 		seq_ClearSeqList();
-		seq_AddSeqToList(list[which].video.toUtf8().constData(), NULL, list[which].captions.toUtf8().constData(), false);
+		seq_AddSeqToList(list[which].video.toUtf8().constData(), nullptr, list[which].captions.toUtf8().constData(), false);
 		seq_StartNextFullScreenVideo();
 	}
 	if (!list[which].package.isEmpty())
@@ -408,7 +411,7 @@ static void frontEndNewGame(int which)
 		path += "campaigns";
 		path += PHYSFS_getDirSeparator();
 		path += list[which].package;
-		if (!PHYSFS_mount(path.toUtf8().constData(), NULL, PHYSFS_APPEND))
+		if (!PHYSFS_mount(path.toUtf8().constData(), nullptr, PHYSFS_APPEND))
 		{
 			debug(LOG_ERROR, "Failed to load campaign mod \"%s\": %s",
 			      path.toUtf8().constData(), PHYSFS_getLastError());
@@ -417,7 +420,7 @@ static void frontEndNewGame(int which)
 	if (!list[which].loading.isEmpty())
 	{
 		debug(LOG_WZ, "Adding campaign mod level \"%s\"", list[which].loading.toUtf8().constData());
-		if (!loadLevFile(list[which].loading.toUtf8().constData(), mod_campaign, false, NULL))
+		if (!loadLevFile(list[which].loading.toUtf8().constData(), mod_campaign, false, nullptr))
 		{
 			debug(LOG_ERROR, "Failed to load %s", list[which].loading.toUtf8().constData());
 			return;
@@ -427,7 +430,7 @@ static void frontEndNewGame(int which)
 	changeTitleMode(STARTGAME);
 }
 
-static void loadOK(void)
+static void loadOK()
 {
 	if (strlen(sRequestResult))
 	{
@@ -479,7 +482,7 @@ bool runCampaignSelector()
 	return true;
 }
 
-bool runSinglePlayerMenu(void)
+bool runSinglePlayerMenu()
 {
 	if (bLoadSaveUp)
 	{
@@ -559,7 +562,7 @@ bool runSinglePlayerMenu(void)
 
 // ////////////////////////////////////////////////////////////////////////////
 // Multi Player Menu
-static bool startMultiPlayerMenu(void)
+static bool startMultiPlayerMenu()
 {
 	addBackdrop();
 	addTopForm();
@@ -578,7 +581,7 @@ static bool startMultiPlayerMenu(void)
 	return true;
 }
 
-bool runMultiPlayerMenu(void)
+bool runMultiPlayerMenu()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
@@ -629,7 +632,7 @@ bool runMultiPlayerMenu(void)
 
 // ////////////////////////////////////////////////////////////////////////////
 // Options Menu
-static bool startOptionsMenu(void)
+static bool startOptionsMenu()
 {
 	sliderEnableDrag(true);
 
@@ -649,7 +652,7 @@ static bool startOptionsMenu(void)
 	return true;
 }
 
-bool runOptionsMenu(void)
+bool runOptionsMenu()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
@@ -714,11 +717,6 @@ static char const *graphicsOptionsScanlinesString()
 	}
 }
 
-static char const *graphicsOptionsScreenShakeString()
-{
-	return getShakeStatus() ? _("On") : _("Off");
-}
-
 static char const *graphicsOptionsSubtitlesString()
 {
 	return seq_GetSubtitles() ? _("On") : _("Off");
@@ -736,7 +734,7 @@ static char const *graphicsOptionsRadarString()
 
 // ////////////////////////////////////////////////////////////////////////////
 // Graphics Options
-static bool startGraphicsOptionsMenu(void)
+static bool startGraphicsOptionsMenu()
 {
 	addBackdrop();
 	addTopForm();
@@ -752,23 +750,18 @@ static bool startGraphicsOptionsMenu(void)
 	addTextButton(FRONTEND_SCANLINES_R, FRONTEND_POS3M - 55, FRONTEND_POS3Y, graphicsOptionsScanlinesString(), WBUT_SECONDARY);
 
 	////////////
-	// screenshake
-	addTextButton(FRONTEND_SSHAKE,   FRONTEND_POS4X - 35, FRONTEND_POS4Y, _("Screen Shake"), WBUT_SECONDARY);
-	addTextButton(FRONTEND_SSHAKE_R, FRONTEND_POS4M - 55, FRONTEND_POS4Y, graphicsOptionsScreenShakeString(), WBUT_SECONDARY);
-
-	////////////
 	//subtitle mode.
-	addTextButton(FRONTEND_SUBTITLES,   FRONTEND_POS6X - 35, FRONTEND_POS5Y, _("Subtitles"), WBUT_SECONDARY);
-	addTextButton(FRONTEND_SUBTITLES_R, FRONTEND_POS6M - 55, FRONTEND_POS5Y, graphicsOptionsSubtitlesString(), WBUT_SECONDARY);
+	addTextButton(FRONTEND_SUBTITLES,   FRONTEND_POS4X - 35, FRONTEND_POS4Y, _("Subtitles"), WBUT_SECONDARY);
+	addTextButton(FRONTEND_SUBTITLES_R, FRONTEND_POS4M - 55, FRONTEND_POS4Y, graphicsOptionsSubtitlesString(), WBUT_SECONDARY);
 
 	////////////
 	//shadows
-	addTextButton(FRONTEND_SHADOWS,   FRONTEND_POS7X - 35, FRONTEND_POS6Y, _("Shadows"), WBUT_SECONDARY);
-	addTextButton(FRONTEND_SHADOWS_R, FRONTEND_POS7M - 55, FRONTEND_POS6Y, graphicsOptionsShadowsString(), WBUT_SECONDARY);
+	addTextButton(FRONTEND_SHADOWS,   FRONTEND_POS5X - 35, FRONTEND_POS5Y, _("Shadows"), WBUT_SECONDARY);
+	addTextButton(FRONTEND_SHADOWS_R, FRONTEND_POS5M - 55, FRONTEND_POS5Y, graphicsOptionsShadowsString(), WBUT_SECONDARY);
 
 	// Radar
-	addTextButton(FRONTEND_RADAR,   FRONTEND_POS7X - 35, FRONTEND_POS7Y, _("Radar"), WBUT_SECONDARY);
-	addTextButton(FRONTEND_RADAR_R, FRONTEND_POS7M - 55, FRONTEND_POS7Y, graphicsOptionsRadarString(), WBUT_SECONDARY);
+	addTextButton(FRONTEND_RADAR,   FRONTEND_POS6X - 35, FRONTEND_POS6Y, _("Radar"), WBUT_SECONDARY);
+	addTextButton(FRONTEND_RADAR_R, FRONTEND_POS6M - 55, FRONTEND_POS6Y, graphicsOptionsRadarString(), WBUT_SECONDARY);
 
 	// Add some text down the side of the form
 	addSideText(FRONTEND_SIDETEXT, FRONTEND_SIDEX, FRONTEND_SIDEY, _("GRAPHICS OPTIONS"));
@@ -780,19 +773,13 @@ static bool startGraphicsOptionsMenu(void)
 	return true;
 }
 
-bool runGraphicsOptionsMenu(void)
+bool runGraphicsOptionsMenu()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
 
 	switch (id)
 	{
-	case FRONTEND_SSHAKE:
-	case FRONTEND_SSHAKE_R:
-		setShakeStatus(!getShakeStatus());
-		widgSetString(psWScreen, FRONTEND_SSHAKE_R, graphicsOptionsScreenShakeString());
-		break;
-
 	case FRONTEND_QUIT:
 		changeTitleMode(OPTIONS);
 		break;
@@ -845,7 +832,7 @@ bool runGraphicsOptionsMenu(void)
 
 // ////////////////////////////////////////////////////////////////////////////
 // Audio Options Menu
-static bool startAudioOptionsMenu(void)
+static bool startAudioOptionsMenu()
 {
 	addBackdrop();
 	addTopForm();
@@ -873,7 +860,7 @@ static bool startAudioOptionsMenu(void)
 	return true;
 }
 
-bool runAudioOptionsMenu(void)
+bool runAudioOptionsMenu()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
@@ -922,16 +909,15 @@ static char const *videoOptionsWindowModeString()
 	return war_getFullscreen()? _("Fullscreen") : _("Windowed");
 }
 
-static char const *videoOptionsFsaaString()
+static std::string videoOptionsAntialiasingString()
 {
-	switch (war_getFSAA())
+	if (war_getAntialiasing() == 0)
 	{
-	case FSAA_OFF: return _("Off");
-	case FSAA_2X: return _("2×");
-	case FSAA_4X: return _("4×");
-	case FSAA_8X: return _("8×");
-	// Some cards can do 16x & 32x ...
-	default: return _("Unsupported");
+		return _("Off");
+	}
+	else
+	{
+		return std::to_string(war_getAntialiasing()) + "×";
 	}
 }
 
@@ -956,7 +942,7 @@ static char const *videoOptionsVsyncString()
 
 // ////////////////////////////////////////////////////////////////////////////
 // Video Options
-static bool startVideoOptionsMenu(void)
+static bool startVideoOptionsMenu()
 {
 	addBackdrop();
 	addTopForm();
@@ -977,19 +963,19 @@ static bool startVideoOptionsMenu(void)
 
 	// Resolution
 	addTextButton(FRONTEND_RESOLUTION, FRONTEND_POS3X - 35, FRONTEND_POS3Y, _("Resolution*"), WBUT_SECONDARY);
-	addTextButton(FRONTEND_RESOLUTION_R, FRONTEND_POS3M - 55, FRONTEND_POS3Y, videoOptionsResolutionString().c_str(), WBUT_SECONDARY);
+	addTextButton(FRONTEND_RESOLUTION_R, FRONTEND_POS3M - 55, FRONTEND_POS3Y, videoOptionsResolutionString(), WBUT_SECONDARY);
 
 	// Texture size
 	addTextButton(FRONTEND_TEXTURESZ, FRONTEND_POS4X - 35, FRONTEND_POS4Y, _("Texture size"), WBUT_SECONDARY);
-	addTextButton(FRONTEND_TEXTURESZ_R, FRONTEND_POS4M - 55, FRONTEND_POS4Y, videoOptionsTextureSizeString().c_str(), WBUT_SECONDARY);
+	addTextButton(FRONTEND_TEXTURESZ_R, FRONTEND_POS4M - 55, FRONTEND_POS4Y, videoOptionsTextureSizeString(), WBUT_SECONDARY);
 
 	// Vsync
 	addTextButton(FRONTEND_VSYNC, FRONTEND_POS5X - 35, FRONTEND_POS5Y, _("Vertical sync"), WBUT_SECONDARY);
 	addTextButton(FRONTEND_VSYNC_R, FRONTEND_POS5M - 55, FRONTEND_POS5Y, videoOptionsVsyncString(), WBUT_SECONDARY);
 
-	// FSAA
-	addTextButton(FRONTEND_FSAA, FRONTEND_POS5X - 35, FRONTEND_POS6Y, "FSAA*", WBUT_SECONDARY);
-	addTextButton(FRONTEND_FSAA_R, FRONTEND_POS5M - 55, FRONTEND_POS6Y, videoOptionsFsaaString(), WBUT_SECONDARY);
+	// Antialiasing
+	addTextButton(FRONTEND_FSAA, FRONTEND_POS5X - 35, FRONTEND_POS6Y, "Antialiasing*", WBUT_SECONDARY);
+	addTextButton(FRONTEND_FSAA_R, FRONTEND_POS5M - 55, FRONTEND_POS6Y, videoOptionsAntialiasingString(), WBUT_SECONDARY);
 
 	// Add some text down the side of the form
 	addSideText(FRONTEND_SIDETEXT, FRONTEND_SIDEX, FRONTEND_SIDEY, _("VIDEO OPTIONS"));
@@ -1000,7 +986,7 @@ static bool startVideoOptionsMenu(void)
 	return true;
 }
 
-bool runVideoOptionsMenu(void)
+bool runVideoOptionsMenu()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
@@ -1016,8 +1002,8 @@ bool runVideoOptionsMenu(void)
 	case FRONTEND_FSAA:
 	case FRONTEND_FSAA_R:
 		{
-			war_setFSAA(stepCycle(war_getFSAA(), FSAA_OFF, FSAA_LEVEL(FSAA_MAX - 1)));
-			widgSetString(psWScreen, FRONTEND_FSAA_R, videoOptionsFsaaString());
+			war_setAntialiasing(pow2Cycle(war_getAntialiasing(), 0, pie_GetMaxAntialiasing()));
+			widgSetString(psWScreen, FRONTEND_FSAA_R, videoOptionsAntialiasingString().c_str());
 			break;
 		}
 
@@ -1134,7 +1120,7 @@ static char const *mouseOptionsCursorModeString()
 
 // ////////////////////////////////////////////////////////////////////////////
 // Mouse Options
-static bool startMouseOptionsMenu(void)
+static bool startMouseOptionsMenu()
 {
 	addBackdrop();
 	addTopForm();
@@ -1172,7 +1158,7 @@ static bool startMouseOptionsMenu(void)
 	return true;
 }
 
-bool runMouseOptionsMenu(void)
+bool runMouseOptionsMenu()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
@@ -1243,7 +1229,7 @@ static char const *gameOptionsDifficultyString()
 
 // ////////////////////////////////////////////////////////////////////////////
 // Game Options Menu
-static bool startGameOptionsMenu(void)
+static bool startGameOptionsMenu()
 {
 	UDWORD	w, h;
 	int playercolor;
@@ -1270,11 +1256,11 @@ static bool startGameOptionsMenu(void)
 	w = iV_GetImageWidth(FrontImages, IMAGE_PLAYERN);
 	h = iV_GetImageHeight(FrontImages, IMAGE_PLAYERN);
 
-	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P0, FRONTEND_POS6M + (0 * (w + 6)), FRONTEND_POS6Y, w, h, NULL, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 0);
-	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P4, FRONTEND_POS6M + (1 * (w + 6)), FRONTEND_POS6Y, w, h, NULL, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 4);
-	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P5, FRONTEND_POS6M + (2 * (w + 6)), FRONTEND_POS6Y, w, h, NULL, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 5);
-	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P6, FRONTEND_POS6M + (3 * (w + 6)), FRONTEND_POS6Y, w, h, NULL, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 6);
-	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P7, FRONTEND_POS6M + (4 * (w + 6)), FRONTEND_POS6Y, w, h, NULL, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 7);
+	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P0, FRONTEND_POS6M + (0 * (w + 6)), FRONTEND_POS6Y, w, h, nullptr, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 0);
+	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P4, FRONTEND_POS6M + (1 * (w + 6)), FRONTEND_POS6Y, w, h, nullptr, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 4);
+	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P5, FRONTEND_POS6M + (2 * (w + 6)), FRONTEND_POS6Y, w, h, nullptr, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 5);
+	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P6, FRONTEND_POS6M + (3 * (w + 6)), FRONTEND_POS6Y, w, h, nullptr, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 6);
+	addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_P7, FRONTEND_POS6M + (4 * (w + 6)), FRONTEND_POS6Y, w, h, nullptr, IMAGE_PLAYERN, IMAGE_PLAYERX, true, 7);
 
 	// FIXME: if playercolor = 1-3, then we Assert in widgSetButtonState() since we don't define FE_P1 - FE_P3
 	// I assume the reason is that in SP games, those are reserved for the AI?  Valid values are 0, 4-7.
@@ -1292,7 +1278,7 @@ static bool startGameOptionsMenu(void)
 	{
 		int cellX = (colour + 1) % 7;
 		int cellY = (colour + 1) / 7;
-		addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_MP_PR + colour + 1, FRONTEND_POS7M + cellX * (w + 2), FRONTEND_POS7Y + cellY * (h + 2) - 5, w, h, NULL, IMAGE_PLAYERN, IMAGE_PLAYERX, true, colour >= 0 ? colour : MAX_PLAYERS + 1);
+		addMultiBut(psWScreen, FRONTEND_BOTFORM, FE_MP_PR + colour + 1, FRONTEND_POS7M + cellX * (w + 2), FRONTEND_POS7Y + cellY * (h + 2) - 5, w, h, nullptr, IMAGE_PLAYERN, IMAGE_PLAYERX, true, colour >= 0 ? colour : MAX_PLAYERS + 1);
 	}
 	widgSetButtonState(psWScreen, FE_MP_PR + playercolor + 1, WBUT_LOCK);
 	addTextButton(FRONTEND_COLOUR_MP, FRONTEND_POS7X, FRONTEND_POS7Y, _("Skirmish/Multiplayer"), 0);
@@ -1306,7 +1292,7 @@ static bool startGameOptionsMenu(void)
 	return true;
 }
 
-bool runGameOptionsMenu(void)
+bool runGameOptionsMenu()
 {
 	WidgetTriggers const &triggers = widgRunScreen(psWScreen);
 	unsigned id = triggers.empty() ? 0 : triggers.front().widget->id; // Just use first click here, since the next click could be on another menu.
@@ -1333,7 +1319,7 @@ bool runGameOptionsMenu(void)
 
 	case FRONTEND_DIFFICULTY:
 	case FRONTEND_DIFFICULTY_R:
-		setDifficultyLevel(stepCycle(getDifficultyLevel(), DL_EASY, DL_HARD));
+		setDifficultyLevel(stepCycle(getDifficultyLevel(), DL_EASY, DL_INSANE));
 		widgSetString(psWScreen, FRONTEND_DIFFICULTY_R, gameOptionsDifficultyString());
 		break;
 
@@ -1425,23 +1411,22 @@ static void displayTitleBitmap(WZ_DECL_UNUSED WIDGET *psWidget, WZ_DECL_UNUSED U
 {
 	char modListText[MAX_STR_LENGTH] = "";
 
-	iV_SetFont(font_regular);
 	iV_SetTextColour(WZCOL_GREY);
-	iV_DrawTextRotated(version_getFormattedVersionString(), pie_GetVideoBufferWidth() - 9, pie_GetVideoBufferHeight() - 14, 270.f);
+	iV_DrawTextRotated(version_getFormattedVersionString(), pie_GetVideoBufferWidth() - 9, pie_GetVideoBufferHeight() - 14, 270.f, font_regular);
 
-	if (*getModList())
+	if (!getModList().empty())
 	{
 		sstrcat(modListText, _("Mod: "));
-		sstrcat(modListText, getModList());
-		iV_DrawText(modListText, 9, 14);
+		sstrcat(modListText, getModList().c_str());
+		iV_DrawText(modListText, 9, 14, font_regular);
 	}
 
 	iV_SetTextColour(WZCOL_TEXT_BRIGHT);
-	iV_DrawTextRotated(version_getFormattedVersionString(), pie_GetVideoBufferWidth() - 10, pie_GetVideoBufferHeight() - 15, 270.f);
+	iV_DrawTextRotated(version_getFormattedVersionString(), pie_GetVideoBufferWidth() - 10, pie_GetVideoBufferHeight() - 15, 270.f, font_regular);
 
-	if (*getModList())
+	if (!getModList().empty())
 	{
-		iV_DrawText(modListText, 10, 15);
+		iV_DrawText(modListText, 10, 15, font_regular);
 	}
 }
 
@@ -1476,15 +1461,13 @@ static void displayTextAt270(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 
 	psLab = (W_LABEL *)psWidget;
 
-	iV_SetFont(font_large);
-
 	fx = xOffset + psWidget->x();
-	fy = yOffset + psWidget->y() + iV_GetTextWidth(psLab->aText.toUtf8().constData());
+	fy = yOffset + psWidget->y() + iV_GetTextWidth(psLab->aText.toUtf8().constData(), font_large);
 
 	iV_SetTextColour(WZCOL_GREY);
-	iV_DrawTextRotated(psLab->aText.toUtf8().constData(), fx + 2, fy + 2, 270.f);
+	iV_DrawTextRotated(psLab->aText.toUtf8().constData(), fx + 2, fy + 2, 270.f, font_large);
 	iV_SetTextColour(WZCOL_TEXT_BRIGHT);
-	iV_DrawTextRotated(psLab->aText.toUtf8().constData(), fx, fy, 270.f);
+	iV_DrawTextRotated(psLab->aText.toUtf8().constData(), fx, fy, 270.f, font_large);
 }
 
 // ////////////////////////////////////////////////////////////////////////////
@@ -1492,20 +1475,17 @@ static void displayTextAt270(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 void displayTextOption(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 {
 	SDWORD			fx, fy, fw;
-	W_BUTTON		*psBut;
+	W_BUTTON		*psBut = (W_BUTTON *)psWidget;
 	bool			hilight = false;
 	bool			greyOut = psWidget->UserData; // if option is unavailable.
-
-	psBut = (W_BUTTON *)psWidget;
-	iV_SetFont(psBut->FontID);
 
 	if (widgGetMouseOver(psWScreen) == psBut->id)					// if mouse is over text then hilight.
 	{
 		hilight = true;
 	}
 
-	fw = iV_GetTextWidth(psBut->pText.toUtf8().constData());
-	fy = yOffset + psWidget->y() + (psWidget->height() - iV_GetTextLineSize()) / 2 - iV_GetTextAboveBase();
+	fw = iV_GetTextWidth(psBut->pText.toUtf8().constData(), psBut->FontID);
+	fy = yOffset + psWidget->y() + (psWidget->height() - iV_GetTextLineSize(psBut->FontID)) / 2 - iV_GetTextAboveBase(psBut->FontID);
 
 	if (psWidget->style & WBUT_TXTCENTRE)							//check for centering, calculate offset.
 	{
@@ -1526,7 +1506,7 @@ void displayTextOption(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		{
 			iV_SetTextColour(WZCOL_TEXT_BRIGHT);
 		}
-		else if (psWidget->id == FRONTEND_HYPERLINK || psWidget->id == FRONTEND_DONATELINK)				// special case for our hyperlink
+		else if (psWidget->id == FRONTEND_HYPERLINK || psWidget->id == FRONTEND_DONATELINK || psWidget->id == FRONTEND_CHATLINK) // special case for our hyperlink
 		{
 			iV_SetTextColour(WZCOL_YELLOW);
 		}
@@ -1536,7 +1516,7 @@ void displayTextOption(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		}
 	}
 
-	iV_DrawText(psBut->pText.toUtf8().constData(), fx, fy);
+	iV_DrawText(psBut->pText.toUtf8().constData(), fx, fy, psBut->FontID);
 
 	return;
 }
@@ -1547,7 +1527,7 @@ void displayTextOption(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 // ////////////////////////////////////////////////////////////////////////////
 // common widgets.
 
-void addBackdrop(void)
+void addBackdrop()
 {
 	W_FORMINIT sFormInit;                              // Backdrop
 	sFormInit.formID = 0;
@@ -1562,7 +1542,7 @@ void addBackdrop(void)
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-void addTopForm(void)
+void addTopForm()
 {
 	WIDGET *parent = widgGetFromID(psWScreen, FRONTEND_BACKDROP);
 
@@ -1601,7 +1581,7 @@ void addTopForm(void)
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-void addBottomForm(void)
+void addBottomForm()
 {
 	WIDGET *parent = widgGetFromID(psWScreen, FRONTEND_BACKDROP);
 
@@ -1643,7 +1623,7 @@ void addSideText(UDWORD id,  UDWORD PosX, UDWORD PosY, const char *txt)
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-void addTextButton(UDWORD id,  UDWORD PosX, UDWORD PosY, const char *txt, unsigned int style)
+void addTextButton(UDWORD id,  UDWORD PosX, UDWORD PosY, const std::string &txt, unsigned int style)
 {
 	W_BUTINIT sButInit;
 
@@ -1655,7 +1635,7 @@ void addTextButton(UDWORD id,  UDWORD PosX, UDWORD PosY, const char *txt, unsign
 	// Align
 	if (!(style & WBUT_TXTCENTRE))
 	{
-		sButInit.width = (short)(iV_GetTextWidth(txt) + 10);
+		sButInit.width = (short)(iV_GetTextWidth(txt.c_str(), font_large) + 10);
 		sButInit.x += 35;
 	}
 	else
@@ -1675,7 +1655,7 @@ void addTextButton(UDWORD id,  UDWORD PosX, UDWORD PosY, const char *txt, unsign
 	sButInit.height = FRONTEND_BUTHEIGHT;
 	sButInit.pDisplay = displayTextOption;
 	sButInit.FontID = font_large;
-	sButInit.pText = txt;
+	sButInit.pText = txt.c_str();
 	widgAddButton(psWScreen, &sButInit);
 
 	// Disable button
@@ -1697,8 +1677,7 @@ void addSmallTextButton(UDWORD id,  UDWORD PosX, UDWORD PosY, const char *txt, u
 	// Align
 	if (!(style & WBUT_TXTCENTRE))
 	{
-		iV_SetFont(font_small);
-		sButInit.width = (short)(iV_GetTextWidth(txt) + 10);
+		sButInit.width = (short)(iV_GetTextWidth(txt, font_small) + 10);
 		sButInit.x += 35;
 	}
 	else

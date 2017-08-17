@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@
 static bool bRevealActive = true;
 
 // ------------------------------------------------------------------------------------
-void	avUpdateTiles(void)
+void	avUpdateTiles()
 {
 	const int len = mapHeight * mapWidth;
 	const int playermask = 1 << selectedPlayer;
@@ -87,7 +87,7 @@ UDWORD	avGetObjLightLevel(BASE_OBJECT *psObj, UDWORD origLevel)
 }
 
 // ------------------------------------------------------------------------------------
-bool	getRevealStatus(void)
+bool	getRevealStatus()
 {
 	return bRevealActive;
 }
@@ -100,7 +100,7 @@ void	setRevealStatus(bool val)
 }
 
 // ------------------------------------------------------------------------------------
-void	preProcessVisibility(void)
+void	preProcessVisibility()
 {
 	for (int i = 0; i < mapWidth; i++)
 	{

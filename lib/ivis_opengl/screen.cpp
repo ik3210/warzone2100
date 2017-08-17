@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -29,8 +29,6 @@
 #include "lib/framework/frame.h"
 #include "lib/framework/opengl.h"
 #include "lib/exceptionhandler/dumpinfo.h"
-#include <physfs.h>
-#include <png.h>
 #include "lib/ivis_opengl/png_util.h"
 #include "lib/ivis_opengl/tex.h"
 #include "lib/ivis_opengl/textdraw.h"
@@ -44,15 +42,16 @@
 #include "screen.h"
 #include "src/console.h"
 #include "src/levels.h"
+
+#include <time.h>
 #include <vector>
 #include <algorithm>
-
+#include <physfs.h>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <cstring>
-
-//using namespace std;
+#include <glm/gtx/transform.hpp>
 
 /* global used to indicate preferred internal OpenGL format */
 int wz_texture_compression = 0;
@@ -76,7 +75,7 @@ static bool		bBackDrop = false;
 static char		screendump_filename[PATH_MAX];
 static bool		screendump_required = false;
 
-static GFX *backdropGfx = NULL;
+static GFX *backdropGfx = nullptr;
 
 static bool perfStarted = false;
 static GLuint perfpos[PERF_COUNT];
@@ -146,8 +145,6 @@ bool screenInitialise()
 	GLint glMaxTUs;
 	GLenum err;
 
-	glErrors();
-
 	err = glewInit();
 	if (GLEW_OK != err)
 	{
@@ -179,6 +176,11 @@ bool screenInitialise()
 	debug(LOG_3D, "%s", opengl.GLEWversion);
 
 	GLubyte const *extensionsBegin = glGetString(GL_EXTENSIONS);
+	if (extensionsBegin == nullptr)
+	{
+		static GLubyte const emptyString[] = "";
+		extensionsBegin = emptyString;
+	}
 	GLubyte const *extensionsEnd = extensionsBegin + strlen((char const *)extensionsBegin);
 	std::vector<std::string> glExtensions;
 	for (GLubyte const *i = extensionsBegin; i < extensionsEnd;)
@@ -274,14 +276,13 @@ bool screenInitialise()
 
 	if (khr_debug)
 	{
-		glDebugMessageCallback((GLDEBUGPROC)khr_callback, NULL);
+		glDebugMessageCallback((GLDEBUGPROC)khr_callback, nullptr);
 		glEnable(GL_DEBUG_OUTPUT);
 		// Do not want to output notifications. Some drivers spam them too much.
-		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
 		debug(LOG_3D, "Enabling KHR_debug message callback");
 	}
 
-	glErrors();
 	return true;
 }
 
@@ -303,7 +304,7 @@ void wzPerfStart()
 
 void wzPerfShutdown()
 {
-	if (perfList.size() == 0)
+	if (perfList.empty())
 	{
 		return;
 	}
@@ -343,7 +344,6 @@ void wzPerfFrame()
 	{
 		glGetQueryObjectui64v(perfpos[i], GL_QUERY_RESULT, &store.counters[i]);
 	}
-	glErrors();
 	perfList.append(store);
 	perfStarted = false;
 
@@ -360,10 +360,10 @@ void wzPerfFrame()
 	GL_DEBUG("Performance sample complete");
 }
 
-static const char *sceneActive = NULL;
+static const char *sceneActive = nullptr;
 void wzSceneBegin(const char *descr)
 {
-	ASSERT(sceneActive == NULL, "Out of order scenes: Wanted to start %s, was in %s", descr, sceneActive);
+	ASSERT(sceneActive == nullptr, "Out of order scenes: Wanted to start %s, was in %s", descr, sceneActive);
 	if (khr_debug)
 	{
 		glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, descr);
@@ -378,7 +378,7 @@ void wzSceneEnd(const char *descr)
 	{
 		glPopDebugGroup();
 	}
-	sceneActive = NULL;
+	sceneActive = nullptr;
 }
 
 void wzPerfBegin(PERF_POINT pp, const char *descr)
@@ -394,7 +394,6 @@ void wzPerfBegin(PERF_POINT pp, const char *descr)
 		return;
 	}
 	glBeginQuery(GL_TIME_ELAPSED, perfpos[pp]);
-	glErrors();
 }
 
 void wzPerfEnd(PERF_POINT pp)
@@ -412,7 +411,7 @@ void wzPerfEnd(PERF_POINT pp)
 	glEndQuery(GL_TIME_ELAPSED);
 }
 
-void screenShutDown(void)
+void screenShutDown()
 {
 	pie_ShutDown();
 	pie_TexShutDown();
@@ -423,7 +422,6 @@ void screenShutDown(void)
 	delete backdropGfx;
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-	glErrors();
 }
 
 /// Display a random backdrop from files in dirname starting with basename.
@@ -435,7 +433,7 @@ void screen_SetRandomBackdrop(const char *dirname, const char *basename)
 
 	// Walk thru the files in our dir, adding the ones that start with basename to our vector of strings
 	size_t len = strlen(basename);
-	for (char **i = rc; *i != NULL; i++)
+	for (char **i = rc; *i != nullptr; i++)
 	{
 		// does our filename start with basename?
 		if (!strncmp(*i, basename, len))
@@ -455,20 +453,20 @@ void screen_SetRandomBackdrop(const char *dirname, const char *basename)
 void screen_SetBackDropFromFile(const char *filename)
 {
 	backdropGfx->loadTexture(filename);
-	screen_Upload(NULL);
+	screen_Upload(nullptr);
 }
 
-void screen_StopBackDrop(void)
+void screen_StopBackDrop()
 {
 	bBackDrop = false;	//checking [movie]
 }
 
-void screen_RestartBackDrop(void)
+void screen_RestartBackDrop()
 {
 	bBackDrop = true;
 }
 
-bool screen_GetBackDrop(void)
+bool screen_GetBackDrop()
 {
 	return bBackDrop;
 }
@@ -478,8 +476,7 @@ void screen_Display()
 	pie_SetDepthBufferStatus(DEPTH_CMP_ALWAYS_WRT_OFF);
 
 	// Draw backdrop
-	glColor3f(1, 1, 1);
-	backdropGfx->draw();
+	backdropGfx->draw(glm::ortho(0.f, (float)pie_GetVideoBufferWidth(), (float)pie_GetVideoBufferHeight(), 0.f));
 
 	if (mappreview)
 	{
@@ -503,14 +500,13 @@ void screen_Display()
 			x = screenWidth / 2 - w / 2 + x * scale;
 			y = screenHeight / 2 - h / 2 + y * scale;
 			ssprintf(text, "%d", i);
-			iV_SetFont(font_large);
 			iV_SetTextColour(WZCOL_BLACK);
-			iV_DrawText(text, x - 1, y - 1);
-			iV_DrawText(text, x + 1, y - 1);
-			iV_DrawText(text, x - 1, y + 1);
-			iV_DrawText(text, x + 1, y + 1);
+			iV_DrawText(text, x - 1, y - 1, font_large);
+			iV_DrawText(text, x + 1, y - 1, font_large);
+			iV_DrawText(text, x - 1, y + 1, font_large);
+			iV_DrawText(text, x + 1, y + 1, font_large);
 			iV_SetTextColour(WZCOL_WHITE);
-			iV_DrawText(text, x, y);
+			iV_DrawText(text, x, y, font_large);
 		}
 	}
 	pie_SetDepthBufferStatus(DEPTH_CMP_LEQ_WRT_ON);
@@ -577,7 +573,7 @@ void screen_enableMapPreview(int width, int height, Vector2i *playerpositions)
 	}
 }
 
-void screen_disableMapPreview(void)
+void screen_disableMapPreview()
 {
 	mappreview = false;
 }
@@ -595,10 +591,10 @@ static const unsigned int channelsPerPixel = 3;
  *
  *  \sa screenDumpToDisk()
  */
-void screenDoDumpToDiskIfRequired(void)
+void screenDoDumpToDiskIfRequired()
 {
 	const char *fileName = screendump_filename;
-	iV_Image image = { 0, 0, 8, NULL };
+	iV_Image image = { 0, 0, 8, nullptr };
 
 	if (!screendump_required)
 	{
@@ -642,11 +638,11 @@ void screenDumpToDisk(const char *path, const char *level)
 	time(&aclock);           /* Get time in seconds */
 	t = localtime(&aclock);  /* Convert time to struct */
 
-	ssprintf(screendump_filename, "%s/wz2100-%04d%02d%02d_%02d%02d%02d-%s.png", path, t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, level);
+	ssprintf(screendump_filename, "%swz2100-%04d%02d%02d_%02d%02d%02d-%s.png", path, t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, level);
 
 	while (PHYSFS_exists(screendump_filename))
 	{
-		ssprintf(screendump_filename, "%s/wz2100-%04d%02d%02d_%02d%02d%02d-%s-%d.png", path, t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, level, ++screendump_num);
+		ssprintf(screendump_filename, "%swz2100-%04d%02d%02d_%02d%02d%02d-%s-%d.png", path, t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, level, ++screendump_num);
 	}
 	screendump_required = true;
 }

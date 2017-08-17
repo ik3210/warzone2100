@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -50,9 +50,9 @@ extern iSurface rendSurface;
  *	Global ProtoTypes
  */
 /***************************************************************************/
-extern bool pie_Initialise(void);
-extern void pie_ShutDown(void);
-extern void pie_ScreenFlip(int ClearMode);
-extern UDWORD	pie_GetResScalingFactor(void);
+bool pie_Initialise();
+void pie_ShutDown();
+void pie_ScreenFlip(int ClearMode);
+UDWORD pie_GetResScalingFactor();
 
 #endif

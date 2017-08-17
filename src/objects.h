@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,19 +30,15 @@
 #include "feature.h"
 #include "objmem.h"
 
-#include "ai.h"
-#include "move.h"
-#include "stats.h"
-
 /* Initialise the object system */
-extern bool objInitialise(void);
+bool objInitialise();
 
 /* Shutdown the object system */
-extern bool objShutdown(void);
+bool objShutdown();
 
-/*goes thru' the list passed in reversing the order so the first entry becomes
-the last and the last entry becomes the first!*/
+/// Goes through the list passed in reversing the order so the first entry becomes the last and the last entry becomes the first!
 void reverseObjectList(BASE_OBJECT **ppsList);
+
 template <typename OBJECT>
 void reverseObjectList(OBJECT **ppsList)
 {
@@ -50,7 +46,6 @@ void reverseObjectList(OBJECT **ppsList)
 	reverseObjectList(&baseList);
 	*ppsList = static_cast<OBJECT *>(baseList);
 }
-
 
 /** Output an informative string about this object. For debugging. */
 const char *objInfo(const BASE_OBJECT *psObj);

@@ -1,28 +1,38 @@
 #version 120
-#pragma debug(on)
+//#pragma debug(on)
 
-uniform sampler2D Texture0;
-uniform sampler2D Texture1;
+uniform sampler2D Texture;
+uniform sampler2D TextureTcmask;
+uniform vec4 colour;
 uniform vec4 teamcolour;
 uniform int tcmask;
+uniform bool alphaTest;
 
-void main(void)
+varying vec2 texCoord;
+
+void main()
 {
-	vec4 mask, colour;
-
 	// Get color from texture unit 0
-	colour = texture2D(Texture0, gl_TexCoord[0].st);
+	vec4 texColour = texture2D(Texture, texCoord);
 
+	vec4 fragColour;
 	if (tcmask == 1)
 	{
 		// Get tcmask information from texture unit 1
-		mask = texture2D(Texture1, gl_TexCoord[0].st);
-	
-		// Apply color using grain merge with tcmask
-		gl_FragColor = (colour + (teamcolour - 0.5) * mask.a) * gl_Color;
+		vec4 mask = texture2D(TextureTcmask, texCoord);
+
+		// Apply colour using grain merge with tcmask
+		fragColour = (texColour + (teamcolour - 0.5) * mask.a) * colour;
 	}
 	else
 	{
-		gl_FragColor = colour * gl_Color;
+		fragColour = texColour * colour;
 	}
+
+	if (alphaTest && fragColour.a <= 0.001)
+	{
+		discard;
+	}
+
+	gl_FragColor = fragColour;
 }

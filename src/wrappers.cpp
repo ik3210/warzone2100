@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -56,16 +56,16 @@ static bool		bPlayerHasLost = false;
 static bool		bPlayerHasWon = false;
 static UBYTE    scriptWinLoseVideo = PLAY_NONE;
 
-void	runCreditsScreen(void);
+void	runCreditsScreen();
 
 static	UDWORD	lastChange = 0;
-bool hostlaunch = false;				// used to detect if we are hosting a game via command line option.
+int hostlaunch = 0;				// used to detect if we are hosting a game via command line option.
 
 static uint32_t lastTick = 0;
 static int barLeftX, barLeftY, barRightX, barRightY, boxWidth, boxHeight, starsNum, starHeight;
-static STAR *stars = NULL;
+static STAR *stars = nullptr;
 
-static STAR newStar(void)
+static STAR newStar()
 {
 	STAR s;
 	s.xPos = rand() % barRightX;
@@ -74,7 +74,7 @@ static STAR newStar(void)
 	return s;
 }
 
-static void setupLoadingScreen(void)
+static void setupLoadingScreen()
 {
 	unsigned int i;
 	int w = pie_GetVideoBufferWidth();
@@ -109,7 +109,7 @@ static void setupLoadingScreen(void)
 // //////////////////////////////////////////////////////////////////
 // Initialise frontend globals and statics.
 //
-bool frontendInitVars(void)
+bool frontendInitVars()
 {
 	firstcall = true;
 
@@ -118,7 +118,7 @@ bool frontendInitVars(void)
 
 // ///////////////// /////////////////////////////////////////////////
 // Main Front end game loop.
-TITLECODE titleLoop(void)
+TITLECODE titleLoop()
 {
 	TITLECODE RetCode = TITLECODE_CONTINUE;
 
@@ -135,17 +135,23 @@ TITLECODE titleLoop(void)
 		// then check --join and if neither, run the normal game menu.
 		if (hostlaunch)
 		{
-			NetPlay.bComms = true; // use network = true
-			NetPlay.isUPNP_CONFIGURED = false;
-			NetPlay.isUPNP_ERROR = false;
-			ingame.bHostSetup = true;
+			if (hostlaunch == 2)
+			{
+				SPinit();
+			}
+			else // single player
+			{
+				NetPlay.bComms = true; // use network = true
+				NetPlay.isUPNP_CONFIGURED = false;
+				NetPlay.isUPNP_ERROR = false;
+				bMultiMessages = true;
+				NETinit(true);
+				NETdiscoverUPnPDevices();
+			}
 			bMultiPlayer = true;
-			bMultiMessages = true;
-			NETinit(true);
-			NETdiscoverUPnPDevices();
+			ingame.bHostSetup = true;
 			game.type = SKIRMISH;
 			changeTitleMode(MULTIOPTION);
-			hostlaunch = false;			// reset the bool to default state.
 		}
 		else if (strlen(iptoconnect))
 		{
@@ -216,7 +222,6 @@ TITLECODE titleLoop(void)
 		runGameOptionsMenu();
 		break;
 
-
 	case GRAPHICS_OPTIONS:
 		runGraphicsOptionsMenu();
 		break;
@@ -280,7 +285,7 @@ TITLECODE titleLoop(void)
 // Loading Screen.
 
 //loadbar update
-void loadingScreenCallback(void)
+void loadingScreenCallback()
 {
 	const PIELIGHT loadingbar_background = WZCOL_LOADING_BAR_BACKGROUND;
 	const uint32_t currTick = wzGetTicks();
@@ -298,7 +303,7 @@ void loadingScreenCallback(void)
 	for (i = 1; i < starsNum; ++i)
 	{
 		stars[i].xPos = stars[i].xPos + stars[i].speed;
-		if (stars[i].xPos >= barRightX)
+		if (barLeftX + stars[i].xPos >= barRightX)
 		{
 			stars[i] = newStar();
 			stars[i].xPos = 1;
@@ -347,7 +352,7 @@ void initLoadingScreen(bool drawbdrop)
 
 
 // fill buffers with the static screen
-void startCreditsScreen(void)
+void startCreditsScreen()
 {
 	lastChange = gameTime;
 
@@ -358,7 +363,7 @@ void startCreditsScreen(void)
 }
 
 /* This function does nothing - since it's already been drawn */
-void runCreditsScreen(void)
+void runCreditsScreen()
 {
 	// Check for key presses now.
 	if (keyReleased(KEY_ESC)
@@ -373,14 +378,14 @@ void runCreditsScreen(void)
 }
 
 // shut down the loading screen
-void closeLoadingScreen(void)
+void closeLoadingScreen()
 {
 	if (stars)
 	{
 		free(stars);
-		stars = NULL;
+		stars = nullptr;
 	}
-	resSetLoadCallback(NULL);
+	resSetLoadCallback(nullptr);
 	pie_ScreenFlip(CLEAR_BLACK);
 }
 
@@ -423,7 +428,7 @@ bool displayGameOver(bool bDidit)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-bool testPlayerHasLost(void)
+bool testPlayerHasLost()
 {
 	return (bPlayerHasLost);
 }
@@ -435,7 +440,7 @@ void setPlayerHasLost(bool val)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-bool testPlayerHasWon(void)
+bool testPlayerHasWon()
 {
 	return (bPlayerHasWon);
 }
@@ -451,7 +456,7 @@ void setScriptWinLoseVideo(UBYTE val)
 	scriptWinLoseVideo = val;
 }
 
-UBYTE getScriptWinLoseVideo(void)
+UBYTE getScriptWinLoseVideo()
 {
 	return scriptWinLoseVideo;
 }

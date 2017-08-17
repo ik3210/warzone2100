@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004	 Eidos Interactive
-	Copyright (C) 2005-2015	 Warzone 2100 Project
+	Copyright (C) 2005-2017	 Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -128,52 +128,33 @@ extern PIELIGHT		psPalette[];
 
 //*************************************************************************
 
-extern void		pal_Init(void);
-extern void		pal_ShutDown(void);
-extern PIELIGHT		pal_GetTeamColour(int team);
+void pal_Init();
+void pal_ShutDown();
+PIELIGHT pal_GetTeamColour(int team);
 
-WZ_DECL_CONST static inline PIELIGHT pal_Colour(UBYTE r, UBYTE g, UBYTE b)
+static inline PIELIGHT WZ_DECL_PURE pal_Colour(UBYTE r, UBYTE g, UBYTE b)
 {
-	PIELIGHT c;
-
-	c.byte.r = r;
-	c.byte.g = g;
-	c.byte.b = b;
-	c.byte.a = UBYTE_MAX;
-
-	return c;
+	return { r, g, b, UBYTE_MAX };
 }
 
-WZ_DECL_CONST static inline PIELIGHT pal_SetBrightness(UBYTE brightness)
+static inline PIELIGHT WZ_DECL_PURE pal_SetBrightness(UBYTE brightness)
 {
-	PIELIGHT c;
-
-	c.byte.r = brightness;
-	c.byte.g = brightness;
-	c.byte.b = brightness;
-	c.byte.a = UBYTE_MAX;
-
-	return c;
+	return { brightness, brightness, brightness, UBYTE_MAX };
 }
 
-WZ_DECL_CONST static inline PIELIGHT pal_RGBA(UBYTE r, UBYTE g, UBYTE b, UBYTE a)
+static inline PIELIGHT WZ_DECL_PURE pal_RGBA(UBYTE r, UBYTE g, UBYTE b, UBYTE a)
 {
-	PIELIGHT c;
-
-	c.byte.r = r;
-	c.byte.g = g;
-	c.byte.b = b;
-	c.byte.a = a;
-
-	return c;
+	return { r, g, b, a };
 }
 
-static inline void pal_PIELIGHTtoRGBA4f(float *rgba4f, PIELIGHT rgba)
+static inline glm::vec4 pal_PIELIGHTtoVec4(PIELIGHT rgba)
 {
-	rgba4f[0] = rgba.byte.r / 255.0;
-	rgba4f[1] = rgba.byte.g / 255.0;
-	rgba4f[2] = rgba.byte.b / 255.0;
-	rgba4f[3] = rgba.byte.a / 255.0;
+	return (1 / 255.0f) * glm::vec4{
+		rgba.byte.r,
+		rgba.byte.g,
+		rgba.byte.b,
+		rgba.byte.a
+	};
 }
 
 #endif

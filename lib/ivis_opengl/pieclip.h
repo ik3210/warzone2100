@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -32,7 +32,6 @@
 /***************************************************************************/
 
 #include "lib/framework/frame.h"
-#include "piedef.h"
 
 /***************************************************************************/
 /*
@@ -40,11 +39,11 @@
  */
 /***************************************************************************/
 
-extern bool pie_SetVideoBufferDepth(UDWORD depth);
-extern bool pie_SetVideoBufferWidth(UDWORD width);
-extern bool pie_SetVideoBufferHeight(UDWORD height);
-extern int pie_GetVideoBufferDepth(void) WZ_DECL_PURE;
-extern int pie_GetVideoBufferWidth(void) WZ_DECL_PURE;
-extern int pie_GetVideoBufferHeight(void) WZ_DECL_PURE;
+bool pie_SetVideoBufferDepth(UDWORD depth);
+bool pie_SetVideoBufferWidth(UDWORD width);
+bool pie_SetVideoBufferHeight(UDWORD height);
+int pie_GetVideoBufferDepth() WZ_DECL_PURE;
+int pie_GetVideoBufferWidth() WZ_DECL_PURE;
+int pie_GetVideoBufferHeight() WZ_DECL_PURE;
 
 #endif // _pieclip_h

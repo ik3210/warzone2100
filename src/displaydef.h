@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,8 +24,7 @@
 #ifndef __INCLUDED_DISPLAYDEF_H__
 #define __INCLUDED_DISPLAYDEF_H__
 
-#include "lib/ivis_opengl/imd.h"
-#include "lib/ivis_opengl/pieclip.h"
+struct iIMDShape;
 
 // for mouse scrolling. (how many pixels from the edge before pointer scrolls the screen in a direction)
 #define	BOUNDARY_X	(2)

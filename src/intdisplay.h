@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -97,7 +97,7 @@ private:
 void SetFormAudioIDs(int OpenID, int CloseID);
 
 // Initialise interface graphics.
-void intInitialiseGraphics(void);
+void intInitialiseGraphics();
 
 // callback to update the command droid size label
 void intUpdateCommandSize(WIDGET *psWidget, W_CONTEXT *psContext);
@@ -112,9 +112,9 @@ void intUpdateProgressBar(WIDGET *psWidget, W_CONTEXT *psContext);
 
 void intUpdateQuantity(WIDGET *psWidget, W_CONTEXT *psContext);
 //callback to display the factory number
-extern void intAddFactoryInc(WIDGET *psWidget, W_CONTEXT *psContext);
+void intAddFactoryInc(WIDGET *psWidget, W_CONTEXT *psContext);
 //callback to display the production quantity number for a template
-extern void intAddProdQuantity(WIDGET *psWidget, W_CONTEXT *psContext);
+void intAddProdQuantity(WIDGET *psWidget, W_CONTEXT *psContext);
 
 void intDisplayPowerBar(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset);
 
@@ -267,7 +267,7 @@ void intDisplayStatsBar(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset);
 void intDisplayDesignPowerBar(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset);
 
 // Widget callback function to play an audio track.
-extern void WidgetAudioCallback(int AudioID);
+void WidgetAudioCallback(int AudioID);
 
 //void intDisplayTransportButton(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset);
 class IntTransportButton : public IntFancyButton
@@ -287,12 +287,12 @@ protected:
 };
 
 /*draws blips on radar to represent Proximity Display*/
-extern void drawRadarBlips(int radarX, int radarY, float pixSizeH, float pixSizeV);
+void drawRadarBlips(int radarX, int radarY, float pixSizeH, float pixSizeV, const glm::mat4 &modelViewProjection);
 
 /*Displays the proximity messages blips over the world*/
 void intDisplayProximityBlips(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset);
 
-extern void intUpdateQuantitySlider(WIDGET *psWidget, W_CONTEXT *psContext);
+void intUpdateQuantitySlider(WIDGET *psWidget, W_CONTEXT *psContext);
 
 void intDisplayResSubGroup(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset);
 

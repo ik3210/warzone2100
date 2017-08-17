@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2007-2015  Warzone 2100 Project
+	Copyright (C) 2007-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -117,6 +117,7 @@ static LONG WINAPI windowsExceptionHandler(PEXCEPTION_POINTERS pExceptionInfo)
 # include <stdint.h>
 # include <signal.h>
 # include <string.h>
+# include <errno.h>
 
 // POSIX headers:
 # include <unistd.h>
@@ -141,8 +142,6 @@ static LONG WINAPI windowsExceptionHandler(PEXCEPTION_POINTERS pExceptionInfo)
 #  include <execinfo.h>
 #  define MAX_BACKTRACE 20
 # endif
-
-#define write(x, y, z) abs(write(x, y, z))  // HACK Squelch unused result warning.
 
 # define MAX_PID_STRING 16
 # define MAX_DATE_STRING 256
@@ -321,65 +320,92 @@ static void setFatalSignalHandler(SigActionHandler signalHandler)
 	new_handler.sa_handler = signalHandler;
 #endif
 
-	sigaction(SIGABRT, NULL, &oldAction[SIGABRT]);
+	sigaction(SIGABRT, nullptr, &oldAction[SIGABRT]);
 	if (oldAction[SIGABRT].sa_handler != SIG_IGN)
 	{
-		sigaction(SIGABRT, &new_handler, NULL);
+		sigaction(SIGABRT, &new_handler, nullptr);
 	}
 
-	sigaction(SIGBUS, NULL, &oldAction[SIGBUS]);
+	sigaction(SIGBUS, nullptr, &oldAction[SIGBUS]);
 	if (oldAction[SIGBUS].sa_handler != SIG_IGN)
 	{
-		sigaction(SIGBUS, &new_handler, NULL);
+		sigaction(SIGBUS, &new_handler, nullptr);
 	}
 
-	sigaction(SIGFPE, NULL, &oldAction[SIGFPE]);
+	sigaction(SIGFPE, nullptr, &oldAction[SIGFPE]);
 	if (oldAction[SIGFPE].sa_handler != SIG_IGN)
 	{
-		sigaction(SIGFPE, &new_handler, NULL);
+		sigaction(SIGFPE, &new_handler, nullptr);
 	}
 
-	sigaction(SIGILL, NULL, &oldAction[SIGILL]);
+	sigaction(SIGILL, nullptr, &oldAction[SIGILL]);
 	if (oldAction[SIGILL].sa_handler != SIG_IGN)
 	{
-		sigaction(SIGILL, &new_handler, NULL);
+		sigaction(SIGILL, &new_handler, nullptr);
 	}
 
-	sigaction(SIGQUIT, NULL, &oldAction[SIGQUIT]);
+	sigaction(SIGQUIT, nullptr, &oldAction[SIGQUIT]);
 	if (oldAction[SIGQUIT].sa_handler != SIG_IGN)
 	{
-		sigaction(SIGQUIT, &new_handler, NULL);
+		sigaction(SIGQUIT, &new_handler, nullptr);
 	}
 
-	sigaction(SIGSEGV, NULL, &oldAction[SIGSEGV]);
+	sigaction(SIGSEGV, nullptr, &oldAction[SIGSEGV]);
 	if (oldAction[SIGSEGV].sa_handler != SIG_IGN)
 	{
-		sigaction(SIGSEGV, &new_handler, NULL);
+		sigaction(SIGSEGV, &new_handler, nullptr);
 	}
 
 #if _XOPEN_UNIX
-	sigaction(SIGSYS, NULL, &oldAction[SIGSYS]);
+	sigaction(SIGSYS, nullptr, &oldAction[SIGSYS]);
 	if (oldAction[SIGSYS].sa_handler != SIG_IGN)
 	{
-		sigaction(SIGSYS, &new_handler, NULL);
+		sigaction(SIGSYS, &new_handler, nullptr);
 	}
 
-	sigaction(SIGXCPU, NULL, &oldAction[SIGXCPU]);
+	sigaction(SIGXCPU, nullptr, &oldAction[SIGXCPU]);
 	if (oldAction[SIGXCPU].sa_handler != SIG_IGN)
 	{
-		sigaction(SIGXCPU, &new_handler, NULL);
+		sigaction(SIGXCPU, &new_handler, nullptr);
 	}
 
-	sigaction(SIGXFSZ, NULL, &oldAction[SIGXFSZ]);
+	sigaction(SIGXFSZ, nullptr, &oldAction[SIGXFSZ]);
 	if (oldAction[SIGXFSZ].sa_handler != SIG_IGN)
 	{
-		sigaction(SIGXFSZ, &new_handler, NULL);
+		sigaction(SIGXFSZ, &new_handler, nullptr);
 	}
 
 	// ignore SIGTRAP
 	new_handler.sa_handler = SIG_IGN;
 	sigaction(SIGTRAP, &new_handler, &oldAction[SIGTRAP]);
 #endif // _XOPEN_UNIX
+}
+
+static ssize_t writeAll(int const fd, const char* const str)
+{
+	size_t const to_write = strlen(str);
+	size_t written = 0;
+	while (written < to_write)
+	{
+		ssize_t ret = write(fd, str + written, to_write - written);
+		if (ret == -1)
+		{
+			switch (errno)
+			{
+				case EAGAIN:
+#if defined(EWOULDBLOCK) && EAGAIN != EWOULDBLOCK
+				case EWOULDBLOCK:
+#endif
+				case EINTR:
+					continue;
+				default:
+					return -1;
+			}
+		}
+		written += ret;
+	}
+
+	return written;
 }
 
 /**
@@ -407,26 +433,23 @@ static pid_t execGdb(int const dumpFile, int *gdbWritePipe)
 {
 	int gdbPipe[2];
 	pid_t pid;
-	char *gdbArgv[] = { gdbPath, programPath, programPID, NULL };
-	char *gdbEnv[] = { NULL };
+	char *gdbArgv[] = { gdbPath, programPath, programPID, nullptr };
+	char *gdbEnv[] = { nullptr };
 	/* Check if the "bare minimum" is available: GDB and an absolute path
 	 * to our program's binary.
 	 */
 	if (!programIsAvailable
 	    || !gdbIsAvailable)
 	{
-		write(dumpFile, "No extended backtrace dumped:\n",
-		      strlen("No extended backtrace dumped:\n"));
+		writeAll(dumpFile, "No extended backtrace dumped:\n");
 
 		if (!programIsAvailable)
 		{
-			write(dumpFile, "- Program path not available\n",
-			      strlen("- Program path not available\n"));
+			writeAll(dumpFile, "- Program path not available\n");
 		}
 		if (!gdbIsAvailable)
 		{
-			write(dumpFile, "- GDB not available\n",
-			      strlen("- GDB not available\n"));
+			writeAll(dumpFile, "- GDB not available\n");
 		}
 
 		return 0;
@@ -435,8 +458,7 @@ static pid_t execGdb(int const dumpFile, int *gdbWritePipe)
 	// Create a pipe to use for communication with 'gdb'
 	if (pipe(gdbPipe) == -1)
 	{
-		write(dumpFile, "Pipe failed\n",
-		      strlen("Pipe failed\n"));
+		writeAll(dumpFile, "Pipe failed\n");
 
 		printf("Pipe failed\n");
 
@@ -447,8 +469,7 @@ static pid_t execGdb(int const dumpFile, int *gdbWritePipe)
 	pid = fork();
 	if (pid == -1)
 	{
-		write(dumpFile, "Fork failed\n",
-		      strlen("Fork failed\n"));
+		writeAll(dumpFile, "Fork failed\n");
 
 		printf("Fork failed\n");
 
@@ -478,8 +499,7 @@ static pid_t execGdb(int const dumpFile, int *gdbWritePipe)
 	dup2(gdbPipe[0], STDIN_FILENO); // STDIN from pipe
 	dup2(dumpFile, STDOUT_FILENO); // STDOUT to dumpFile
 
-	write(dumpFile, "GDB extended backtrace:\n",
-	      strlen("GDB extended backtrace:\n"));
+	writeAll(dumpFile, "GDB extended backtrace:\n");
 
 	/* If execve() is successful it effectively prevents further
 	 * execution of this function.
@@ -487,8 +507,7 @@ static pid_t execGdb(int const dumpFile, int *gdbWritePipe)
 	execve(gdbPath, (char **)gdbArgv, (char **)gdbEnv);
 
 	// If we get here it means that execve failed!
-	write(dumpFile, "execcv(\"gdb\") failed\n",
-	      strlen("execcv(\"gdb\") failed\n"));
+	writeAll(dumpFile, "execcv(\"gdb\") failed\n");
 
 	// Terminate the child, indicating failure
 	_exit(1);
@@ -520,7 +539,7 @@ static bool gdbExtendedBacktrace(int const dumpFile)
 	 */
 	void const *const frame =
 #if   defined(SA_SIGINFO) && defined(REG_RBP)
-	    sigcontext ? (void *)(sigcontext->uc_mcontext.gregs[REG_RBP] + sizeof(greg_t) + sizeof(void (*)(void))) : NULL;
+	    sigcontext ? (void *)(sigcontext->uc_mcontext.gregs[REG_RBP] + sizeof(greg_t) + sizeof(void (*)(void))) : nullptr;
 #elif defined(SA_SIGINFO) && defined(REG_EBP)
 	    sigcontext ? (void *)(sigcontext->uc_mcontext.gregs[REG_EBP] + sizeof(greg_t) + sizeof(void (*)(void))) : NULL;
 #else
@@ -532,7 +551,7 @@ static bool gdbExtendedBacktrace(int const dumpFile)
 	 */
 	void (*instruction)(void) =
 #if   defined(SA_SIGINFO) && defined(REG_RIP)
-	    sigcontext ? (void (*)(void))sigcontext->uc_mcontext.gregs[REG_RIP] : NULL;
+	    sigcontext ? (void (*)(void))sigcontext->uc_mcontext.gregs[REG_RIP] : nullptr;
 #elif defined(SA_SIGINFO) && defined(REG_EIP)
 	    sigcontext ? (void (*)(void))sigcontext->uc_mcontext.gregs[REG_EIP] : NULL;
 #else
@@ -574,7 +593,7 @@ static bool gdbExtendedBacktrace(int const dumpFile)
 		        "disassemble /m\n", frame);
 	}
 
-	write(gdbPipe, gdbCommands, strlen(gdbCommands));
+	writeAll(gdbPipe, gdbCommands);
 
 	/* Flush our end of the pipe to make sure that GDB has all commands
 	 * directly available to it.
@@ -590,8 +609,7 @@ static bool gdbExtendedBacktrace(int const dumpFile)
 	// waitpid(): on error, -1 is returned
 	if (wpid == -1)
 	{
-		write(dumpFile, "GDB failed\n",
-		      strlen("GDB failed\n"));
+		writeAll(dumpFile, "GDB failed\n");
 		printf("GDB failed\n");
 
 		return false;
@@ -612,8 +630,7 @@ static bool gdbExtendedBacktrace(int const dumpFile)
 	if (!WIFEXITED(status)
 	    || WEXITSTATUS(status) != 0)
 	{
-		write(dumpFile, "GDB failed\n",
-		      strlen("GDB failed\n"));
+		writeAll(dumpFile, "GDB failed\n");
 		printf("GDB failed\n");
 
 		return false;
@@ -645,7 +662,7 @@ static void posixExceptionHandler(int signum)
 	int dumpFile;
 	const char *signal;
 # if defined(__GLIBC__)
-	void *btBuffer[MAX_BACKTRACE] = {NULL};
+	void *btBuffer[MAX_BACKTRACE] = {nullptr};
 	uint32_t btSize = backtrace(btBuffer, MAX_BACKTRACE);
 # endif
 
@@ -671,23 +688,22 @@ static void posixExceptionHandler(int signum)
 	dbgDumpHeader(dumpFile);
 
 #ifdef SA_SIGINFO
-	write(dumpFile, "Dump caused by signal: ", strlen("Dump caused by signal: "));
+	writeAll(dumpFile, "Dump caused by signal: ");
 
 	signal = wz_strsignal(siginfo->si_signo, siginfo->si_code);
-	write(dumpFile, signal, strlen(signal));
-	write(dumpFile, "\n\n", 2);
+	writeAll(dumpFile, signal);
+	writeAll(dumpFile, "\n\n");
 #endif
 
 	dbgDumpLog(dumpFile); // dump out the last several log calls
 
 # if defined(__GLIBC__)
 	// Dump raw backtrace in case GDB is not available or fails
-	write(dumpFile, "GLIBC raw backtrace:\n", strlen("GLIBC raw backtrace:\n"));
+	writeAll(dumpFile, "GLIBC raw backtrace:\n");
 	backtrace_symbols_fd(btBuffer, btSize, dumpFile);
-	write(dumpFile, "\n", 1);
+	writeAll(dumpFile, "\n");
 # else
-	write(dumpFile, "GLIBC not available, no raw backtrace dumped\n\n",
-	      strlen("GLIBC not available, no raw backtrace dumped\n\n"));
+	writeAll(dumpFile, "GLIBC not available, no raw backtrace dumped\n\n");
 # endif
 
 
@@ -706,7 +722,7 @@ static void posixExceptionHandler(int signum)
 	close(dumpFile);
 
 
-	sigaction(signum, &oldAction[signum], NULL);
+	sigaction(signum, &oldAction[signum], nullptr);
 	raise(signum);
 }
 
@@ -794,7 +810,7 @@ void setupExceptionHandler(int argc, const char **argv, const char *packageVersi
 
 	sysInfoValid = (uname(&sysInfo) == 0);
 
-	currentTime = time(NULL);
+	currentTime = time(nullptr);
 	sstrcpy(executionDate, ctime(&currentTime));
 
 	snprintf(programPID, sizeof(programPID), "%i", getpid());

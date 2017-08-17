@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -37,26 +37,26 @@ extern FEATURE_STATS *oilResFeature;
 bool loadFeatureStats(const char *pFileName);
 
 /* Release the feature stats memory */
-extern void featureStatsShutDown(void);
+void featureStatsShutDown();
 
 /* Create a feature on the map */
-extern FEATURE *buildFeature(FEATURE_STATS *psStats, UDWORD x, UDWORD y, bool FromSave);
+FEATURE *buildFeature(FEATURE_STATS *psStats, UDWORD x, UDWORD y, bool FromSave);
 
 /* Update routine for features */
-extern void featureUpdate(FEATURE *psFeat);
+void featureUpdate(FEATURE *psFeat);
 
 // free up a feature with no visual effects
-extern bool removeFeature(FEATURE *psDel);
+bool removeFeature(FEATURE *psDel);
 
 /* Remove a Feature and free it's memory */
 bool destroyFeature(FEATURE *psDel, unsigned impactTime);
 
 /* get a feature stat id from its name */
-extern SDWORD getFeatureStatFromName(const char *pName);
+SDWORD getFeatureStatFromName(const char *pName);
 
 int32_t featureDamage(FEATURE *psFeature, unsigned damage, WEAPON_CLASS weaponClass, WEAPON_SUBCLASS weaponSubClass, unsigned impactTime, bool isDamagePerSecond, int minDamage);
 
-extern void     featureInitVars(void);
+void featureInitVars();
 
 Vector2i getFeatureStatsSize(FEATURE_STATS const *pStructureType);
 StructureBounds getStructureBounds(FEATURE const *object);
@@ -69,17 +69,17 @@ void _syncDebugFeature(const char *function, FEATURE const *psFeature, char ch);
 // True iff object is a feature.
 static inline bool isFeature(SIMPLE_OBJECT const *psObject)
 {
-	return psObject != NULL && psObject->type == OBJ_FEATURE;
+	return psObject != nullptr && psObject->type == OBJ_FEATURE;
 }
 // Returns FEATURE * if feature or NULL if not.
 static inline FEATURE *castFeature(SIMPLE_OBJECT *psObject)
 {
-	return isFeature(psObject) ? (FEATURE *)psObject : (FEATURE *)NULL;
+	return isFeature(psObject) ? (FEATURE *)psObject : (FEATURE *)nullptr;
 }
 // Returns FEATURE const * if feature or NULL if not.
 static inline FEATURE const *castFeature(SIMPLE_OBJECT const *psObject)
 {
-	return isFeature(psObject) ? (FEATURE const *)psObject : (FEATURE const *)NULL;
+	return isFeature(psObject) ? (FEATURE const *)psObject : (FEATURE const *)nullptr;
 }
 
 #endif // __INCLUDED_SRC_FEATURE_H__

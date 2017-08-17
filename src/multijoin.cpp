@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -47,6 +47,7 @@
 #include "projectile.h"
 #include "droid.h"
 #include "map.h"
+#include "levels.h"
 #include "power.h"
 #include "game.h"					// for loading maps
 #include "message.h"				// for clearing game messages
@@ -88,14 +89,12 @@ bool intDisplayMultiJoiningStatus(UBYTE joinCount)
 	x = RET_X;
 	y = RET_Y;
 
-//	cameraToHome(selectedPlayer);				// home the camera to the player.
-	RenderWindowFrame(FRAME_NORMAL, x, y , w, h);		// draw a wee blu box.
+	RenderWindowFrame(FRAME_NORMAL, x, y , w, h);		// draw a wee blue box.
 
 	// display how far done..
-	iV_SetFont(font_regular);
 	iV_DrawText(_("Players Still Joining"),
-	            x + (w / 2) - (iV_GetTextWidth(_("Players Still Joining")) / 2),
-	            y + (h / 2) - 8);
+	            x + (w / 2) - (iV_GetTextWidth(_("Players Still Joining"), font_regular) / 2),
+	            y + (h / 2) - 8, font_regular);
 	unsigned playerCount = 0;  // Calculate what NetPlay.playercount should be, which is apparently only non-zero for the host.
 	for (unsigned player = 0; player < game.maxPlayers; ++player)
 	{
@@ -108,12 +107,10 @@ bool intDisplayMultiJoiningStatus(UBYTE joinCount)
 	{
 		return true;
 	}
-	iV_SetFont(font_large);
 	sprintf(sTmp, "%d%%", PERCENT(playerCount - joinCount, playerCount));
-	iV_DrawText(sTmp , x + (w / 2) - 10, y + (h / 2) + 10);
+	iV_DrawText(sTmp , x + (w / 2) - 10, y + (h / 2) + 10, font_large);
 
-	iV_SetFont(font_small);
-	int yStep = iV_GetTextLineSize();
+	int yStep = iV_GetTextLineSize(font_small);
 	int yPos = RET_Y - yStep * game.maxPlayers;
 
 	static const std::string statusStrings[3] = {"☐ ", "☑ ", "☒ "};
@@ -131,7 +128,7 @@ bool intDisplayMultiJoiningStatus(UBYTE joinCount)
 		}
 		if (status >= 0)
 		{
-			iV_DrawText((statusStrings[status] + getPlayerName(player)).c_str(), x + 5, yPos + yStep * NetPlay.players[player].position);
+			iV_DrawText((statusStrings[status] + getPlayerName(player)).c_str(), x + 5, yPos + yStep * NetPlay.players[player].position, font_small);
 		}
 	}
 
@@ -295,15 +292,14 @@ bool MultiPlayerLeave(UDWORD playerIndex)
 	}
 	game.skDiff[playerIndex] = 0;
 
-	if (NetPlay.players[playerIndex].wzFile.isSending)
+	if (!NetPlay.players[playerIndex].wzFiles.empty())
 	{
 		char buf[256];
 
 		ssprintf(buf, _("File transfer has been aborted for %d.") , playerIndex);
 		addConsoleMessage(buf, DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
 		debug(LOG_INFO, "=== File has been aborted for %d ===", playerIndex);
-		NetPlay.players[playerIndex].wzFile.isSending = false;
-		NetPlay.players[playerIndex].needFile = false;
+		NetPlay.players[playerIndex].wzFiles.clear();
 	}
 
 	if (widgGetFromID(psWScreen, IDRET_FORM))
@@ -373,7 +369,7 @@ bool MultiPlayerJoin(UDWORD playerIndex)
 	return true;
 }
 
-bool sendDataCheck(void)
+bool sendDataCheck()
 {
 	int i = 0;
 
@@ -426,12 +422,8 @@ bool recvDataCheck(NETQUEUE queue)
 		{
 			char msg[256] = {'\0'};
 
-			for (i = 0; i < DATA_MAXDATA; i++)
+			for (i = 0; DataHash[i] == tempBuffer[i]; ++i)
 			{
-				if (DataHash[i] != tempBuffer[i])
-				{
-					break;
-				}
 			}
 
 			sprintf(msg, _("%s (%u) has an incompatible mod, and has been kicked."), getPlayerName(player), player);
@@ -483,7 +475,7 @@ void setupNewPlayer(UDWORD player)
 
 // While not the perfect place for this, it has to do when a HOST joins (hosts) game
 // unfortunatly, we don't get the message until after the setup is done.
-void ShowMOTD(void)
+void ShowMOTD()
 {
 	char buf[250] = { '\0' };
 	// when HOST joins the game, show server MOTD message first
@@ -492,7 +484,7 @@ void ShowMOTD(void)
 	if (NetPlay.HaveUpgrade)
 	{
 		audio_PlayTrack(ID_SOUND_BUILD_FAIL);
-		ssprintf(buf, _("There is an update to the game, please visit http://wz2100.net to download new version."));
+		ssprintf(buf, "%s", _("There is an update to the game, please visit http://wz2100.net to download new version."));
 		addConsoleMessage(buf, DEFAULT_JUSTIFY, NOTIFY_MESSAGE);
 	}
 	else

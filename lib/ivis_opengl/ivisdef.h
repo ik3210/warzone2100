@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -70,6 +70,13 @@ struct EDGE
 	int from, to;
 };
 
+struct ANIMFRAME
+{
+	Position pos;
+	Rotation rot;
+	Vector3f scale;
+};
+
 struct iIMDPoly
 {
 	uint32_t flags;
@@ -88,6 +95,15 @@ enum VBO_TYPE
 	VBO_NORMAL = VBO_MINIMAL,
 	VBO_INDEX,
 	VBO_COUNT
+};
+
+enum ANIMATION_EVENTS
+{
+	ANIM_EVENT_NONE,
+	ANIM_EVENT_ACTIVE,
+	ANIM_EVENT_FIRING, // should not be combined with fire-on-move, as this will look weird
+	ANIM_EVENT_DYING,
+	ANIM_EVENT_COUNT
 };
 
 struct iIMDShape
@@ -120,7 +136,16 @@ struct iIMDShape
 
 	// The new rendering data
 	GLuint buffers[VBO_COUNT];
-	GLuint shaderProgram; // if using specialized shader for this model
+	SHADER_MODE shaderProgram; // if using specialized shader for this model
+
+	// object animation (animating a level, rather than its texture)
+	std::vector<ANIMFRAME> objanimdata;
+	int objanimframes;
+
+	// more object animation, but these are only set for the first level
+	int objanimtime; ///< total time to render all animation frames
+	int objanimcycles; ///< Number of cycles to render, zero means infinitely many
+	iIMDShape *objanimpie[ANIM_EVENT_COUNT];
 
 	iIMDShape *next;  // next pie in multilevel pies (NULL for non multilevel !)
 };
@@ -165,7 +190,7 @@ struct IMAGEFILE
 
 struct Image
 {
-	Image(IMAGEFILE const *images = NULL, unsigned id = 0) : images(const_cast<IMAGEFILE *>(images)), id(id) {}
+	Image(IMAGEFILE const *images = nullptr, unsigned id = 0) : images(const_cast<IMAGEFILE *>(images)), id(id) {}
 
 	bool isNull() const
 	{

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -340,7 +340,7 @@ WZ_DECL_NONNULL(1) WidgetTriggers const &widgRunScreen(W_SCREEN *psScreen);
 
 /** Display the screen's widgets in their current state
  * (Call after calling widgRunScreen, this allows the input
- *  processing to be seperated from the display of the widgets).
+ *  processing to be separated from the display of the widgets).
  */
 WZ_DECL_NONNULL(1) void widgDisplayScreen(W_SCREEN *psScreen);
 

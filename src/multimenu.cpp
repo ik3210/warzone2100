@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 #include "intdisplay.h"
 // FIXME Direct iVis implementation include!
 #include "lib/ivis_opengl/pieblitfunc.h"
-#include "lib/ivis_opengl/piedef.h"
+#include "lib/ivis_opengl/pietypes.h"
 #include "lib/ivis_opengl/piepalette.h"
 #include "lib/ivis_opengl/bitimage.h"
 #include "lib/gamelib/gtime.h"
@@ -191,8 +191,6 @@ void displayRequestOption(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 
 	drawBlueBox(x, y, psWidget->width(), psWidget->height());
 
-	iV_SetFont(font_regular);					// font
-
 	if (mapData && CheckForMod(mapData->realFileName))
 	{
 		iV_SetTextColour(WZCOL_RED);
@@ -203,14 +201,14 @@ void displayRequestOption(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	}
 
 
-	while (iV_GetTextWidth(butString) > psWidget->width() - 10)
+	while (iV_GetTextWidth(butString, font_regular) > psWidget->width() - 10)
 	{
 		butString[strlen(butString) - 1] = '\0';
 	}
 
-	iV_DrawText(butString, x + 6, y + 12);	//draw text
+	iV_DrawText(butString, x + 6, y + 12, font_regular);	//draw text
 
-	if (mapData != NULL)
+	if (mapData != nullptr)
 	{
 		// Display map hash, so we can see the difference between identically named maps.
 		Sha256 hash = mapData->realFileHash;  // levGetFileHash can be slightly expensive.
@@ -225,15 +223,13 @@ void displayRequestOption(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		}
 		if (!hash.isZero())
 		{
-			iV_SetFont(font_small);
 			iV_SetTextColour(WZCOL_TEXT_DARK);
 			sstrcpy(butString, hash.toString().c_str());
-			while (iV_GetTextWidth(butString) > psWidget->width() - 10 - (8 + mapData->players * 6))
+			while (iV_GetTextWidth(butString, font_small) > psWidget->width() - 10 - (8 + mapData->players * 6))
 			{
 				butString[strlen(butString) - 1] = '\0';
 			}
-			iV_DrawText(butString, x + 6 + 8 + mapData->players * 6, y + 26);
-			iV_SetFont(font_regular);
+			iV_DrawText(butString, x + 6 + 8 + mapData->players * 6, y + 26, font_small);
 		}
 
 		// if map, then draw no. of players.
@@ -253,7 +249,6 @@ static void displayCamTypeBut(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	int y = yOffset + psWidget->y();
 	char buffer[8];
 
-	iV_SetFont(font_regular);
 	drawBlueBox(x, y, psWidget->width(), psWidget->height());
 	sprintf(buffer, "T%i", (int)(psWidget->UserData));
 	if ((unsigned int)(psWidget->UserData) == current_tech)
@@ -264,7 +259,7 @@ static void displayCamTypeBut(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	{
 		iV_SetTextColour(WZCOL_TEXT_MEDIUM);
 	}
-	iV_DrawText(buffer, x + 2, y + 12);
+	iV_DrawText(buffer, x + 2, y + 12, font_regular);
 }
 
 static void displayNumPlayersBut(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
@@ -273,7 +268,6 @@ static void displayNumPlayersBut(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffse
 	int y = yOffset + psWidget->y();
 	char buffer[8];
 
-	iV_SetFont(font_regular);
 	drawBlueBox(x, y, psWidget->width(), psWidget->height());
 	if ((unsigned int)(psWidget->UserData) == current_numplayers)
 	{
@@ -292,8 +286,7 @@ static void displayNumPlayersBut(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffse
 		sprintf(buffer, "%iP", (int)(psWidget->UserData));
 		buffer[2] = '\0';  // Truncate 'P' if 2 digits, since there isn't room.
 	}
-	iV_DrawText(buffer, x + 2, y + 12);
-
+	iV_DrawText(buffer, x + 2, y + 12, font_regular);
 }
 
 static int stringRelevance(std::string const &string, std::string const &search)
@@ -396,7 +389,7 @@ void addMultiRequest(const char *searchDir, const char *fileExtension, UDWORD mo
 
 	// Put the buttons on it.
 	int nextButtonId = M_REQUEST_BUT;
-	for (char **currFile = fileList; *currFile != NULL; ++currFile)
+	for (char **currFile = fileList; *currFile != nullptr; ++currFile)
 	{
 		const unsigned int fileNameLength = strlen(*currFile);
 
@@ -504,12 +497,12 @@ void addMultiRequest(const char *searchDir, const char *fileExtension, UDWORD mo
 	}
 }
 
-static void closeMultiRequester(void)
+static void closeMultiRequester()
 {
 	multiRequestUp = false;
 	resetReadyStatus(false);
 	delete psRScreen;  // move this to the frontend shutdown...
-	psRScreen = NULL;
+	psRScreen = nullptr;
 	return;
 }
 
@@ -608,57 +601,46 @@ static void displayExtraGubbins(UDWORD height)
 {
 	char str[128];
 
-	//draw grid
-	iV_Line(MULTIMENU_FORM_X + MULTIMENU_C0 - 6 , MULTIMENU_FORM_Y,
-	        MULTIMENU_FORM_X + MULTIMENU_C0 - 6 , MULTIMENU_FORM_Y + height, WZCOL_BLACK);
+	// draw grid
+	const std::vector<glm::ivec4> lines = {
+	         glm::ivec4(MULTIMENU_FORM_X + MULTIMENU_C0 - 6 , MULTIMENU_FORM_Y, MULTIMENU_FORM_X + MULTIMENU_C0 - 6 , MULTIMENU_FORM_Y + height),
+	         glm::ivec4(MULTIMENU_FORM_X + MULTIMENU_C8 - 6 , MULTIMENU_FORM_Y, MULTIMENU_FORM_X + MULTIMENU_C8 - 6 , MULTIMENU_FORM_Y + height),
+	         glm::ivec4(MULTIMENU_FORM_X + MULTIMENU_C9 - 6 , MULTIMENU_FORM_Y, MULTIMENU_FORM_X + MULTIMENU_C9 - 6 , MULTIMENU_FORM_Y + height),
+	         glm::ivec4(MULTIMENU_FORM_X + MULTIMENU_C10 - 6 , MULTIMENU_FORM_Y, MULTIMENU_FORM_X + MULTIMENU_C10 - 6 , MULTIMENU_FORM_Y + height),
+	         glm::ivec4(MULTIMENU_FORM_X + MULTIMENU_C11 - 6 , MULTIMENU_FORM_Y, MULTIMENU_FORM_X + MULTIMENU_C11 - 6 , MULTIMENU_FORM_Y + height),
+	         glm::ivec4(MULTIMENU_FORM_X, MULTIMENU_FORM_Y + MULTIMENU_PLAYER_H, MULTIMENU_FORM_X + MULTIMENU_FORM_W, MULTIMENU_FORM_Y + MULTIMENU_PLAYER_H) };
+	iV_Lines(lines, WZCOL_BLACK);
 
-	iV_Line(MULTIMENU_FORM_X + MULTIMENU_C8 - 6 , MULTIMENU_FORM_Y,
-	        MULTIMENU_FORM_X + MULTIMENU_C8 - 6 , MULTIMENU_FORM_Y + height, WZCOL_BLACK);
-
-	iV_Line(MULTIMENU_FORM_X + MULTIMENU_C9 - 6 , MULTIMENU_FORM_Y,
-	        MULTIMENU_FORM_X + MULTIMENU_C9 - 6 , MULTIMENU_FORM_Y + height, WZCOL_BLACK);
-
-	iV_Line(MULTIMENU_FORM_X + MULTIMENU_C10 - 6 , MULTIMENU_FORM_Y,
-	        MULTIMENU_FORM_X + MULTIMENU_C10 - 6 , MULTIMENU_FORM_Y + height, WZCOL_BLACK);
-
-	iV_Line(MULTIMENU_FORM_X + MULTIMENU_C11 - 6 , MULTIMENU_FORM_Y,
-	        MULTIMENU_FORM_X + MULTIMENU_C11 - 6 , MULTIMENU_FORM_Y + height, WZCOL_BLACK);
-
-	iV_Line(MULTIMENU_FORM_X				, MULTIMENU_FORM_Y + MULTIMENU_PLAYER_H,
-	        MULTIMENU_FORM_X + MULTIMENU_FORM_W, MULTIMENU_FORM_Y + MULTIMENU_PLAYER_H, WZCOL_BLACK);
-
-	iV_SetFont(font_regular);						// font
 	iV_SetTextColour(WZCOL_TEXT_BRIGHT);			// main wz text color
 
 	// draw timer
 	getAsciiTime(str, gameTime);
-	iV_DrawText(str, MULTIMENU_FORM_X + MULTIMENU_C2, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET) ;
+	iV_DrawText(str, MULTIMENU_FORM_X + MULTIMENU_C2, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET, font_regular);
 
 	// draw titles.
-	iV_DrawText(_("Alliances"), MULTIMENU_FORM_X + MULTIMENU_C0, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET);
-	iV_DrawText(_("Score"), MULTIMENU_FORM_X + MULTIMENU_C8, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET);
-	iV_DrawText(_("Kills"), MULTIMENU_FORM_X + MULTIMENU_C9, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET);
-	iV_DrawText(_("Units"), MULTIMENU_FORM_X + MULTIMENU_C10, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET);
+	iV_DrawText(_("Alliances"), MULTIMENU_FORM_X + MULTIMENU_C0, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET, font_regular);
+	iV_DrawText(_("Score"), MULTIMENU_FORM_X + MULTIMENU_C8, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET, font_regular);
+	iV_DrawText(_("Kills"), MULTIMENU_FORM_X + MULTIMENU_C9, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET, font_regular);
+	iV_DrawText(_("Units"), MULTIMENU_FORM_X + MULTIMENU_C10, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET, font_regular);
 
 	if (getDebugMappingStatus())
 	{
-		iV_DrawText(_("Power"), MULTIMENU_FORM_X + MULTIMENU_C11, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET);
+		iV_DrawText(_("Power"), MULTIMENU_FORM_X + MULTIMENU_C11, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET, font_regular);
 	}
 	else
 	{
 		// ping is useless for non MP games, so display something useful depending on mode.
 		if (runningMultiplayer())
 		{
-			iV_DrawText(_("Ping"), MULTIMENU_FORM_X + MULTIMENU_C11, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET);
+			iV_DrawText(_("Ping"), MULTIMENU_FORM_X + MULTIMENU_C11, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET, font_regular);
 		}
 		else
 		{
-			iV_DrawText(_("Structs"), MULTIMENU_FORM_X + MULTIMENU_C11, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET);
+			iV_DrawText(_("Structs"), MULTIMENU_FORM_X + MULTIMENU_C11, MULTIMENU_FORM_Y + MULTIMENU_FONT_OSET, font_regular);
 		}
 	}
 
 #ifdef DEBUG
-	iV_SetFont(font_small);
 	for (unsigned q = 0; q < 2; ++q)
 	{
 		unsigned xPos = 0;
@@ -667,19 +649,19 @@ static void displayExtraGubbins(UDWORD height)
 
 		char const *srText[2] = {_("Sent/Received per sec —"), _("Total Sent/Received —")};
 		sprintf(str, srText[q]);
-		iV_DrawText(str, MULTIMENU_FORM_X + xPos, MULTIMENU_FORM_Y + height + yPos);
-		xPos += iV_GetTextWidth(str) + 20;
+		iV_DrawText(str, MULTIMENU_FORM_X + xPos, MULTIMENU_FORM_Y + height + yPos, font_small);
+		xPos += iV_GetTextWidth(str, font_small) + 20;
 
 		sprintf(str, _("Traf: %u/%u"), NETgetStatistic(NetStatisticRawBytes, true, isTotal), NETgetStatistic(NetStatisticRawBytes, false, isTotal));
-		iV_DrawText(str, MULTIMENU_FORM_X + xPos, MULTIMENU_FORM_Y + height + yPos);
-		xPos += iV_GetTextWidth(str) + 20;
+		iV_DrawText(str, MULTIMENU_FORM_X + xPos, MULTIMENU_FORM_Y + height + yPos, font_small);
+		xPos += iV_GetTextWidth(str, font_small) + 20;
 
 		sprintf(str, _("Uncompressed: %u/%u"), NETgetStatistic(NetStatisticUncompressedBytes, true, isTotal), NETgetStatistic(NetStatisticUncompressedBytes, false, isTotal));
-		iV_DrawText(str, MULTIMENU_FORM_X + xPos, MULTIMENU_FORM_Y + height + yPos);
-		xPos += iV_GetTextWidth(str) + 20;
+		iV_DrawText(str, MULTIMENU_FORM_X + xPos, MULTIMENU_FORM_Y + height + yPos, font_small);
+		xPos += iV_GetTextWidth(str, font_small) + 20;
 
 		sprintf(str, _("Pack: %u/%u"), NETgetStatistic(NetStatisticPackets, true, isTotal), NETgetStatistic(NetStatisticPackets, false, isTotal));
-		iV_DrawText(str, MULTIMENU_FORM_X + xPos, MULTIMENU_FORM_Y + height + yPos);
+		iV_DrawText(str, MULTIMENU_FORM_X + xPos, MULTIMENU_FORM_Y + height + yPos, font_small);
 	}
 #endif
 	return;
@@ -698,7 +680,6 @@ static void displayMultiPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		displayExtraGubbins(widgGetFromID(psWScreen, MULTIMENU_FORM)->height());
 	}
 
-	iV_SetFont(font_regular);  // font
 	iV_SetTextColour(WZCOL_TEXT_BRIGHT);
 
 	const bool isHuman = isHumanPlayer(player);
@@ -711,11 +692,11 @@ static void displayMultiPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	{
 		ssprintf(str, "%d: %s", NetPlay.players[player].position, getPlayerName(player));
 
-		while (iV_GetTextWidth(str) >= MULTIMENU_C0 - MULTIMENU_C2 - 10)
+		while (iV_GetTextWidth(str, font_regular) >= MULTIMENU_C0 - MULTIMENU_C2 - 10)
 		{
 			str[strlen(str) - 1] = '\0';
 		}
-		iV_DrawText(str, x + MULTIMENU_C2, y + MULTIMENU_FONT_OSET);
+		iV_DrawText(str, x + MULTIMENU_C2, y + MULTIMENU_FONT_OSET, font_regular);
 
 		//c3-7 alliance
 		//manage buttons by showing or hiding them. gifts only in campaign,
@@ -757,20 +738,20 @@ static void displayMultiPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		{
 			sprintf(str, "%d", getMultiStats(player).recentScore);
 		}
-		iV_DrawText(str, x + MULTIMENU_C8, y + MULTIMENU_FONT_OSET);
+		iV_DrawText(str, x + MULTIMENU_C8, y + MULTIMENU_FONT_OSET, font_regular);
 
 		//c9:kills,
 		sprintf(str, "%d", getMultiStats(player).recentKills);
-		iV_DrawText(str, x + MULTIMENU_C9, y + MULTIMENU_FONT_OSET);
+		iV_DrawText(str, x + MULTIMENU_C9, y + MULTIMENU_FONT_OSET, font_regular);
 	}
 	else
 	{
 		// estimate of score for skirmish games
 		sprintf(str, "%d", ingame.skScores[player][0]);
-		iV_DrawText(str, x + MULTIMENU_C8, y + MULTIMENU_FONT_OSET);
+		iV_DrawText(str, x + MULTIMENU_C8, y + MULTIMENU_FONT_OSET, font_regular);
 		// estimated kills
 		sprintf(str, "%d", ingame.skScores[player][1]);
-		iV_DrawText(str, x + MULTIMENU_C9, y + MULTIMENU_FONT_OSET);
+		iV_DrawText(str, x + MULTIMENU_C9, y + MULTIMENU_FONT_OSET, font_regular);
 	}
 
 	//only show player's and allies' unit counts, and nobody elses.
@@ -778,7 +759,7 @@ static void displayMultiPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	if (isAlly || getDebugMappingStatus())
 	{
 		sprintf(str, "%d", getNumDroids(player) + getNumTransporterDroids(player));
-		iV_DrawText(str, x + MULTIMENU_C10, y + MULTIMENU_FONT_OSET);
+		iV_DrawText(str, x + MULTIMENU_C10, y + MULTIMENU_FONT_OSET, font_regular);
 	}
 
 	/* Display player power instead of number of played games
@@ -788,7 +769,7 @@ static void displayMultiPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	{
 		//c11: Player power
 		sprintf(str, "%u", (int)getPower(player));
-		iV_DrawText(str, MULTIMENU_FORM_X + MULTIMENU_C11, y + MULTIMENU_FONT_OSET);
+		iV_DrawText(str, MULTIMENU_FORM_X + MULTIMENU_C11, y + MULTIMENU_FONT_OSET, font_regular);
 	}
 	else if (runningMultiplayer())
 	{
@@ -803,7 +784,7 @@ static void displayMultiPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 			{
 				sprintf(str, "∞");
 			}
-			iV_DrawText(str, x + MULTIMENU_C11, y + MULTIMENU_FONT_OSET);
+			iV_DrawText(str, x + MULTIMENU_C11, y + MULTIMENU_FONT_OSET, font_regular);
 		}
 	}
 	else
@@ -813,18 +794,18 @@ static void displayMultiPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		{
 			// NOTE, This tallys up *all* the structures you have. Test out via 'start with no base'.
 			int num = 0;
-			for (STRUCTURE *temp = apsStructLists[player]; temp != NULL; temp = temp->psNext)
+			for (STRUCTURE *temp = apsStructLists[player]; temp != nullptr; temp = temp->psNext)
 			{
 				++num;
 			}
 			sprintf(str, "%d", num);
-			iV_DrawText(str, x + MULTIMENU_C11, y + MULTIMENU_FONT_OSET);
+			iV_DrawText(str, x + MULTIMENU_C11, y + MULTIMENU_FONT_OSET, font_regular);
 		}
 	}
 
 	// a droid of theirs.
 	DROID *displayDroid = apsDroidLists[player];
-	while (displayDroid != NULL && !displayDroid->visible[selectedPlayer])
+	while (displayDroid != nullptr && !displayDroid->visible[selectedPlayer])
 	{
 		displayDroid = displayDroid->psNext;
 	}
@@ -853,12 +834,12 @@ static void displayMultiPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	// clean up widgets if player leaves while menu is up.
 	if (!isHuman && !(game.type == SKIRMISH && player < game.maxPlayers))
 	{
-		if (widgGetFromID(psWScreen, MULTIMENU_CHANNEL + player) != NULL)
+		if (widgGetFromID(psWScreen, MULTIMENU_CHANNEL + player) != nullptr)
 		{
 			widgDelete(psWScreen, MULTIMENU_CHANNEL + player);
 		}
 
-		if (widgGetFromID(psWScreen, MULTIMENU_ALLIANCE_BASE + player) != NULL)
+		if (widgGetFromID(psWScreen, MULTIMENU_ALLIANCE_BASE + player) != nullptr)
 		{
 			widgDelete(psWScreen, MULTIMENU_ALLIANCE_BASE + player);
 			widgDelete(psWScreen, MULTIMENU_GIFT_RAD + player);
@@ -1015,7 +996,7 @@ static void addMultiPlayer(UDWORD player, UDWORD pos)
 	}
 }
 
-bool intAddMultiMenu(void)
+bool intAddMultiMenu()
 {
 	UDWORD			i;
 
@@ -1074,7 +1055,7 @@ bool intAddMultiMenu(void)
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-void intCloseMultiMenuNoAnim(void)
+void intCloseMultiMenuNoAnim()
 {
 	widgDelete(psWScreen, MULTIMENU_FORM);
 	if (!MultiMenuUp)
@@ -1090,7 +1071,7 @@ void intCloseMultiMenuNoAnim(void)
 
 
 // ////////////////////////////////////////////////////////////////////////////
-bool intCloseMultiMenu(void)
+bool intCloseMultiMenu()
 {
 	if (!MultiMenuUp)
 	{
@@ -1114,7 +1095,7 @@ bool intCloseMultiMenu(void)
 
 // ////////////////////////////////////////////////////////////////////////////
 // In Game Options house keeping stuff.
-bool intRunMultiMenu(void)
+bool intRunMultiMenu()
 {
 	return true;
 }

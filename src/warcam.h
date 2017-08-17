@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -21,8 +21,10 @@
 #ifndef __INCLUDED_SRC_WARCAM_H__
 #define __INCLUDED_SRC_WARCAM_H__
 
-#include "lib/ivis_opengl/pietypes.h"
-#include "objectdef.h"
+#include "lib/framework/vector.h"
+
+struct BASE_OBJECT;
+struct DROID;
 
 #define X_UPDATE 0x1
 #define Y_UPDATE 0x2
@@ -48,41 +50,21 @@ enum WARSTATUS
 	CAM_TRACK_LOCATION
 };
 
-/* Storage for old viewnagles etc */
-struct WARCAM
-{
-	WARSTATUS status;
-	UDWORD trackClass;
-	UDWORD lastUpdate;
-	iView oldView;
-
-	Vector3f acceleration;
-	Vector3f velocity;
-	Vector3f position;
-
-	Vector3f rotation;
-	Vector3f rotVel;
-	Vector3f rotAccel;
-
-	UDWORD oldDistance;
-	BASE_OBJECT *target;
-};
-
 /* Externally referenced functions */
-extern void	initWarCam(void);
-extern void	setWarCamActive(bool status);
-extern bool	getWarCamStatus(void);
-extern void camToggleStatus(void);
-extern bool processWarCam(void);
-extern void	camToggleInfo(void);
-extern void	requestRadarTrack(SDWORD x, SDWORD y);
-extern bool	getRadarTrackingStatus(void);
-extern void	toggleRadarAllignment(void);
-extern void	camInformOfRotation(Vector3i *rotation);
-extern BASE_OBJECT *camFindDroidTarget(void);
-extern DROID *getTrackingDroid(void);
-extern SDWORD	getPresAngle(void);
-extern UDWORD	getNumDroidsSelected(void);
-extern void	camAllignWithTarget(BASE_OBJECT *psTarget);
+void initWarCam();
+void setWarCamActive(bool status);
+bool getWarCamStatus();
+void camToggleStatus();
+bool processWarCam();
+void camToggleInfo();
+void requestRadarTrack(SDWORD x, SDWORD y);
+bool getRadarTrackingStatus();
+void toggleRadarAllignment();
+void camInformOfRotation(Vector3i *rotation);
+BASE_OBJECT *camFindDroidTarget();
+DROID *getTrackingDroid();
+SDWORD getPresAngle();
+UDWORD getNumDroidsSelected();
+void camAllignWithTarget(BASE_OBJECT *psTarget);
 
 #endif // __INCLUDED_SRC_WARCAM_H__

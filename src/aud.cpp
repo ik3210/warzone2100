@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,8 +24,9 @@
  */
 
 #include "lib/framework/frame.h"
+#include "lib/framework/math_ext.h"
+#include "lib/framework/fixedpoint.h"
 #include "lib/sound/aud.h"
-#include "lib/sound/tracklib.h"
 
 #include "display3d.h"
 #include "map.h"
@@ -33,7 +34,7 @@
 bool audio_ObjectDead(SIMPLE_OBJECT *psSimpleObj)
 {
 	/* check is valid simple object pointer */
-	if (psSimpleObj == NULL)
+	if (psSimpleObj == nullptr)
 	{
 		debug(LOG_NEVER, "audio_ObjectDead: simple object pointer invalid");
 		return true;
@@ -52,7 +53,7 @@ bool audio_ObjectDead(SIMPLE_OBJECT *psSimpleObj)
 }
 // @FIXME we don't need to do this, since we are not using qsound.
 
-Vector3f audio_GetPlayerPos(void)
+Vector3f audio_GetPlayerPos()
 {
 	Vector3f pos;
 
@@ -91,7 +92,7 @@ void audio_GetStaticPos(SDWORD iWorldX, SDWORD iWorldY, SDWORD *piX, SDWORD *piY
 void audio_GetObjectPos(SIMPLE_OBJECT *psBaseObj, SDWORD *piX, SDWORD *piY, SDWORD *piZ)
 {
 	/* check is valid pointer */
-	ASSERT_OR_RETURN(, psBaseObj != NULL, "Game object pointer invalid");
+	ASSERT_OR_RETURN(, psBaseObj != nullptr, "Game object pointer invalid");
 
 	*piX = psBaseObj->pos.x;
 	*piZ = map_TileHeight(map_coord(psBaseObj->pos.x), map_coord(psBaseObj->pos.y));

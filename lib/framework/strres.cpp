@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -50,7 +50,7 @@ STR_RES *strresCreate()
 	{
 		debug(LOG_FATAL, "Out of memory");
 		abort();
-		return NULL;
+		return nullptr;
 	}
 
 	psRes->psIDTreap = treapCreate();
@@ -59,7 +59,7 @@ STR_RES *strresCreate()
 		debug(LOG_FATAL, "Out of memory");
 		abort();
 		free(psRes);
-		return NULL;
+		return nullptr;
 	}
 
 	return psRes;
@@ -78,7 +78,7 @@ void strresDestroy(STR_RES *psRes)
 bool strresStoreString(STR_RES *psRes, const char *pID, const char *pString)
 {
 	// Make sure that this ID string hasn't been used before
-	if (treapFind(psRes->psIDTreap, pID) != NULL)
+	if (treapFind(psRes->psIDTreap, pID) != nullptr)
 	{
 		debug(LOG_FATAL, "Duplicate string for id: \"%s\"", pID);
 		abort();

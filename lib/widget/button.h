@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -23,6 +23,8 @@
 
 #ifndef __INCLUDED_LIB_WIDGET_BUTTON_H__
 #define __INCLUDED_LIB_WIDGET_BUTTON_H__
+
+#include "lib/ivis_opengl/ivisdef.h"
 
 #include "widget.h"
 #include "widgbase.h"
@@ -65,14 +67,8 @@ public:
 	void setImages(Images const &images);
 	void setImages(Image image, Image imageDown, Image imageHighlight, Image imageDisabled = Image());
 
-	void setString(char const *stringUtf8)
-	{
-		WIDGET::setString(stringUtf8);    // Unhide the WIDGET::setString(char const *) function...
-	}
-	void setTip(char const *stringUtf8)
-	{
-		WIDGET::setTip(stringUtf8);    // Unhide the WIDGET::setTip(char const *) function...
-	}
+	using WIDGET::setString;
+	using WIDGET::setTip;
 
 signals:
 	void clicked();
@@ -94,10 +90,12 @@ class StateButton : public W_BUTTON
 
 public:
 	StateButton(WIDGET *parent) : W_BUTTON(parent) {}
-	void setState(int state);
-	void setTip(int state, QString string);
+	void setState(unsigned state);
+	void setTip(int state, const QString& string);
 	void setTip(int state, char const *stringUtf8);
 	void setImages(int state, Images const &images);
+
+	using WIDGET::setTip;
 
 private:
 	int currentState;

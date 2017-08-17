@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -45,11 +45,11 @@ extern unsigned screenHeight;
 /* backDrop */
 void screen_SetRandomBackdrop(const char *dirname,
                               const char *basename);
-extern void screen_SetBackDropFromFile(const char *filename);
-extern void screen_StopBackDrop(void);
-extern void screen_RestartBackDrop(void);
-extern bool screen_GetBackDrop(void);
-extern void screen_Upload(const char *newBackDropBmp);
+void screen_SetBackDropFromFile(const char *filename);
+void screen_StopBackDrop();
+void screen_RestartBackDrop();
+bool screen_GetBackDrop();
+void screen_Upload(const char *newBackDropBmp);
 void screen_Display();
 
 /* screendump */
@@ -57,10 +57,10 @@ void screenDumpToDisk(const char *path, const char *level);
 
 extern int wz_texture_compression;
 
-extern void screenDoDumpToDiskIfRequired(void);
+void screenDoDumpToDiskIfRequired();
 
 void screen_enableMapPreview(int width, int height, Vector2i *playerpositions);
-void screen_disableMapPreview(void);
+void screen_disableMapPreview();
 
 /// gaphics performance measurement points
 enum PERF_POINT

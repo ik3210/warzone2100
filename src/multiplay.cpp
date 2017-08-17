@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -63,6 +63,7 @@
 #include "scriptfuncs.h"
 #include "template.h"
 #include "lib/netplay/netplay.h"								// the netplay library.
+#include "modding.h"
 #include "multiplay.h"								// warzone net stuff.
 #include "multijoin.h"								// player management stuff.
 #include "multirecv.h"								// incoming messages stuff
@@ -107,8 +108,8 @@ static bool recvBeacon(NETQUEUE queue);
 static bool recvResearch(NETQUEUE queue);
 static bool sendAIMessage(char *pStr, UDWORD player, UDWORD to);
 
-bool		multiplayPlayersReady(bool bNotifyStatus);
-void		startMultiplayerGame(void);
+bool multiplayPlayersReady(bool bNotifyStatus);
+void startMultiplayerGame();
 
 // ////////////////////////////////////////////////////////////////////////////
 // temporarily disable multiplayer mode.
@@ -198,7 +199,7 @@ bool multiplayerWinSequence(bool firstCall)
 			pos2.z = world_coord(mapHeight);
 		}
 
-		addEffect(&pos2, EFFECT_FIREWORK, FIREWORK_TYPE_LAUNCHER, false, NULL, 0);	// throw up some fire works.
+		addEffect(&pos2, EFFECT_FIREWORK, FIREWORK_TYPE_LAUNCHER, false, nullptr, 0);	// throw up some fire works.
 	}
 
 	// show the score..
@@ -210,7 +211,7 @@ bool multiplayerWinSequence(bool firstCall)
 // ////////////////////////////////////////////////////////////////////////////
 // ////////////////////////////////////////////////////////////////////////////
 // MultiPlayer main game loop code.
-bool multiPlayerLoop(void)
+bool multiPlayerLoop()
 {
 	UDWORD		i;
 	UBYTE		joinCount;
@@ -326,7 +327,7 @@ DROID *IdToDroid(UDWORD id, UDWORD player)
 			}
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 // find off-world droids
@@ -355,7 +356,7 @@ DROID *IdToMissionDroid(UDWORD id, UDWORD player)
 			}
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 // ////////////////////////////////////////////////////////////////////////////
@@ -382,7 +383,7 @@ STRUCTURE *IdToStruct(UDWORD id, UDWORD player)
 			}
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 // ////////////////////////////////////////////////////////////////////////////
@@ -397,7 +398,7 @@ FEATURE *IdToFeature(UDWORD id, UDWORD player)
 			return d;
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 // ////////////////////////////////////////////////////////////////////////////
@@ -412,7 +413,7 @@ DROID_TEMPLATE *IdToTemplate(UDWORD tempId, UDWORD player)
 		{
 			return droidTemplates[player][tempId];
 		}
-		return NULL;
+		return nullptr;
 	}
 
 	// It could be a AI template...or that of another player
@@ -425,7 +426,7 @@ DROID_TEMPLATE *IdToTemplate(UDWORD tempId, UDWORD player)
 	}
 
 	// no error, since it is possible that we don't have this template defined yet.
-	return NULL;
+	return nullptr;
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -457,7 +458,7 @@ BASE_OBJECT *IdToPointer(UDWORD id, UDWORD player)
 		return (BASE_OBJECT *)pF;
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 
@@ -465,7 +466,7 @@ BASE_OBJECT *IdToPointer(UDWORD id, UDWORD player)
 // return a players name.
 const char *getPlayerName(int player)
 {
-	ASSERT_OR_RETURN(NULL, player < MAX_PLAYERS , "Wrong player index: %u", player);
+	ASSERT_OR_RETURN(nullptr, player < MAX_PLAYERS , "Wrong player index: %u", player);
 
 	if (game.type != CAMPAIGN)
 	{
@@ -608,7 +609,7 @@ Vector3i cameraToHome(UDWORD player, bool scroll)
 static void recvSyncRequest(NETQUEUE queue)
 {
 	int32_t req_id, x, y, obj_id, obj_id2, player_id, player_id2;
-	BASE_OBJECT *psObj = NULL, *psObj2 = NULL;
+	BASE_OBJECT *psObj = nullptr, *psObj2 = nullptr;
 
 	NETbeginDecode(queue, GAME_SYNC_REQUEST);
 	NETint32_t(&req_id);
@@ -663,7 +664,7 @@ void sendSyncRequest(int32_t req_id, int32_t x, int32_t y, BASE_OBJECT *psObj, B
 // ////////////////////////////////////////////////////////////////////////////
 // ////////////////////////////////////////////////////////////////////////////
 // Recv Messages. Get a message and dispatch to relevant function.
-bool recvMessage(void)
+bool recvMessage()
 {
 	NETQUEUE queue;
 	uint8_t type;
@@ -952,7 +953,7 @@ static bool recvResearch(NETQUEUE queue)
 	if (!IsResearchCompleted(pPlayerRes))
 	{
 		MakeResearchCompleted(pPlayerRes);
-		researchResult(index, player, false, NULL, true);
+		researchResult(index, player, false, nullptr, true);
 	}
 
 	// Update allies research accordingly
@@ -968,7 +969,7 @@ static bool recvResearch(NETQUEUE queue)
 				{
 					// Do the research for that player
 					MakeResearchCompleted(pPlayerRes);
-					researchResult(index, i, false, NULL, true);
+					researchResult(index, i, false, nullptr, true);
 				}
 			}
 		}
@@ -1025,7 +1026,7 @@ STRUCTURE *findResearchingFacilityByResearchIndex(unsigned player, unsigned inde
 			return psBuilding;
 		}
 	}
-	return NULL;  // Not found.
+	return nullptr;  // Not found.
 }
 
 bool recvResearchStatus(NETQUEUE queue)
@@ -1089,8 +1090,8 @@ bool recvResearchStatus(NETQUEUE queue)
 			if (IsResearchStarted(pPlayerRes))
 			{
 				STRUCTURE *psOtherBuilding = findResearchingFacilityByResearchIndex(player, index);
-				ASSERT(psOtherBuilding != NULL, "Something researched but no facility.");
-				if (psOtherBuilding != NULL)
+				ASSERT(psOtherBuilding != nullptr, "Something researched but no facility.");
+				if (psOtherBuilding != nullptr)
 				{
 					cancelResearch(psOtherBuilding, ModeImmediate);
 				}
@@ -1190,7 +1191,7 @@ void sendTeamMessage(const char *pStr, uint32_t from)
 			}
 			else if (myResponsibility(i))
 			{
-				msgStackPush(CALL_AI_MSG, from, i, display, -1, -1, NULL);
+				msgStackPush(CALL_AI_MSG, from, i, display, -1, -1, nullptr);
 				triggerEventChat(from, i, display);
 			}
 			else	//also send to AIs now (non-humans), needed for AI
@@ -1300,7 +1301,7 @@ bool sendTextMessage(const char *pStr, bool all, uint32_t from)
 			}
 			if (i != from && !isHumanPlayer(i) && myResponsibility(i))
 			{
-				msgStackPush(CALL_AI_MSG, from, i, msg, -1, -1, NULL);
+				msgStackPush(CALL_AI_MSG, from, i, msg, -1, -1, nullptr);
 				triggerEventChat(from, i, msg);
 			}
 			else if (i != from && !isHumanPlayer(i) && !myResponsibility(i))
@@ -1329,7 +1330,7 @@ bool sendTextMessage(const char *pStr, bool all, uint32_t from)
 				}
 				else if (myResponsibility(i))
 				{
-					msgStackPush(CALL_AI_MSG, from, i, msg, -1, -1, NULL);
+					msgStackPush(CALL_AI_MSG, from, i, msg, -1, -1, nullptr);
 					triggerEventChat(from, i, msg);
 				}
 				else	// send to AIs on different host
@@ -1359,7 +1360,7 @@ bool sendTextMessage(const char *pStr, bool all, uint32_t from)
 				}
 				else if (myResponsibility(i))
 				{
-					msgStackPush(CALL_AI_MSG, from, i, curStr, -1, -1, NULL);
+					msgStackPush(CALL_AI_MSG, from, i, curStr, -1, -1, nullptr);
 					triggerEventChat(from, i, curStr);
 				}
 				else	//also send to AIs now (non-humans), needed for AI
@@ -1535,7 +1536,7 @@ bool recvTextMessageAI(NETQUEUE queue)
 	//Received a console message from a player callback
 	//store and call later
 	//-------------------------------------------------
-	if (!msgStackPush(CALL_AI_MSG, sender, receiver, msg, -1, -1, NULL))
+	if (!msgStackPush(CALL_AI_MSG, sender, receiver, msg, -1, -1, nullptr))
 	{
 		debug(LOG_ERROR, "recvTextMessageAI() - msgStackPush - stack failed");
 		return false;
@@ -1573,7 +1574,7 @@ bool recvDestroyFeature(NETQUEUE queue)
 	}
 
 	pF = IdToFeature(id, ANYPLAYER);
-	if (pF == NULL)
+	if (pF == nullptr)
 	{
 		debug(LOG_FEATURE, "feature id %d not found (probably already destroyed)", id);
 		return false;
@@ -1592,90 +1593,97 @@ bool recvDestroyFeature(NETQUEUE queue)
 // Network File packet processor.
 bool recvMapFileRequested(NETQUEUE queue)
 {
-	//char mapStr[256],mapName[256],fixedname[256];
-	uint32_t player;
+	ASSERT_OR_RETURN(false, NetPlay.isHost, "Host only routine detected for client!");
 
-	PHYSFS_sint64 fileSize_64;
-	PHYSFS_file	*pFileHandle;
+	uint32_t player = queue.index;
 
-	if (!NetPlay.isHost)				// only host should act
-	{
-		ASSERT(false, "Host only routine detected for client!");
-		return false;
-	}
-
-	//	Check to see who wants the file
+	Sha256 hash;
+	hash.setZero();
 	NETbeginDecode(queue, NET_FILE_REQUESTED);
-	NETuint32_t(&player);
+	NETbin(hash.bytes, hash.Bytes);
 	NETend();
 
-	if (!NetPlay.players[player].wzFile.isSending)
+	auto &files = NetPlay.players[player].wzFiles;
+	if (std::any_of(files.begin(), files.end(), [&](WZFile const &file) { return file.hash == hash; }))
 	{
-		NetPlay.players[player].needFile = true;
-		NetPlay.players[player].wzFile.isCancelled = false;
-		NetPlay.players[player].wzFile.isSending = true;
+		return true;  // Already sending this file, do nothing.
+	}
+
+	netPlayersUpdated = true;  // Show download icon on player.
+
+	std::string filename;
+	if (hash == game.hash)
+	{
+		addConsoleMessage(_("Map was requested: SENDING MAP!"), DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
 
 		LEVEL_DATASET *mapData = levFindDataSet(game.map, &game.hash);
-
-		addConsoleMessage("Map was requested: SENDING MAP!", DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
-
-		char *mapStr = mapData->realFileName;
-		debug(LOG_INFO, "Map was requested. Looking for %s", mapStr);
-
-		// Checking to see if file is available...
-		pFileHandle = PHYSFS_openRead(mapStr);
-		if (pFileHandle == NULL)
+		filename = mapData->realFileName;
+		debug(LOG_INFO, "Map was requested. Looking for %s", filename.c_str());
+	}
+	else
+	{
+		filename = getModFilename(hash);
+		if (filename.empty())
 		{
-			debug(LOG_ERROR, "Failed to open %s for reading: %s", mapStr, PHYSFS_getLastError());
-			debug(LOG_FATAL, "You have a map (%s) that can't be located.\n\nMake sure it is in the correct directory and or format! (No map packs!)", mapStr);
-			// NOTE: if we get here, then the game is basically over, The host can't send the file for whatever reason...
-			// Which also means, that we can't continue.
-			debug(LOG_NET, "***Host has a file issue, and is being forced to quit!***");
-			NETbeginEncode(NETbroadcastQueue(), NET_HOST_DROPPED);
-			NETend();
-			abort();
+			debug(LOG_INFO, "Unknown file requested by %u.", player);
+			return false;
 		}
 
-		// get the file's size.
-		fileSize_64 = PHYSFS_fileLength(pFileHandle);
-		debug(LOG_INFO, "File is valid, sending [directory: %s] %s to client %u", PHYSFS_getRealDir(mapStr), mapStr, player);
-
-		NetPlay.players[player].wzFile.pFileHandle = pFileHandle;
-		NetPlay.players[player].wzFile.fileSize_32 = (int32_t) fileSize_64;		//we don't support 64bit int nettypes.
-		NetPlay.players[player].wzFile.currPos = 0;
-
-		NETsendFile(game.map, game.hash, player);
+		addConsoleMessage(_("Mod was requested: SENDING MOD!"), DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
 	}
+
+	// Checking to see if file is available...
+	PHYSFS_file *pFileHandle = PHYSFS_openRead(filename.c_str());
+	if (pFileHandle == nullptr)
+	{
+		debug(LOG_ERROR, "Failed to open %s for reading: %s", filename.c_str(), PHYSFS_getLastError());
+		debug(LOG_FATAL, "You have a map (%s) that can't be located.\n\nMake sure it is in the correct directory and or format! (No map packs!)", filename.c_str());
+		// NOTE: if we get here, then the game is basically over, The host can't send the file for whatever reason...
+		// Which also means, that we can't continue.
+		debug(LOG_NET, "***Host has a file issue, and is being forced to quit!***");
+		NETbeginEncode(NETbroadcastQueue(), NET_HOST_DROPPED);
+		NETend();
+		abort();
+	}
+
+	debug(LOG_INFO, "File is valid, sending [directory: %s] %s to client %u", PHYSFS_getRealDir(filename.c_str()), filename.c_str(), player);
+
+	PHYSFS_sint64 fileSize_64 = PHYSFS_fileLength(pFileHandle);
+	ASSERT_OR_RETURN(false, fileSize_64 <= 0xFFFFFFFF, "File too big!");
+
+	// Schedule file to be sent.
+	files.emplace_back(pFileHandle, hash, fileSize_64);
+
 	return true;
 }
 
-// continue sending the map
-void sendMap(void)
+// Continue sending maps and mods.
+void sendMap()
 {
-	int i = 0;
-
-	for (i = 0; i < MAX_PLAYERS; i++)
+	for (int i = 0; i < MAX_PLAYERS; ++i)
 	{
-		if (NetPlay.players[i].wzFile.isSending)
+		auto &files = NetPlay.players[i].wzFiles;
+		for (auto &file : files)
 		{
-			int done = NETsendFile(game.map, game.hash, i);
+			int done = NETsendFile(file, i);
 			if (done == 100)
 			{
-				addConsoleMessage("MAP SENT!", DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
+				netPlayersUpdated = true;  // Remove download icon from player.
+				addConsoleMessage(_("FILE SENT!"), DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
 				debug(LOG_INFO, "=== File has been sent to player %d ===", i);
-				NetPlay.players[i].wzFile.isSending = false;
-				NetPlay.players[i].needFile = false;
 			}
 		}
+		files.erase(std::remove_if(files.begin(), files.end(), [](WZFile const &file) { return file.handle == nullptr; }), files.end());
 	}
 }
 
 // Another player is broadcasting a map, recv a chunk. Returns false if not yet done.
 bool recvMapFileData(NETQUEUE queue)
 {
-	mapDownloadProgress = NETrecvFile(queue);
-	if (mapDownloadProgress == 100)
+	NETrecvFile(queue);
+	if (NetPlay.wzFiles.empty())
 	{
+		netPlayersUpdated = true;  // Remove download icon from ourselves.
 		addConsoleMessage("MAP DOWNLOADED!", DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
 		sendTextMessage("MAP DOWNLOADED", true);					//send
 		debug(LOG_INFO, "=== File has been received. ===");
@@ -1695,11 +1703,11 @@ bool recvMapFileData(NETQUEUE queue)
 			char buf[256];
 			if (game.isMapMod)
 			{
-				ssprintf(buf, _("Warning, this is a map-mod, it could alter normal gameplay."));
+				ssprintf(buf, "%s", _("Warning, this is a map-mod, it could alter normal gameplay."));
 			}
 			else
 			{
-				ssprintf(buf, _("Warning, HOST has altered the game code, and can't be trusted!"));
+				ssprintf(buf, "%s", _("Warning, HOST has altered the game code, and can't be trusted!"));
 			}
 			addConsoleMessage(buf,  DEFAULT_JUSTIFY, NOTIFY_MESSAGE);
 			game.isMapMod = true;
@@ -1717,7 +1725,7 @@ bool recvMapFileData(NETQUEUE queue)
 //------------------------------------------------------------------------------------------------//
 
 /* multiplayer message stack */
-void msgStackReset(void)
+void msgStackReset()
 {
 	msgStackPos = -1;		//Beginning of the stack
 }
@@ -1750,7 +1758,7 @@ UDWORD msgStackPush(SDWORD CBtype, SDWORD plFrom, SDWORD plTo, const char *tStr,
 	return true;
 }
 
-bool isMsgStackEmpty(void)
+bool isMsgStackEmpty()
 {
 	if (msgStackPos <= (-1))
 	{
@@ -1827,7 +1835,7 @@ bool msgStackGetMsg(char  *psVal)
 	return true;
 }
 
-static bool msgStackSort(void)
+static bool msgStackSort()
 {
 	SDWORD i;
 
@@ -1859,7 +1867,7 @@ static bool msgStackSort(void)
 	return true;
 }
 
-bool msgStackPop(void)
+bool msgStackPop()
 {
 	debug(LOG_WZ, "msgStackPop: stack size %d", msgStackPos);
 
@@ -1885,12 +1893,12 @@ bool msgStackGetDroid(DROID **ppsDroid)
 	return true;
 }
 
-SDWORD msgStackGetCount(void)
+SDWORD msgStackGetCount()
 {
 	return msgStackPos + 1;
 }
 
-bool msgStackFireTop(void)
+bool msgStackFireTop()
 {
 	SDWORD		_callbackType;
 	char		msg[255];

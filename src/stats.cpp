@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,6 +30,8 @@
 #include "lib/framework/frame.h"
 #include "lib/framework/strres.h"
 #include "lib/framework/frameresource.h"
+#include "lib/framework/fixedpoint.h"
+#include "lib/ivis_opengl/imd.h"
 #include "lib/gamelib/gtime.h"
 #include "objects.h"
 #include "stats.h"
@@ -114,26 +116,21 @@ static void updateMaxECMStats(UWORD maxValue);
 static void updateMaxBodyStats(UWORD maxBody, UWORD maxPower, UWORD maxArmour);
 static void updateMaxConstStats(UWORD maxValue);
 
-static inline bool stringToEnumFindFunction(std::pair<char const *, unsigned> const &a, char const *b)
-{
-	return strcmp(a.first, b) < 0;
-}
-
 /***********************************************************************************
 *	Dealloc the extra storage tables
 ***********************************************************************************/
 //Deallocate the storage assigned for the Propulsion Types table
-static void deallocPropulsionTypes(void)
+static void deallocPropulsionTypes()
 {
 	free(asPropulsionTypes);
-	asPropulsionTypes = NULL;
+	asPropulsionTypes = nullptr;
 }
 
 //dealloc the storage assigned for the terrain table
-static void deallocTerrainTable(void)
+static void deallocTerrainTable()
 {
 	free(asTerrainTable);
-	asTerrainTable = NULL;
+	asTerrainTable = nullptr;
 }
 
 /*******************************************************************************
@@ -154,7 +151,7 @@ static void deallocTerrainTable(void)
 	listSize = 0; \
 	(list) = NULL
 
-void statsInitVars(void)
+void statsInitVars()
 {
 	/* The number of different stats stored */
 	numBodyStats = 0;
@@ -174,7 +171,7 @@ void statsInitVars(void)
 }
 
 /*Deallocate all the stats assigned from input data*/
-bool statsShutDown(void)
+bool statsShutDown()
 {
 	lookupStatPtr.clear();
 
@@ -259,9 +256,9 @@ bool statsAllocConstruct(UDWORD	numStats)
 *		Load stats functions
 *******************************************************************************/
 
-static iIMDShape *statsGetIMD(WzConfig &json, BASE_STATS *psStats, QString key, QString key2 = QString())
+static iIMDShape *statsGetIMD(WzConfig &json, BASE_STATS *psStats, const QString& key, const QString& key2 = QString())
 {
-	iIMDShape *retval = NULL;
+	iIMDShape *retval = nullptr;
 	if (json.contains(key))
 	{
 		QJsonValue value = json.json(key);
@@ -271,12 +268,12 @@ static iIMDShape *statsGetIMD(WzConfig &json, BASE_STATS *psStats, QString key, 
 			QJsonObject obj = value.toObject();
 			if (!obj.contains(key2))
 			{
-				return NULL;
+				return nullptr;
 			}
 			value = obj[key2];
 		}
 		retval = modelGet(value.toString());
-		ASSERT(retval != NULL, "Cannot find the PIE model %s for stat %s in %s",
+		ASSERT(retval != nullptr, "Cannot find the PIE model %s for stat %s in %s",
 		       value.toString().toUtf8().constData(), getName(psStats), json.fileName().toUtf8().constData());
 	}
 	return retval;
@@ -296,6 +293,61 @@ static void loadCompStats(WzConfig &json, COMPONENT_STATS *psStats, int index)
 	loadStats(json, psStats, index);
 	psStats->buildPower = json.value("buildPower", 0).toUInt();
 	psStats->buildPoints = json.value("buildPoints", 0).toUInt();
+	psStats->designable = json.value("designable", false).toBool();
+	psStats->weight = json.value("weight", 0).toUInt();
+	psStats->pBase->hitpoints = json.value("hitpoints", 0).toUInt();
+	psStats->pBase->hitpointPct = json.value("hitpointPct", 100).toUInt();
+
+	QString dtype = json.value("droidType", "DROID").toString();
+	psStats->droidTypeOverride = DROID_ANY;
+	if (dtype.compare("PERSON") == 0)
+	{
+		psStats->droidTypeOverride = DROID_PERSON;
+	}
+	else if (dtype.compare("TRANSPORTER") == 0)
+	{
+		psStats->droidTypeOverride = DROID_TRANSPORTER;
+	}
+	else if (dtype.compare("CYBORG") == 0)
+	{
+		psStats->droidTypeOverride = DROID_CYBORG;
+	}
+	else if (dtype.compare("CYBORG_SUPER") == 0)
+	{
+		psStats->droidTypeOverride = DROID_CYBORG_SUPER;
+	}
+	else if (dtype.compare("CYBORG_CONSTRUCT") == 0)
+	{
+		psStats->droidTypeOverride = DROID_CYBORG_CONSTRUCT;
+	}
+	else if (dtype.compare("CYBORG_REPAIR") == 0)
+	{
+		psStats->droidTypeOverride = DROID_CYBORG_REPAIR;
+	}
+	else if (dtype.compare("DROID_CONSTRUCT") == 0)
+	{
+		psStats->droidTypeOverride = DROID_CONSTRUCT;
+	}
+	else if (dtype.compare("DROID_ECM") == 0)
+	{
+		psStats->droidTypeOverride = DROID_ECM;
+	}
+	else if (dtype.compare("DROID_COMMAND") == 0)
+	{
+		psStats->droidTypeOverride = DROID_COMMAND;
+	}
+	else if (dtype.compare("DROID_SENSOR") == 0)
+	{
+		psStats->droidTypeOverride = DROID_SENSOR;
+	}
+	else if (dtype.compare("DROID_REPAIR") == 0)
+	{
+		psStats->droidTypeOverride = DROID_REPAIR;
+	}
+	else if (dtype.compare("DROID") != 0)
+	{
+		debug(LOG_ERROR, "Unrecognized droidType %s", dtype.toUtf8().constData());
+	}
 }
 
 /*Load the weapon stats from the file exported from Access*/
@@ -317,8 +369,6 @@ bool loadWeaponStats(const char *pFileName)
 		loadCompStats(ini, psStats, i);
 		psStats->compType = COMP_WEAPON;
 
-		psStats->weight = ini.value("weight", 0).toUInt();
-		psStats->body = ini.value("hitpoints", 0).toUInt();
 		psStats->radiusLife = ini.value("radiusLife", 0).toUInt();
 
 		psStats->base.maxRange = ini.value("longRange").toUInt();
@@ -354,7 +404,6 @@ bool loadWeaponStats(const char *pFileName)
 		psStats->effectSize = ini.value("effectSize").toUInt();
 		flags = ini.value("flags", 0).toStringList();
 		psStats->vtolAttackRuns = ini.value("numAttackRuns", 0).toUInt();
-		psStats->designable = ini.value("designable").toBool();
 		psStats->penetrate = ini.value("penetrate", false).toBool();
 		// weapon size limitation
 		int weaponSize = ini.value("weaponSize", WEAPON_SIZE_ANY).toInt();
@@ -525,45 +574,15 @@ bool loadBodyStats(const char *pFileName)
 		loadCompStats(ini, psStats, i);
 		psStats->compType = COMP_BODY;
 
-		psStats->weight = ini.value("weight", 0).toInt();
-		psStats->body = ini.value("hitpoints").toInt();
 		psStats->weaponSlots = ini.value("weaponSlots").toInt();
-		psStats->designable = ini.value("designable", false).toBool();
 		psStats->bodyClass = ini.value("class").toString();
 		psStats->base.thermal = ini.value("armourHeat").toInt();
 		psStats->base.armour = ini.value("armourKinetic").toInt();
 		psStats->base.power = ini.value("powerOutput").toInt();
-		psStats->base.body = psStats->body; // special exception hack
 		psStats->base.resistance = ini.value("resistance", 30).toInt();
 		for (int j = 0; j < MAX_PLAYERS; j++)
 		{
 			psStats->upgrade[j] = psStats->base;
-		}
-		QString dtype = ini.value("droidType", "DROID").toString();
-		psStats->droidTypeOverride = DROID_DEFAULT;
-		if (dtype.compare("PERSON") == 0)
-		{
-			psStats->droidTypeOverride = DROID_PERSON;
-		}
-		else if (dtype.compare("TRANSPORTER") == 0)
-		{
-			psStats->droidTypeOverride = DROID_TRANSPORTER;
-		}
-		else if (dtype.compare("CYBORG") == 0)
-		{
-			psStats->droidTypeOverride = DROID_CYBORG;
-		}
-		else if (dtype.compare("CYBORG_SUPER") == 0)
-		{
-			psStats->droidTypeOverride = DROID_CYBORG_SUPER;
-		}
-		else if (dtype.compare("CYBORG_CONSTRUCT") == 0)
-		{
-			psStats->droidTypeOverride = DROID_CYBORG_CONSTRUCT;
-		}
-		else if (dtype.compare("CYBORG_REPAIR") == 0)
-		{
-			psStats->droidTypeOverride = DROID_CYBORG_REPAIR;
 		}
 		psStats->ref = REF_BODY_START + i;
 		if (!getBodySize(ini.value("size").toString().toUtf8().constData(), &psStats->size))
@@ -581,7 +600,7 @@ bool loadBodyStats(const char *pFileName)
 			setMaxBodyArmour(psStats->base.armour);
 			setMaxBodyArmour(psStats->base.thermal);
 			setMaxBodyPower(psStats->base.power);
-			setMaxBodyPoints(psStats->body);
+			setMaxBodyPoints(psStats->base.hitpoints);
 			setMaxComponentWeight(psStats->weight);
 		}
 	}
@@ -593,14 +612,14 @@ bool loadBodyStats(const char *pFileName)
 	for (int numStats = 0; numStats < numBodyStats; ++numStats)
 	{
 		BODY_STATS *psBodyStat = &asBodyStats[numStats];
-		psBodyStat->ppIMDList.resize(numPropulsionStats * NUM_PROP_SIDES, NULL);
-		psBodyStat->ppMoveIMDList.resize(numPropulsionStats * NUM_PROP_SIDES, NULL);
-		psBodyStat->ppStillIMDList.resize(numPropulsionStats * NUM_PROP_SIDES, NULL);
+		psBodyStat->ppIMDList.resize(numPropulsionStats * NUM_PROP_SIDES, nullptr);
+		psBodyStat->ppMoveIMDList.resize(numPropulsionStats * NUM_PROP_SIDES, nullptr);
+		psBodyStat->ppStillIMDList.resize(numPropulsionStats * NUM_PROP_SIDES, nullptr);
 	}
 	for (int i = 0; i < list.size(); ++i)
 	{
 		QString propulsionName, leftIMD, rightIMD;
-		BODY_STATS *psBodyStat = NULL;
+		BODY_STATS *psBodyStat = nullptr;
 		int numStats;
 
 		ini.beginGroup(list[i]);
@@ -672,12 +691,27 @@ bool loadBrainStats(const char *pFileName)
 		psStats->compType = COMP_BRAIN;
 
 		psStats->weight = ini.value("weight", 0).toInt();
-		psStats->maxDroids = ini.value("maxDroids").toInt();
-		psStats->maxDroidsMult = ini.value("maxDroidsMult").toInt();
+		psStats->base.maxDroids = ini.value("maxDroids").toInt();
+		psStats->base.maxDroidsMult = ini.value("maxDroidsMult").toInt();
+		QVariant rankNames = ini.value("ranks");
+		for (const QVariant &v : rankNames.toList())
+		{
+			psStats->rankNames.push_back(v.toString().toStdString());
+		}
+		QVariant rankThresholds = ini.value("thresholds");
+		for (const QVariant &v : rankThresholds.toList())
+		{
+			psStats->base.rankThresholds.push_back(v.toInt());
+		}
 		psStats->ref = REF_BRAIN_START + i;
 
+		for (int j = 0; j < MAX_PLAYERS; j++)
+		{
+			psStats->upgrade[j] = psStats->base;
+		}
+
 		// check weapon attached
-		psStats->psWeaponStat = NULL;
+		psStats->psWeaponStat = nullptr;
 		if (ini.contains("turret"))
 		{
 			int weapon = getCompFromName(COMP_WEAPON, ini.value("turret").toString());
@@ -749,10 +783,8 @@ bool loadPropulsionStats(const char *pFileName)
 		loadCompStats(ini, psStats, i);
 		psStats->compType = COMP_PROPULSION;
 
-		psStats->weight = ini.value("weight").toInt();
-		psStats->body = ini.value("hitpoints").toInt();
+		psStats->base.hitpointPctOfBody = ini.value("hitpointPctOfBody", 0).toInt();
 		psStats->maxSpeed = ini.value("speed").toInt();
-		psStats->designable = ini.value("designable", false).toBool();
 		psStats->ref = REF_PROPULSION_START + i;
 		psStats->turnSpeed = ini.value("turnSpeed", DEG(1) / 3).toInt();
 		psStats->spinSpeed = ini.value("spinSpeed", DEG(3) / 4).toInt();
@@ -760,8 +792,12 @@ bool loadPropulsionStats(const char *pFileName)
 		psStats->acceleration = ini.value("acceleration", 250).toInt();
 		psStats->deceleration = ini.value("deceleration", 800).toInt();
 		psStats->skidDeceleration = ini.value("skidDeceleration", 600).toInt();
-		psStats->pIMD = NULL;
+		psStats->pIMD = nullptr;
 		psStats->pIMD = statsGetIMD(ini, psStats, "model");
+		for (int j = 0; j < MAX_PLAYERS; j++)
+		{
+			psStats->upgrade[j] = psStats->base;
+		}
 		if (!getPropulsionType(ini.value("type").toString().toUtf8().constData(), &psStats->propulsionType))
 		{
 			debug(LOG_FATAL, "loadPropulsionStats: Invalid Propulsion type for %s", getName(psStats));
@@ -819,15 +855,11 @@ bool loadSensorStats(const char *pFileName)
 		loadCompStats(ini, psStats, i);
 		psStats->compType = COMP_SENSOR;
 
-		psStats->weight = ini.value("weight", 0).toInt();
-		psStats->body = ini.value("hitpoints", 0).toInt();
 		psStats->base.range = ini.value("range").toInt();
 		for (int j = 0; j < MAX_PLAYERS; j++)
 		{
-			psStats->upgrade[j].range = psStats->base.range;
+			psStats->upgrade[j] = psStats->base;
 		}
-		psStats->time = ini.value("time").toInt();
-		psStats->designable = ini.value("designable", false).toBool();
 
 		psStats->ref = REF_SENSOR_START + i;
 
@@ -873,8 +905,6 @@ bool loadSensorStats(const char *pFileName)
 		{
 			ASSERT(false, "Invalid Sensor type");
 		}
-		//multiply time stats
-		psStats->time *= WEAPON_TIME;
 
 		//get the IMD for the component
 		psStats->pIMD = statsGetIMD(ini, psStats, "sensorModel");
@@ -911,14 +941,11 @@ bool loadECMStats(const char *pFileName)
 		loadCompStats(ini, psStats, i);
 		psStats->compType = COMP_ECM;
 
-		psStats->weight = ini.value("weight", 0).toInt();
-		psStats->body = ini.value("hitpoints", 0).toInt();
 		psStats->base.range = ini.value("range").toInt();
 		for (int j = 0; j < MAX_PLAYERS; j++)
 		{
-			psStats->upgrade[j].range = psStats->base.range;
+			psStats->upgrade[j] = psStats->base;
 		}
-		psStats->designable = ini.value("designable", false).toBool();
 
 		psStats->ref = REF_ECM_START + i;
 
@@ -970,14 +997,12 @@ bool loadRepairStats(const char *pFileName)
 		loadCompStats(ini, psStats, i);
 		psStats->compType = COMP_REPAIRUNIT;
 
-		psStats->weight = ini.value("weight", 0).toInt();
 		psStats->base.repairPoints = ini.value("repairPoints").toInt();
 		for (int j = 0; j < MAX_PLAYERS; j++)
 		{
-			psStats->upgrade[j].repairPoints = psStats->base.repairPoints;
+			psStats->upgrade[j] = psStats->base;
 		}
 		psStats->time = ini.value("time", 0).toInt() * WEAPON_TIME;
-		psStats->designable = ini.value("designable", false).toBool();
 
 		psStats->ref = REF_REPAIR_START + i;
 
@@ -1032,14 +1057,11 @@ bool loadConstructStats(const char *pFileName)
 		loadCompStats(ini, psStats, i);
 		psStats->compType = COMP_CONSTRUCT;
 
-		psStats->weight = ini.value("weight", 0).toInt();
-		psStats->body = ini.value("hitpoints", 0).toInt();
 		psStats->base.constructPoints = ini.value("constructPoints").toInt();
 		for (int j = 0; j < MAX_PLAYERS; j++)
 		{
-			psStats->upgrade[j].constructPoints = psStats->base.constructPoints;
+			psStats->upgrade[j] = psStats->base;
 		}
-		psStats->designable = ini.value("designable", false).toBool();
 		psStats->ref = REF_CONSTRUCT_START + i;
 
 		//get the IMD for the component
@@ -1227,7 +1249,7 @@ bool loadPropulsionSounds(const char *pFileName)
 	PROPULSION_TYPE type;
 	PROPULSION_TYPES *pPropType;
 
-	ASSERT(asPropulsionTypes != NULL, "loadPropulsionSounds: Propulsion type stats not loaded");
+	ASSERT(asPropulsionTypes != nullptr, "loadPropulsionSounds: Propulsion type stats not loaded");
 
 	WzConfig ini(pFileName, WzConfig::ReadOnlyAndRequired);
 	QStringList list = ini.childGroups();
@@ -1395,7 +1417,7 @@ int getCompFromName(COMPONENT_TYPE compType, const QString &name)
 
 int getCompFromID(COMPONENT_TYPE compType, const QString &name)
 {
-	COMPONENT_STATS *psComp = (COMPONENT_STATS *)lookupStatPtr.value(name, NULL);
+	COMPONENT_STATS *psComp = (COMPONENT_STATS *)lookupStatPtr.value(name, nullptr);
 	ASSERT_OR_RETURN(-1, psComp, "No such component ID [%s] found", name.toUtf8().constData());
 	ASSERT_OR_RETURN(-1, compType == psComp->compType, "Wrong component type for ID %s", name.toUtf8().constData());
 	return psComp->index;
@@ -1405,7 +1427,7 @@ int getCompFromID(COMPONENT_TYPE compType, const QString &name)
 /// Returns NULL if record not found
 COMPONENT_STATS *getCompStatsFromName(const QString &name)
 {
-	COMPONENT_STATS *psComp = (COMPONENT_STATS *)lookupStatPtr.value(name, NULL);
+	COMPONENT_STATS *psComp = (COMPONENT_STATS *)lookupStatPtr.value(name, nullptr);
 	/*if (!psComp)
 	{
 		debug(LOG_ERROR, "Not found: %s", name.toUtf8().constData());
@@ -1630,7 +1652,7 @@ bool getWeaponEffect(const char *weaponEffect, WEAPON_EFFECT *effect)
 	return true;
 }
 
-bool getWeaponClass(QString weaponClassStr, WEAPON_CLASS *weaponClass)
+bool getWeaponClass(const QString& weaponClassStr, WEAPON_CLASS *weaponClass)
 {
 	if (weaponClassStr.compare("KINETIC") == 0)
 	{
@@ -1753,7 +1775,7 @@ void setMaxComponentWeight(UDWORD weight)
 		maxComponentWeight = weight;
 	}
 }
-UDWORD getMaxComponentWeight(void)
+UDWORD getMaxComponentWeight()
 {
 	return maxComponentWeight;
 }
@@ -1765,7 +1787,7 @@ void setMaxBodyArmour(UDWORD armour)
 		maxBodyArmour = armour;
 	}
 }
-UDWORD getMaxBodyArmour(void)
+UDWORD getMaxBodyArmour()
 {
 	return maxBodyArmour;
 }
@@ -1777,7 +1799,7 @@ void setMaxBodyPower(UDWORD power)
 		maxBodyPower = power;
 	}
 }
-UDWORD getMaxBodyPower(void)
+UDWORD getMaxBodyPower()
 {
 	return maxBodyPower;
 }
@@ -1789,7 +1811,7 @@ void setMaxBodyPoints(UDWORD points)
 		maxBodyPoints = points;
 	}
 }
-UDWORD getMaxBodyPoints(void)
+UDWORD getMaxBodyPoints()
 {
 	return maxBodyPoints;
 }
@@ -1802,7 +1824,7 @@ void setMaxSensorRange(UDWORD range)
 	}
 }
 
-UDWORD getMaxSensorRange(void)
+UDWORD getMaxSensorRange()
 {
 	return maxSensorRange;
 }
@@ -1815,7 +1837,7 @@ void setMaxECMRange(UDWORD range)
 	}
 }
 
-UDWORD getMaxECMRange(void)
+UDWORD getMaxECMRange()
 {
 	return maxECMRange;
 }
@@ -1827,7 +1849,7 @@ void setMaxConstPoints(UDWORD points)
 		maxConstPoints = points;
 	}
 }
-UDWORD getMaxConstPoints(void)
+UDWORD getMaxConstPoints()
 {
 	return maxConstPoints;
 }
@@ -1839,7 +1861,7 @@ void setMaxRepairPoints(UDWORD repair)
 		maxRepairPoints = repair;
 	}
 }
-UDWORD getMaxRepairPoints(void)
+UDWORD getMaxRepairPoints()
 {
 	return maxRepairPoints;
 }
@@ -1851,7 +1873,7 @@ void setMaxWeaponRange(UDWORD range)
 		maxWeaponRange = range;
 	}
 }
-UDWORD getMaxWeaponRange(void)
+UDWORD getMaxWeaponRange()
 {
 	return maxWeaponRange;
 }
@@ -1863,7 +1885,7 @@ void setMaxWeaponDamage(UDWORD damage)
 		maxWeaponDamage = damage;
 	}
 }
-UDWORD getMaxWeaponDamage(void)
+UDWORD getMaxWeaponDamage()
 {
 	return maxWeaponDamage;
 }
@@ -1875,7 +1897,7 @@ void setMaxWeaponROF(UDWORD rof)
 		maxWeaponROF = rof;
 	}
 }
-UDWORD getMaxWeaponROF(void)
+UDWORD getMaxWeaponROF()
 {
 	return maxWeaponROF;
 }
@@ -1887,7 +1909,7 @@ void setMaxPropulsionSpeed(UDWORD speed)
 		maxPropulsionSpeed = speed;
 	}
 }
-UDWORD getMaxPropulsionSpeed(void)
+UDWORD getMaxPropulsionSpeed()
 {
 	return maxPropulsionSpeed;
 }
@@ -1975,7 +1997,7 @@ void updateMaxConstStats(UWORD maxValue)
 	}
 }
 
-void adjustMaxDesignStats(void)
+void adjustMaxDesignStats()
 {
 	UWORD       weaponDamage, sensorRange, repairPoints,
 	            ecmRange, constPoints, bodyPoints, bodyPower, bodyArmour;
@@ -1988,7 +2010,7 @@ void adjustMaxDesignStats(void)
 	for (int j = 0; j < numBodyStats; j++)
 	{
 		BODY_STATS *psStats = asBodyStats + j;
-		bodyPoints = MAX(bodyPoints, psStats->upgrade[selectedPlayer].body);
+		bodyPoints = MAX(bodyPoints, psStats->upgrade[selectedPlayer].hitpoints);
 		bodyArmour = MAX(bodyArmour, psStats->upgrade[selectedPlayer].armour);
 		bodyPower = MAX(bodyPower, psStats->upgrade[selectedPlayer].power);
 	}
@@ -2051,7 +2073,7 @@ bool objHasWeapon(const BASE_OBJECT *psObj)
 
 SENSOR_STATS *objActiveRadar(const BASE_OBJECT *psObj)
 {
-	SENSOR_STATS	*psStats = NULL;
+	SENSOR_STATS	*psStats = nullptr;
 	int				compIndex;
 
 	switch (psObj->type)
@@ -2059,17 +2081,17 @@ SENSOR_STATS *objActiveRadar(const BASE_OBJECT *psObj)
 	case OBJ_DROID:
 		if (((DROID *)psObj)->droidType != DROID_SENSOR && ((DROID *)psObj)->droidType != DROID_COMMAND)
 		{
-			return NULL;
+			return nullptr;
 		}
 		compIndex = ((DROID *)psObj)->asBits[COMP_SENSOR];
-		ASSERT_OR_RETURN(NULL, compIndex < numSensorStats, "Invalid range referenced for numSensorStats, %d > %d", compIndex, numSensorStats);
+		ASSERT_OR_RETURN(nullptr, compIndex < numSensorStats, "Invalid range referenced for numSensorStats, %d > %d", compIndex, numSensorStats);
 		psStats = asSensorStats + compIndex;
 		break;
 	case OBJ_STRUCTURE:
 		psStats = ((STRUCTURE *)psObj)->pStructureType->pSensor;
-		if (psStats == NULL || psStats->location != LOC_TURRET || ((STRUCTURE *)psObj)->status != SS_BUILT)
+		if (psStats == nullptr || psStats->location != LOC_TURRET || ((STRUCTURE *)psObj)->status != SS_BUILT)
 		{
-			return NULL;
+			return nullptr;
 		}
 		break;
 	default:

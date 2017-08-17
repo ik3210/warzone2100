@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -63,14 +63,8 @@ public:
 	void setFlash(bool enable);
 	void setTip(QString string);
 
-	void setString(char const *stringUtf8)
-	{
-		WIDGET::setString(stringUtf8);    // Unhide the WIDGET::setString(char const *) function...
-	}
-	void setTip(char const *stringUtf8)
-	{
-		WIDGET::setTip(stringUtf8);    // Unhide the WIDGET::setTip(char const *) function...
-	}
+	using WIDGET::setString;
+	using WIDGET::setTip;
 
 	bool isDown() const;
 	bool isHighlighted() const;

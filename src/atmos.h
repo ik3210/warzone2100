@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -41,11 +41,11 @@ enum WT_CLASS
 	WT_NONE
 };
 
-void atmosInitSystem(void);
-void atmosUpdateSystem(void);
-void renderParticle(ATPART *psPart);
-void atmosDrawParticles(void);
+void atmosInitSystem();
+void atmosUpdateSystem();
+void renderParticle(ATPART *psPart, const glm::mat4 &viewMatrix);
+void atmosDrawParticles(const glm::mat4 &viewMatrix);
 void atmosSetWeatherType(WT_CLASS type);
-WT_CLASS atmosGetWeatherType(void);
+WT_CLASS atmosGetWeatherType();
 
 #endif // __INCLUDED_SRC_ATMOS_H__

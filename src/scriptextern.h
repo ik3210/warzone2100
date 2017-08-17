@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -33,7 +33,6 @@ extern bool		bExtraVictoryFlag;
 extern bool		bExtraFailFlag;
 extern bool		bTrackTransporter;
 
-
 // ID numbers for external variables
 enum _externids
 {
@@ -57,12 +56,12 @@ enum _externids
 };
 
 // reset the script externals for a new level
-extern void scrExternReset(void);
+void scrExternReset();
 
 // General function to get some basic game values
-extern bool scrGenExternGet(UDWORD index);
+bool scrGenExternGet(UDWORD index);
 
 // General function to set some basic game values
-extern bool scrGenExternSet(UDWORD index);
+bool scrGenExternSet(UDWORD index);
 
 #endif // __INCLUDED_SRC_SCRIPTEXTERN_H__

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -41,12 +41,12 @@ static void gwFreeGateway(GATEWAY *psDel);
 /*                   Gateway data access functions                                                    */
 
 // get the size of the map
-static SDWORD gwMapWidth(void)
+static SDWORD gwMapWidth()
 {
 	return (SDWORD)mapWidth;
 }
 
-static SDWORD gwMapHeight(void)
+static SDWORD gwMapHeight()
 {
 	return (SDWORD)mapHeight;
 }
@@ -68,14 +68,14 @@ static void gwClearGatewayFlag(SDWORD x, SDWORD y)
 /*                   Gateway functions                                                                */
 
 // Initialise the gateway system
-bool gwInitialise(void)
+bool gwInitialise()
 {
 	psGateways.clear();
 	return true;
 }
 
 // Shutdown the gateway system
-void gwShutDown(void)
+void gwShutDown()
 {
 	for (auto psGateway : psGateways)
 	{

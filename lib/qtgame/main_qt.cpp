@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -70,7 +70,7 @@ bool wzMainScreenSetup(int antialiasing, bool fullscreen, bool vsync)
 	mainwindow.setMinimumResolution(QSize(800, 600));
 	if (!mainwindow.context()->isValid())
 	{
-		QMessageBox::critical(NULL, "Oops!", "Warzone2100 failed to create an OpenGL context. This probably means that your graphics drivers are out of date. Try updating them!");
+		QMessageBox::critical(nullptr, "Oops!", "Warzone2100 failed to create an OpenGL context. This probably means that your graphics drivers are out of date. Try updating them!");
 		return false;
 	}
 
@@ -115,9 +115,9 @@ void wzMainEventLoop()
 void wzShutdown()
 {
 	delete mainWindowPtr;
-	mainWindowPtr = NULL;
+	mainWindowPtr = nullptr;
 	delete appPtr;
-	appPtr = NULL;
+	appPtr = nullptr;
 }
 
 bool wzIsFullscreen()

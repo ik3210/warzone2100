@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -111,230 +111,19 @@ bool customDebugfile = false;		// Default false: user has NOT specified where to
 char datadir[PATH_MAX] = ""; // Global that src/clparse.c:ParseCommandLine can write to, so it can override the default datadir on runtime. Needs to be empty on startup for ParseCommandLine to work!
 char configdir[PATH_MAX] = ""; // specifies custom USER directory. Same rules apply as datadir above.
 char rulesettag[40] = "";
-char *global_mods[MAX_MODS] = { NULL };
-char *campaign_mods[MAX_MODS] = { NULL };
-char *multiplay_mods[MAX_MODS] = { NULL };
-
-char *override_mods[MAX_MODS] = { NULL };
-char *override_mod_list = NULL;
-bool use_override_mods = false;
-
-char *loaded_mods[MAX_MODS] = { NULL };
-char *mod_list = NULL;
-int num_loaded_mods = 0;
-
-
-// Warzone 2100 . Pumpkin Studios
 
 //flag to indicate when initialisation is complete
 bool	gameInitialised = false;
 char	SaveGamePath[PATH_MAX];
 char	ScreenDumpPath[PATH_MAX];
-char	MultiForcesPath[PATH_MAX];
 char	MultiCustomMapsPath[PATH_MAX];
 char	MultiPlayersPath[PATH_MAX];
 char	KeyMapPath[PATH_MAX];
 // Start game in title mode:
 static GS_GAMEMODE gameStatus = GS_TITLE_SCREEN;
 // Status of the gameloop
-static int gameLoopStatus = 0;
+static GAMECODE gameLoopStatus = GAMECODE_CONTINUE;
 static FOCUS_STATE focusState = FOCUS_IN;
-
-extern void debug_callback_stderr(void **, const char *);
-extern void debug_callback_win32debug(void **, const char *);
-
-static bool inList(char *list[], const char *item)
-{
-	int i = 0;
-#ifdef DEBUG
-	debug(LOG_NEVER, "inList: Current item: [%s]", item);
-#endif
-	while (list[i] != NULL)
-	{
-#ifdef DEBUG
-		debug(LOG_NEVER, "inList: Checking for match with: [%s]", list[i]);
-#endif
-		if (strcmp(list[i], item) == 0)
-		{
-			return true;
-		}
-		i++;
-	}
-	return false;
-}
-
-
-/*!
- * Tries to mount a list of directories, found in /basedir/subdir/<list>.
- * \param basedir Base directory
- * \param subdir A subdirectory of basedir
- * \param appendToPath Whether to append or prepend
- * \param checkList List of directories to check. NULL means any.
- */
-void addSubdirs(const char *basedir, const char *subdir, const bool appendToPath, char *checkList[], bool addToModList)
-{
-	char tmpstr[PATH_MAX];
-	char buf[256];
-	char **subdirlist = PHYSFS_enumerateFiles(subdir);
-	char **i = subdirlist;
-	while (*i != NULL)
-	{
-#ifdef DEBUG
-		debug(LOG_NEVER, "addSubdirs: Examining subdir: [%s]", *i);
-#endif // DEBUG
-		if (*i[0] != '.' && (!checkList || inList(checkList, *i)))
-		{
-			snprintf(tmpstr, sizeof(tmpstr), "%s%s%s%s", basedir, subdir, PHYSFS_getDirSeparator(), *i);
-#ifdef DEBUG
-			debug(LOG_NEVER, "addSubdirs: Adding [%s] to search path", tmpstr);
-#endif // DEBUG
-			if (addToModList)
-			{
-				addLoadedMod(*i);
-				snprintf(buf, sizeof(buf), "mod: %s", *i);
-				addDumpInfo(buf);
-			}
-			PHYSFS_addToSearchPath(tmpstr, appendToPath);
-		}
-		i++;
-	}
-	PHYSFS_freeList(subdirlist);
-}
-
-void removeSubdirs(const char *basedir, const char *subdir, char *checkList[])
-{
-	char tmpstr[PATH_MAX];
-	char **subdirlist = PHYSFS_enumerateFiles(subdir);
-	char **i = subdirlist;
-	while (*i != NULL)
-	{
-#ifdef DEBUG
-		debug(LOG_NEVER, "removeSubdirs: Examining subdir: [%s]", *i);
-#endif // DEBUG
-		if (!checkList || inList(checkList, *i))
-		{
-			snprintf(tmpstr, sizeof(tmpstr), "%s%s%s%s", basedir, subdir, PHYSFS_getDirSeparator(), *i);
-#ifdef DEBUG
-			debug(LOG_NEVER, "removeSubdirs: Removing [%s] from search path", tmpstr);
-#endif // DEBUG
-			if (!PHYSFS_removeFromSearchPath(tmpstr))
-			{
-#ifdef DEBUG	// spams a ton!
-				debug(LOG_NEVER, "Couldn't remove %s from search path because %s", tmpstr, PHYSFS_getLastError());
-#endif // DEBUG
-			}
-		}
-		i++;
-	}
-	PHYSFS_freeList(subdirlist);
-}
-
-void printSearchPath(void)
-{
-	char **i, ** searchPath;
-
-	debug(LOG_WZ, "Search paths:");
-	searchPath = PHYSFS_getSearchPath();
-	for (i = searchPath; *i != NULL; i++)
-	{
-		debug(LOG_WZ, "    [%s]", *i);
-	}
-	PHYSFS_freeList(searchPath);
-}
-
-void setOverrideMods(char *modlist)
-{
-	char *curmod = modlist;
-	char *nextmod;
-	int i = 0;
-	while ((nextmod = strstr(curmod, ", ")) && i < MAX_MODS - 2)
-	{
-		override_mods[i] = (char *)malloc(nextmod - curmod + 1);
-		strlcpy(override_mods[i], curmod, nextmod - curmod + 1);
-		override_mods[i][nextmod - curmod] = '\0';
-		curmod = nextmod + 2;
-		i++;
-	}
-	override_mods[i] = strdup(curmod);
-	override_mods[i + 1] = NULL;
-	override_mod_list = modlist;
-	use_override_mods = true;
-}
-
-void clearOverrideMods(void)
-{
-	int i;
-	use_override_mods = false;
-	for (i = 0; i < MAX_MODS && override_mods[i]; i++)
-	{
-		free(override_mods[i]);
-	}
-	override_mods[0] = NULL;
-	override_mod_list = NULL;
-}
-
-void addLoadedMod(const char *modname)
-{
-	if (num_loaded_mods >= MAX_MODS)
-	{
-		// mod list full
-		return;
-	}
-	char *mod = strdup(modname);
-	// Yes, this is an online insertion sort.
-	// I swear, for the numbers of mods this is going to be dealing with
-	// (i.e. 0 to 2), it really is faster than, say, Quicksort.
-	int i;
-	for (i = 0; i < num_loaded_mods && strcmp(loaded_mods[i], mod) > 0; i++) {}
-	if (i < num_loaded_mods)
-	{
-		if (strcmp(loaded_mods[i], mod) == 0)
-		{
-			// mod already in list
-			free(mod);
-			return;
-		}
-		memmove(&loaded_mods[i + 1], &loaded_mods[i], (num_loaded_mods - i)*sizeof(char *));
-	}
-	loaded_mods[i] = mod;
-	num_loaded_mods++;
-}
-
-void clearLoadedMods(void)
-{
-	int i;
-	for (i = 0; i < num_loaded_mods; i++)
-	{
-		free(loaded_mods[i]);
-	}
-	num_loaded_mods = 0;
-	if (mod_list)
-	{
-		free(mod_list);
-		mod_list = NULL;
-	}
-}
-
-char *getModList(void)
-{
-	int i;
-	if (mod_list)
-	{
-		// mod list already constructed
-		return mod_list;
-	}
-	mod_list = (char *)malloc(modlist_string_size);
-	mod_list[0] = 0; //initialize
-	for (i = 0; i < num_loaded_mods; i++)
-	{
-		if (i != 0)
-		{
-			strlcat(mod_list, ", ", modlist_string_size);
-		}
-		strlcat(mod_list, loaded_mods[i], modlist_string_size);
-	}
-	return mod_list;
-}
 
 
 /*!
@@ -346,15 +135,15 @@ char *getModList(void)
 static bool getCurrentDir(char *const dest, size_t const size)
 {
 #if defined(WZ_OS_UNIX)
-	if (getcwd(dest, size) == NULL)
+	if (getcwd(dest, size) == nullptr)
 	{
 		if (errno == ERANGE)
 		{
-			debug(LOG_ERROR, "getPlatformUserDir: The buffer to contain our current directory is too small (%u bytes and more needed)", (unsigned int)size);
+			debug(LOG_ERROR, "The buffer to contain our current directory is too small (%u bytes and more needed)", (unsigned int)size);
 		}
 		else
 		{
-			debug(LOG_ERROR, "getPlatformUserDir: getcwd failed: %s", strerror(errno));
+			debug(LOG_ERROR, "getcwd failed: %s", strerror(errno));
 		}
 
 		return false;
@@ -373,7 +162,7 @@ static bool getCurrentDir(char *const dest, size_t const size)
 		FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM, NULL, err, 0, (char *)&err_string, 0, NULL);
 
 		// Print an error message with the above description
-		debug(LOG_ERROR, "getPlatformUserDir: GetCurrentDirectory failed (error code: %d): %s", err, err_string);
+		debug(LOG_ERROR, "GetCurrentDirectory failed (error code: %d): %s", err, err_string);
 
 		// Free our chunk of memory FormatMessageA gave us
 		LocalFree(err_string);
@@ -382,7 +171,7 @@ static bool getCurrentDir(char *const dest, size_t const size)
 	}
 	else if (len > size)
 	{
-		debug(LOG_ERROR, "getPlatformUserDir: The buffer to contain our current directory is too small (%u bytes and %d needed)", (unsigned int)size, len);
+		debug(LOG_ERROR, "The buffer to contain our current directory is too small (%u bytes and %d needed)", (unsigned int)size, len);
 
 		return false;
 	}
@@ -457,7 +246,7 @@ static void getPlatformUserDir(char *const tmpstr, size_t const size)
 }
 
 
-static void initialize_ConfigDir(void)
+static void initialize_ConfigDir()
 {
 	char tmpstr[PATH_MAX] = { '\0' };
 
@@ -517,7 +306,7 @@ static void initialize_ConfigDir(void)
 	}
 
 
-	// User's home dir first so we allways see what we write
+	// User's home dir first so we always see what we write
 	PHYSFS_addToSearchPath(PHYSFS_getWriteDir(), PHYSFS_PREPEND);
 
 	PHYSFS_permitSymbolicLinks(1);
@@ -541,7 +330,7 @@ static void initialize_PhysicsFS(const char *argv_0)
 	}
 }
 
-static void check_Physfs(void)
+static void check_Physfs()
 {
 	const PHYSFS_ArchiveInfo **i;
 	bool zipfound = false;
@@ -566,7 +355,7 @@ static void check_Physfs(void)
 		debug(LOG_ERROR, "Please upgrade/downgrade PhysicsFS to a different version, such as 2.0.3 or 2.0.1.");
 	}
 
-	for (i = PHYSFS_supportedArchiveTypes(); *i != NULL; i++)
+	for (i = PHYSFS_supportedArchiveTypes(); *i != nullptr; i++)
 	{
 		debug(LOG_WZ, "[**] Supported archive(s): [%s], which is [%s].", (*i)->extension, (*i)->description);
 		if (!strncasecmp("zip", (*i)->extension, 3) && !zipfound)
@@ -587,15 +376,15 @@ static void check_Physfs(void)
  *
  * Priority:
  * Lower loads first. Current:
- * -datadir > User's home dir > source tree data > AutoPackage > BaseDir > DEFAULT_DATADIR
+ * --datadir > User's home dir > source tree data > AutoPackage > BaseDir > DEFAULT_DATADIR
  *
- * Only -datadir and home dir are allways examined. Others only if data still not found.
+ * Only --datadir and home dir are always examined. Others only if data still not found.
  *
  * We need ParseCommandLine, before we can add any mods...
  *
  * \sa rebuildSearchPath
  */
-static void scanDataDirs(void)
+static void scanDataDirs()
 {
 	char tmpstr[PATH_MAX], prefix[PATH_MAX];
 	char *separator;
@@ -709,7 +498,7 @@ static void scanDataDirs(void)
 static void make_dir(char *dest, const char *dirname, const char *subdir)
 {
 	strcpy(dest, dirname);
-	if (subdir != NULL)
+	if (subdir != nullptr)
 	{
 		strcat(dest, "/");
 		strcat(dest, subdir);
@@ -737,7 +526,7 @@ static void make_dir(char *dest, const char *dirname, const char *subdir)
  * Preparations before entering the title (mainmenu) loop
  * Would start the timer in an event based mainloop
  */
-static void startTitleLoop(void)
+static void startTitleLoop()
 {
 	SetGameMode(GS_TITLE_SCREEN);
 
@@ -755,7 +544,7 @@ static void startTitleLoop(void)
  * Shutdown/cleanup after the title (mainmenu) loop
  * Would stop the timer
  */
-static void stopTitleLoop(void)
+static void stopTitleLoop()
 {
 	if (!frontendShutdown())
 	{
@@ -769,12 +558,12 @@ static void stopTitleLoop(void)
  * Preparations before entering the game loop
  * Would start the timer in an event based mainloop
  */
-static void startGameLoop(void)
+static void startGameLoop()
 {
 	SetGameMode(GS_NORMAL);
 
 	// Not sure what aLevelName is, in relation to game.map. But need to use aLevelName here, to be able to start the right map for campaign, and need game.hash, to start the right non-campaign map, if there are multiple identically named maps.
-	if (!levLoadData(aLevelName, &game.hash, NULL, GTYPE_SCENARIO_START))
+	if (!levLoadData(aLevelName, &game.hash, nullptr, GTYPE_SCENARIO_START))
 	{
 		debug(LOG_FATAL, "Shutting down after failure");
 		exit(EXIT_FAILURE);
@@ -808,14 +597,13 @@ static void startGameLoop(void)
  * Shutdown/cleanup after the game loop
  * Would stop the timer
  */
-static void stopGameLoop(void)
+static void stopGameLoop()
 {
 	if (gameLoopStatus != GAMECODE_NEWLEVEL)
 	{
 		clearBlueprints();
 		initLoadingScreen(true); // returning to f.e. do a loader.render not active
 		pie_EnableFog(false); // dont let the normal loop code set status on
-		fogStatus = 0;
 		if (gameLoopStatus != GAMECODE_LOADGAME)
 		{
 			if (!levReleaseAll())
@@ -841,7 +629,7 @@ static void stopGameLoop(void)
  * Load a savegame and start into the game loop
  * Game data should be initialised afterwards, so that startGameLoop is not necessary anymore.
  */
-static bool initSaveGameLoad(void)
+static bool initSaveGameLoad()
 {
 	// NOTE: always setGameMode correctly before *any* loading routines!
 	SetGameMode(GS_NORMAL);
@@ -881,7 +669,7 @@ static bool initSaveGameLoad(void)
 /*!
  * Run the code inside the gameloop
  */
-static void runGameLoop(void)
+static void runGameLoop()
 {
 	gameLoopStatus = gameLoop();
 	switch (gameLoopStatus)
@@ -918,7 +706,7 @@ static void runGameLoop(void)
 /*!
  * Run the code inside the titleloop
  */
-static void runTitleLoop(void)
+static void runTitleLoop()
 {
 	switch (titleLoop())
 	{
@@ -955,8 +743,8 @@ static void runTitleLoop(void)
 	case TITLECODE_SHOWINTRO:
 		debug(LOG_MAIN, "TITLECODE_SHOWINTRO");
 		seq_ClearSeqList();
-		seq_AddSeqToList("titles.ogg", NULL, NULL, false);
-		seq_AddSeqToList("devastation.ogg", NULL, "devastation.txa", false);
+		seq_AddSeqToList("titles.ogg", nullptr, nullptr, false);
+		seq_AddSeqToList("devastation.ogg", nullptr, "devastation.txa", false);
 		seq_StartNextFullScreenVideo();
 		break;
 	default:
@@ -969,7 +757,7 @@ static void runTitleLoop(void)
  * The mainloop.
  * Fetches events, executes appropriate code
  */
-void mainLoop(void)
+void mainLoop()
 {
 	frameUpdate(); // General housekeeping
 
@@ -1005,7 +793,7 @@ void mainLoop(void)
 	RAND_add(buf, sizeof(buf), 1);
 }
 
-bool getUTF8CmdLine(int *const utfargc, const char *** const utfargv) // explicitely pass by reference
+bool getUTF8CmdLine(int *const utfargc WZ_DECL_UNUSED, const char *** const utfargv WZ_DECL_UNUSED) // explicitely pass by reference
 {
 #ifdef WZ_OS_WIN
 	int wargc;
@@ -1060,10 +848,19 @@ int realmain(int argc, char *argv[])
 	const char **utfargv = (const char **)argv;
 	wzMain(argc, argv);		// init Qt integration first
 
+#if !defined(OPENSSL_API_COMPAT) || OPENSSL_API_COMPAT < 0x10100000L
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 	// The libcrypto startup stuff... May or may not actually be needed for anything at all.
 	ERR_load_crypto_strings();  // This is needed for descriptive error messages.
 	OpenSSL_add_all_algorithms();  // Don't actually use the EVP functions, so probably not needed.
 	OPENSSL_config(nullptr);  // What does this actually do?
+#pragma GCC diagnostic pop
+#else
+	// The libcrypto startup stuff... May or may not actually be needed for anything at all.
+	OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CRYPTO_STRINGS | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS | OPENSSL_INIT_LOAD_CONFIG, nullptr);
+#endif
+
 #ifdef WZ_OS_WIN
 	RAND_screen();  // Uses a screenshot as a random seed, on systems lacking /dev/random.
 #endif
@@ -1073,7 +870,7 @@ int realmain(int argc, char *argv[])
 #endif
 
 	debug_init();
-	debug_register_callback(debug_callback_stderr, NULL, NULL, NULL);
+	debug_register_callback(debug_callback_stderr, nullptr, nullptr, nullptr);
 #if defined(WZ_OS_WIN) && defined(DEBUG_INSANE)
 	debug_register_callback(debug_callback_win32debug, NULL, NULL, NULL);
 #endif // WZ_OS_WIN && DEBUG_INSANE
@@ -1108,17 +905,18 @@ int realmain(int argc, char *argv[])
 	initialize_ConfigDir();
 
 	/*** Initialize directory structure ***/
-	make_dir(ScreenDumpPath, "screenshots", NULL);
-	make_dir(SaveGamePath, "savegames", NULL);
+	make_dir(ScreenDumpPath, "screenshots", nullptr);
+	make_dir(SaveGamePath, "savegames", nullptr);
 	PHYSFS_mkdir("savegames/campaign");
 	PHYSFS_mkdir("savegames/skirmish");
-	make_dir(MultiCustomMapsPath, "maps", NULL); // MUST have this to prevent crashes when getting map
+	make_dir(MultiCustomMapsPath, "maps", nullptr); // MUST have this to prevent crashes when getting map
 	PHYSFS_mkdir("music");
 	PHYSFS_mkdir("logs");		// a place to hold our netplay, mingw crash reports & WZ logs
 	PHYSFS_mkdir("userdata");	// a place to store per-mod data user generated data
 	memset(rulesettag, 0, sizeof(rulesettag)); // tag to add to userdata to find user generated stuff
-	make_dir(MultiPlayersPath, "multiplay", NULL);
+	make_dir(MultiPlayersPath, "multiplay", nullptr);
 	make_dir(MultiPlayersPath, "multiplay", "players");
+	PHYSFS_mkdir("mods/downloads");
 
 	if (!customDebugfile)
 	{
@@ -1136,8 +934,7 @@ int realmain(int argc, char *argv[])
 		         newtime->tm_mon + 1, newtime->tm_mday, newtime->tm_hour, newtime->tm_min, newtime->tm_sec);
 		debug_register_callback(debug_callback_file, debug_callback_file_init, debug_callback_file_exit, buf);
 
-		// FIXME: Change this to LOG_WZ on next release
-		debug(LOG_INFO, "Using %s debug file", buf);
+		debug(LOG_WZ, "Using %s debug file", buf);
 	}
 
 	// NOTE: it is now safe to use debug() calls to make sure output gets captured.
@@ -1150,7 +947,7 @@ int realmain(int argc, char *argv[])
 
 
 	/* Put in the writedir root */
-	sstrcpy(KeyMapPath, "keymap.map");
+	sstrcpy(KeyMapPath, "keymap.json");
 
 	// initialise all the command line states
 	war_SetDefaultStates();
@@ -1172,77 +969,59 @@ int realmain(int argc, char *argv[])
 	scanDataDirs();
 
 	// Now we check the mods to see if they exist or not (specified on the command line)
-	// They are all capped at 100 mods max(see clparse.c)
 	// FIX ME: I know this is a bit hackish, but better than nothing for now?
 	{
-		char *modname;
 		char modtocheck[256];
-		int i = 0;
 		int result = 0;
 
 		// check global mods
-		for (i = 0; i < 100; i++)
+		for (auto const &modname : global_mods)
 		{
-			modname = global_mods[i];
-			if (modname == NULL)
-			{
-				break;
-			}
-			ssprintf(modtocheck, "mods/global/%s", modname);
+			ssprintf(modtocheck, "mods/global/%s", modname.c_str());
 			result = PHYSFS_exists(modtocheck);
 			result |= PHYSFS_isDirectory(modtocheck);
 			if (!result)
 			{
-				debug(LOG_ERROR, "The (global) mod (%s) you have specified doesn't exist!", modname);
+				debug(LOG_ERROR, "The (global) mod (%s) you have specified doesn't exist!", modtocheck);
 			}
 			else
 			{
-				info("(global) mod (%s) is enabled", modname);
+				info("(global) mod (%s) is enabled", modname.c_str());
 			}
 		}
 		// check campaign mods
-		for (i = 0; i < 100; i++)
+		for (auto const &modname : campaign_mods)
 		{
-			modname = campaign_mods[i];
-			if (modname == NULL)
-			{
-				break;
-			}
-			ssprintf(modtocheck, "mods/campaign/%s", modname);
+			ssprintf(modtocheck, "mods/campaign/%s", modname.c_str());
 			result = PHYSFS_exists(modtocheck);
 			result |= PHYSFS_isDirectory(modtocheck);
 			if (!result)
 			{
-				debug(LOG_ERROR, "The mod_ca (%s) you have specified doesn't exist!", modname);
+				debug(LOG_ERROR, "The mod_ca (%s) you have specified doesn't exist!", modtocheck);
 			}
 			else
 			{
-				info("mod_ca (%s) is enabled", modname);
+				info("mod_ca (%s) is enabled", modname.c_str());
 			}
 		}
 		// check multiplay mods
-		for (i = 0; i < 100; i++)
+		for (auto const &modname : multiplay_mods)
 		{
-			modname = multiplay_mods[i];
-			if (modname == NULL)
-			{
-				break;
-			}
-			ssprintf(modtocheck, "mods/multiplay/%s", modname);
+			ssprintf(modtocheck, "mods/multiplay/%s", modname.c_str());
 			result = PHYSFS_exists(modtocheck);
 			result |= PHYSFS_isDirectory(modtocheck);
 			if (!result)
 			{
-				debug(LOG_ERROR, "The mod_mp (%s) you have specified doesn't exist!", modname);
+				debug(LOG_ERROR, "The mod_mp (%s) you have specified doesn't exist!", modtocheck);
 			}
 			else
 			{
-				info("mod_mp (%s) is enabled", modname);
+				info("mod_mp (%s) is enabled", modname.c_str());
 			}
 		}
 	}
 
-	if (!wzMainScreenSetup(war_getFSAA(), war_getFullscreen(), war_GetVsync()))
+	if (!wzMainScreenSetup(war_getAntialiasing(), war_getFullscreen(), war_GetVsync()))
 	{
 		return EXIT_FAILURE;
 	}
@@ -1339,7 +1118,7 @@ int realmain(int argc, char *argv[])
 /*!
  * Get the mode the game is currently in
  */
-GS_GAMEMODE GetGameMode(void)
+GS_GAMEMODE GetGameMode()
 {
 	return gameStatus;
 }

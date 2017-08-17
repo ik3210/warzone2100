@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -42,10 +42,12 @@ enum SCRIPT_TYPE
 // ----------------------------------------------
 // Private to scripting module functions below
 
+void doNotSaveGlobal(const QString &global);
+
 void groupRemoveObject(BASE_OBJECT *psObj);
 
 /// Register functions to engine context
-bool registerFunctions(QScriptEngine *engine, QString scriptName);
+bool registerFunctions(QScriptEngine *engine, const QString& scriptName);
 bool unregisterFunctions(QScriptEngine *engine);
 
 bool saveGroups(WzConfig &ini, QScriptEngine *engine);
@@ -74,7 +76,13 @@ QScriptValue js_enumSelected(QScriptContext *, QScriptEngine *engine);
 QStandardItemModel *createLabelModel();
 
 /// Mark and show label
-void showLabel(const QString &key);
+void showLabel(const QString &key, bool clear_old = true, bool jump_to = true);
+
+/// Show all labels or all currently active labels
+void markAllLabels(bool only_active);
+
+/// Clear all map markers (used by label marking, for instance)
+void clearMarks();
 
 /// Check if this object marked for a seen trigger once it comes into vision
 std::pair<bool, int> seenLabelCheck(QScriptEngine *engine, BASE_OBJECT *seen, BASE_OBJECT *viewer);

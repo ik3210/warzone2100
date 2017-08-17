@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -60,13 +60,13 @@ enum
 	DATA_MAXDATA		// must be last
 };
 
-void resetDataHash(void);
+void resetDataHash();
 extern uint32_t DataHash[DATA_MAXDATA];
 
 /* Pass all the data loading functions to the framework library */
-bool dataInitLoadFuncs(void);
+bool dataInitLoadFuncs();
 
-void dataSetSaveFlag(void);
-void dataClearSaveFlag(void);
+void dataSetSaveFlag();
+void dataClearSaveFlag();
 
 #endif // __INCLUDED_SRC_DATA_H__

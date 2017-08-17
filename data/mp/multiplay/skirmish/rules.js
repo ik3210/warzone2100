@@ -334,12 +334,12 @@ function eventDestroyed(victim)
 
 function eventResearched(research, structure, player)
 {
-	//debug("RESEARCH : " + research.fullname + "(" + research.name + ") for " + player);
+	//if (research.name == "") debug("RESEARCH : " + research.fullname + "(" + research.name + ") for " + player);
 	// iterate over all results
 	for (var i = 0; i < research.results.length; i++)
 	{
 		var v = research.results[i];
-		//debug("    RESULT : class=" + v['class'] + " parameter=" + v['parameter'] + " value=" + v['value'] + " filter=" + v['filterParameter'] + " filterparam=" + v['filterParameter']);
+		//if (research.name == "") debug("    RESULT : class=" + v['class'] + " parameter=" + v['parameter'] + " value=" + v['value'] + " filter=" + v['filterParameter'] + " filterval=" + v['filterValue']);
 		for (var cname in Upgrades[player][v['class']]) // iterate over all components of this type
 		{
 			var parameter = v['parameter'];
@@ -347,13 +347,25 @@ function eventResearched(research, structure, player)
 			var filterparam = v['filterParameter'];
 			if ('filterParameter' in v && Stats[ctype][cname][filterparam] != v['filterValue']) // more specific filter
 			{
+				//if (research.name == "") debug("    skipped param=" + parameter + " cname=" + cname);
 				continue;
 			}
-			if (Stats[ctype][cname][parameter] > 0) // only applies if stat has above zero value already
+			if (Stats[ctype][cname][parameter] instanceof Array)
+			{
+				var dst = Upgrades[player][ctype][cname][parameter].slice()
+				for (var x = 0; x < dst.length; x++)
+				{
+					dst[x] += Math.ceil(Stats[ctype][cname][parameter][x] * v['value'] / 100);
+				}
+				Upgrades[player][ctype][cname][parameter] = dst
+				//debug("    upgraded to " + dst);
+			}
+			else if (Stats[ctype][cname][parameter] > 0) // only applies if stat has above zero value already
 			{
 				Upgrades[player][ctype][cname][parameter] += Math.ceil(Stats[ctype][cname][parameter] * v['value'] / 100);
-				//debug("      upgraded " + cname + " to " + Upgrades[player][ctype][cname][parameter] + " by " + Math.ceil(Stats[ctype][cname][parameter] * v['value'] / 100));
+				//if (research.name == "") debug("      upgraded " + cname + " to " + Upgrades[player][ctype][cname][parameter] + " by " + Math.ceil(Stats[ctype][cname][parameter] * v['value'] / 100));
 			}
+			//else if (research.name == "") debug("    passed " + Stats[ctype][cname][parameter] + " param=" + parameter + " cname=" + cname);
 		}
 	}
 }
@@ -365,6 +377,21 @@ function eventCheatMode(entered)
 
 function eventChat(from, to, message)
 {
+	if (message == "bettertogether" && cheatmode)
+	{
+		for (var i in Upgrades[from].Brain)
+		{
+			if (Upgrades[from].Brain[i].BaseCommandLimit > 0) // is commander
+			{
+				Upgrades[from].Brain[i].BaseCommandLimit += 4;
+				Upgrades[from].Brain[i].CommandLimitByLevel += 2;
+				// you must set the thresholds this way, as an array, because of the clunky
+				// way that this is implemented behind the scenes
+				Upgrades[from].Brain[i].RankThresholds = [ 0, 2, 4, 8, 16, 24, 32, 48, 64 ];
+			}
+		}
+		console("Made player " + from + "'s commanders SUPERIOR!");
+	}
 	if (message == "makesuperior" && cheatmode)
 	{
 		for (var i in Upgrades[from].Body)
@@ -372,6 +399,7 @@ function eventChat(from, to, message)
 			if (Upgrades[from].Body[i].bodyClass === 'Droids' || Upgrades[from].Body[i].bodyClass === 'Cyborgs')
 			{
 				Upgrades[from].Body[i].HitPoints += 500;
+				Upgrades[from].Body[i].HitPointPct += 100;
 				Upgrades[from].Body[i].Armour += 500;
 				Upgrades[from].Body[i].Thermal += 500;
 				Upgrades[from].Body[i].Power += 500;

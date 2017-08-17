@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@
 #include "mission.h" // for cheats
 #include "multistat.h"
 #include <QtCore/QSettings>
+#include <utility>
 
 
 // ////////////////////////////////////////////////////////////////////////////
@@ -68,7 +69,7 @@ bool setMultiStats(uint32_t playerIndex, PLAYERSTATS plStats, bool bLocal)
 	}
 
 	// First copy over the data into our local array
-	playerStats[playerIndex] = plStats;
+	playerStats[playerIndex] = std::move(plStats);
 
 	if (!bLocal)
 	{
@@ -269,7 +270,7 @@ void updateMultiStatsDamage(UDWORD attacker, UDWORD defender, UDWORD inflicted)
 }
 
 // update games played.
-void updateMultiStatsGames(void)
+void updateMultiStatsGames()
 {
 	if (Cheated || selectedPlayer >= MAX_PLAYERS)
 	{
@@ -279,7 +280,7 @@ void updateMultiStatsGames(void)
 }
 
 // games won
-void updateMultiStatsWins(void)
+void updateMultiStatsWins()
 {
 	if (Cheated || selectedPlayer >= MAX_PLAYERS)
 	{
@@ -289,7 +290,7 @@ void updateMultiStatsWins(void)
 }
 
 //games lost.
-void updateMultiStatsLoses(void)
+void updateMultiStatsLoses()
 {
 	if (Cheated || selectedPlayer >= MAX_PLAYERS)
 	{

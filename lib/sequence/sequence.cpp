@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2008-2015  Warzone 2100 Project
+	Copyright (C) 2008-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -66,6 +66,8 @@
 #include "lib/sound/audio.h"
 #include "lib/sound/openal_error.h"
 #include "lib/sound/mixer.h"
+#include <glm/gtx/transform.hpp>
+#include "lib/ivis_opengl/pieclip.h"
 
 #include <theora/theora.h>
 #include <physfs.h>
@@ -123,10 +125,10 @@ static bool videobuf_ready = false;		// single frame video buffer ready for proc
 static bool audiobuf_ready = false;		// single 'frame' audio buffer ready for processing
 
 // file handle
-static PHYSFS_file *fpInfile = NULL;
+static PHYSFS_file *fpInfile = nullptr;
 
-static uint32_t *RGBAframe = NULL;					// texture buffer
-static ogg_int16_t *audiobuf = NULL;			// audio buffer
+static uint32_t *RGBAframe = nullptr;					// texture buffer
+static ogg_int16_t *audiobuf = nullptr;			// audio buffer
 
 // For timing
 static double audioTime = 0;
@@ -147,7 +149,7 @@ static int dropped = 0;
 
 // Screen dimensions
 #define NUM_VERTICES 4
-static GFX *videoGfx = NULL;
+static GFX *videoGfx = nullptr;
 static GLfloat vertices[NUM_VERTICES][2];
 static GLfloat Scrnvidpos[3];
 
@@ -232,7 +234,7 @@ static void audio_close(void)
 	if (audiobuf)
 	{
 		free(audiobuf);
-		audiobuf = NULL;
+		audiobuf = nullptr;
 	}
 }
 
@@ -382,13 +384,10 @@ static void video_write(bool update)
 	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 
-	glPushMatrix();
-	glTranslatef(Scrnvidpos[0], Scrnvidpos[1], Scrnvidpos[2]);
-
-	videoGfx->draw();
-
-	glPopMatrix();
-	glErrors();
+	videoGfx->draw(
+		glm::ortho(0.f, static_cast<float>(pie_GetVideoBufferWidth()), static_cast<float>(pie_GetVideoBufferHeight()), 0.f) *
+		glm::translate(glm::vec3(Scrnvidpos[0], Scrnvidpos[1], Scrnvidpos[2]))
+	);
 }
 
 // FIXME: perhaps we should use wz's routine for audio?
@@ -505,12 +504,12 @@ bool seq_Play(const char *filename)
 	seq_InitOgg();
 
 	fpInfile = PHYSFS_openRead(filename);
-	if (fpInfile == NULL)
+	if (fpInfile == nullptr)
 	{
 		info("unable to open '%s' for playback", filename);
 
 		fpInfile = PHYSFS_openRead("novideo.ogg");
-		if (fpInfile == NULL)
+		if (fpInfile == nullptr)
 		{
 			return false;
 		}
@@ -682,14 +681,14 @@ bool seq_Play(const char *filename)
 			debug(LOG_ERROR, "Video size too large, must be below %.gx%.g!",
 			      texture_width, texture_height);
 			delete videoGfx;
-			videoGfx = NULL;
+			videoGfx = nullptr;
 			return false;
 		}
 		if (videodata.ti.pixelformat != OC_PF_420)
 		{
 			debug(LOG_ERROR, "Video not in YUV420 format!");
 			delete videoGfx;
-			videoGfx = NULL;
+			videoGfx = nullptr;
 			return false;
 		}
 		char *blackframe = (char *)calloc(1, texture_width * texture_height * 4);
@@ -918,7 +917,7 @@ void seq_Shutdown()
 		return;
 	}
 	delete videoGfx;
-	videoGfx = NULL;
+	videoGfx = nullptr;
 
 	if (vorbis_p)
 	{

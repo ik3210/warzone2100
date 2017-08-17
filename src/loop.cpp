@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -42,7 +42,6 @@
 #include "lib/sound/mixer.h"
 #include "lib/netplay/netplay.h"
 
-#include "animobj.h"
 #include "loop.h"
 #include "objects.h"
 #include "display.h"
@@ -78,7 +77,6 @@
 #include "lighting.h"
 #include "mapgrid.h"
 #include "edit3d.h"
-#include "drive.h"
 #include "fpath.h"
 #include "scriptextern.h"
 #include "cluster.h"
@@ -98,14 +96,13 @@
 #include <numeric>
 
 
-static void fireWaitingCallbacks(void);
+static void fireWaitingCallbacks();
 
 /*
  * Global variables
  */
 unsigned int loopPieCount;
 unsigned int loopPolyCount;
-unsigned int loopStateChanges;
 
 /*
  * local variables
@@ -195,9 +192,6 @@ static GAMECODE renderLoop()
 					calcDroidIllumination(psCurr);
 				}
 			}
-
-			/* update animations */
-			animObj_Update();
 		}
 
 		if (!consolePaused())
@@ -346,12 +340,7 @@ static GAMECODE renderLoop()
 
 	wzSetCursor(cursor);
 
-	pie_GetResetCounts(&loopPieCount, &loopPolyCount, &loopStateChanges);
-
-	if ((fogStatus & FOG_BACKGROUND) && (loopMissionState == LMS_SAVECONTINUE))
-	{
-		pie_SetFogStatus(false);
-	}
+	pie_GetResetCounts(&loopPieCount, &loopPolyCount);
 
 	if (!quitting)
 	{
@@ -443,7 +432,7 @@ static void countUpdate(bool synch)
 		numMissionDroids[i] = 0;
 		numTransporterDroids[i] = 0;
 
-		for (DROID *psCurr = apsDroidLists[i]; psCurr != NULL; psCurr = psCurr->psNext)
+		for (DROID *psCurr = apsDroidLists[i]; psCurr != nullptr; psCurr = psCurr->psNext)
 		{
 			numDroids[i]++;
 			switch (psCurr->droidType)
@@ -457,13 +446,13 @@ static void countUpdate(bool synch)
 				break;
 			case DROID_TRANSPORTER:
 			case DROID_SUPERTRANSPORTER:
-				if ((psCurr->psGroup != NULL))
+				if ((psCurr->psGroup != nullptr))
 				{
-					DROID *psDroid = NULL;
+					DROID *psDroid = nullptr;
 
 					numTransporterDroids[i] += psCurr->psGroup->refCount - 1;
 					// and count the units inside it...
-					for (psDroid = psCurr->psGroup->psList; psDroid != NULL && psDroid != psCurr; psDroid = psDroid->psGrpNext)
+					for (psDroid = psCurr->psGroup->psList; psDroid != nullptr && psDroid != psCurr; psDroid = psDroid->psGrpNext)
 					{
 						if (psDroid->droidType == DROID_CYBORG_CONSTRUCT || psDroid->droidType == DROID_CONSTRUCT)
 						{
@@ -480,7 +469,7 @@ static void countUpdate(bool synch)
 				break;
 			}
 		}
-		for (DROID *psCurr = mission.apsDroidLists[i]; psCurr != NULL; psCurr = psCurr->psNext)
+		for (DROID *psCurr = mission.apsDroidLists[i]; psCurr != nullptr; psCurr = psCurr->psNext)
 		{
 			numMissionDroids[i]++;
 			switch (psCurr->droidType)
@@ -494,7 +483,7 @@ static void countUpdate(bool synch)
 				break;
 			case DROID_TRANSPORTER:
 			case DROID_SUPERTRANSPORTER:
-				if ((psCurr->psGroup != NULL))
+				if ((psCurr->psGroup != nullptr))
 				{
 					numTransporterDroids[i] += psCurr->psGroup->refCount - 1;
 				}
@@ -503,7 +492,7 @@ static void countUpdate(bool synch)
 				break;
 			}
 		}
-		for (DROID *psCurr = apsLimboDroids[i]; psCurr != NULL; psCurr = psCurr->psNext)
+		for (DROID *psCurr = apsLimboDroids[i]; psCurr != nullptr; psCurr = psCurr->psNext)
 		{
 			// count the type of units
 			switch (psCurr->droidType)
@@ -521,7 +510,7 @@ static void countUpdate(bool synch)
 		}
 		// FIXME: These for-loops are code duplicationo
 		setLasSatExists(false, i);
-		for (STRUCTURE *psCBuilding = apsStructLists[i]; psCBuilding != NULL; psCBuilding = psCBuilding->psNext)
+		for (STRUCTURE *psCBuilding = apsStructLists[i]; psCBuilding != nullptr; psCBuilding = psCBuilding->psNext)
 		{
 			if (psCBuilding->pStructureType->type == REF_SAT_UPLINK && psCBuilding->status == SS_BUILT)
 			{
@@ -533,7 +522,7 @@ static void countUpdate(bool synch)
 				setLasSatExists(true, i);
 			}
 		}
-		for (STRUCTURE *psCBuilding = mission.apsStructLists[i]; psCBuilding != NULL; psCBuilding = psCBuilding->psNext)
+		for (STRUCTURE *psCBuilding = mission.apsStructLists[i]; psCBuilding != nullptr; psCBuilding = psCBuilding->psNext)
 		{
 			if (psCBuilding->pStructureType->type == REF_SAT_UPLINK && psCBuilding->status == SS_BUILT)
 			{
@@ -611,10 +600,6 @@ static void gameStateUpdate()
 
 	// update the command droids
 	cmdDroidUpdate();
-	if (getDrivingStatus())
-	{
-		driveUpdate();
-	}
 
 	fireWaitingCallbacks(); //Now is the good time to fire waiting callbacks (since interpreter is off now)
 
@@ -624,14 +609,14 @@ static void gameStateUpdate()
 		updatePlayerPower(i);
 
 		DROID *psNext;
-		for (DROID *psCurr = apsDroidLists[i]; psCurr != NULL; psCurr = psNext)
+		for (DROID *psCurr = apsDroidLists[i]; psCurr != nullptr; psCurr = psNext)
 		{
 			// Copy the next pointer - not 100% sure if the droid could get destroyed but this covers us anyway
 			psNext = psCurr->psNext;
 			droidUpdate(psCurr);
 		}
 
-		for (DROID *psCurr = mission.apsDroidLists[i]; psCurr != NULL; psCurr = psNext)
+		for (DROID *psCurr = mission.apsDroidLists[i]; psCurr != nullptr; psCurr = psNext)
 		{
 			/* Copy the next pointer - not 100% sure if the droid could
 			get destroyed but this covers us anyway */
@@ -641,13 +626,13 @@ static void gameStateUpdate()
 
 		// FIXME: These for-loops are code duplicationo
 		STRUCTURE *psNBuilding;
-		for (STRUCTURE *psCBuilding = apsStructLists[i]; psCBuilding != NULL; psCBuilding = psNBuilding)
+		for (STRUCTURE *psCBuilding = apsStructLists[i]; psCBuilding != nullptr; psCBuilding = psNBuilding)
 		{
 			/* Copy the next pointer - not 100% sure if the structure could get destroyed but this covers us anyway */
 			psNBuilding = psCBuilding->psNext;
 			structureUpdate(psCBuilding, false);
 		}
-		for (STRUCTURE *psCBuilding = mission.apsStructLists[i]; psCBuilding != NULL; psCBuilding = psNBuilding)
+		for (STRUCTURE *psCBuilding = mission.apsStructLists[i]; psCBuilding != nullptr; psCBuilding = psNBuilding)
 		{
 			/* Copy the next pointer - not 100% sure if the structure could get destroyed but this covers us anyway. It shouldn't do since its not even on the map!*/
 			psNBuilding = psCBuilding->psNext;
@@ -666,20 +651,27 @@ static void gameStateUpdate()
 		featureUpdate(psCFeat);
 	}
 
-	objmemUpdate();
-
 	// Clean up dead droid pointers in UI.
 	hciUpdate();
+
+	// Free dead droid memory.
+	objmemUpdate();
 
 	// Must end update, since we may or may not have ticked, and some message queue processing code may vary depending on whether it's in an update.
 	gameTimeUpdateEnd();
 
 	// Must be at the beginning or end of each tick, since countUpdate is also called randomly (unsynchronised) between ticks.
 	countUpdate(true);
+
+	static int i = 0;
+	if (i++ % 10 == 0) // trigger every second
+	{
+		jsDebugUpdate();
+	}
 }
 
 /* The main game loop */
-GAMECODE gameLoop(void)
+GAMECODE gameLoop()
 {
 	static uint32_t lastFlushTime = 0;
 
@@ -737,14 +729,14 @@ GAMECODE gameLoop(void)
 }
 
 /* The video playback loop */
-void videoLoop(void)
+void videoLoop()
 {
 	bool videoFinished;
 
 	ASSERT(videoMode == 1, "videoMode out of sync");
 
 	// display a frame of the FMV
-	videoFinished = !seq_UpdateFullScreenVideo(NULL);
+	videoFinished = !seq_UpdateFullScreenVideo(nullptr);
 	pie_ScreenFlip(CLEAR_BLACK);
 
 	// should we stop playing?
@@ -780,7 +772,7 @@ void videoLoop(void)
 }
 
 
-void loop_SetVideoPlaybackMode(void)
+void loop_SetVideoPlaybackMode()
 {
 	videoMode += 1;
 	paused = true;
@@ -794,7 +786,7 @@ void loop_SetVideoPlaybackMode(void)
 }
 
 
-void loop_ClearVideoPlaybackMode(void)
+void loop_ClearVideoPlaybackMode()
 {
 	videoMode -= 1;
 	paused = false;
@@ -807,17 +799,17 @@ void loop_ClearVideoPlaybackMode(void)
 }
 
 
-SDWORD loop_GetVideoMode(void)
+SDWORD loop_GetVideoMode()
 {
 	return videoMode;
 }
 
-bool loop_GetVideoStatus(void)
+bool loop_GetVideoStatus()
 {
 	return video;
 }
 
-bool gamePaused(void)
+bool gamePaused()
 {
 	return paused;
 }
@@ -827,23 +819,23 @@ void setGamePauseStatus(bool val)
 	paused = val;
 }
 
-bool gameUpdatePaused(void)
+bool gameUpdatePaused()
 {
 	return pauseState.gameUpdatePause;
 }
-bool audioPaused(void)
+bool audioPaused()
 {
 	return pauseState.audioPause;
 }
-bool scriptPaused(void)
+bool scriptPaused()
 {
 	return pauseState.scriptPause;
 }
-bool scrollPaused(void)
+bool scrollPaused()
 {
 	return pauseState.scrollPause;
 }
-bool consolePaused(void)
+bool consolePaused()
 {
 	return pauseState.consolePause;
 }
@@ -920,7 +912,7 @@ void incNumConstructorDroids(UDWORD player)
 }
 
 /* Fire waiting beacon messages which we couldn't run before */
-static void fireWaitingCallbacks(void)
+static void fireWaitingCallbacks()
 {
 	bool bOK = true;
 

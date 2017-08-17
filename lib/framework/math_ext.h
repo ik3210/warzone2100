@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -99,26 +99,6 @@ static inline WZ_DECL_CONST float hypotf(float x, float y)
 
 
 /*!
- * Moves x into the range 0.0f - max
- * \param x Value to clip
- * \param max Upper range
- * \return Value in the range 0.0f - max
- */
-static inline WZ_DECL_CONST float wrapf(float x, float max)
-{
-	while (x < 0.0f)
-	{
-		x += max;
-	}
-	while (x >= max)
-	{
-		x -= max;
-	}
-	return x;
-}
-
-
-/*!
  * Clips x to boundaries
  * \param x Value to clip
  * \param min Lower bound
@@ -126,15 +106,8 @@ static inline WZ_DECL_CONST float wrapf(float x, float max)
  */
 static inline WZ_DECL_CONST int clip(int x, int min, int max)
 {
-	if (x < min)
-	{
-		return min;
-	}
-	if (x > max)
-	{
-		return max;
-	}
-	return x;
+	// std::min and std::max not constexpr until C++14.
+	return x < min ? min : x > max ? max : x;
 }
 
 
@@ -146,15 +119,7 @@ static inline WZ_DECL_CONST int clip(int x, int min, int max)
  */
 static inline WZ_DECL_CONST float clipf(float x, float min, float max)
 {
-	if (x < min)
-	{
-		return min;
-	}
-	if (x > max)
-	{
-		return max;
-	}
-	return x;
+	return x < min ? min : x > max ? max : x;
 }
 
 /// Finds change in y and y' after time dt, according to the differential equation y'' = -ay - fy'

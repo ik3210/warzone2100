@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -35,23 +35,23 @@ enum TITLECODE
 #define PLAY_WIN    1
 #define PLAY_LOSE   2
 
-extern bool hostlaunch;
+extern int hostlaunch;
 
-bool frontendInitVars(void);
-TITLECODE titleLoop(void);
+bool frontendInitVars();
+TITLECODE titleLoop();
 
 void initLoadingScreen(bool drawbdrop);
-void closeLoadingScreen(void);
-void loadingScreenCallback(void);
+void closeLoadingScreen();
+void loadingScreenCallback();
 
-void startCreditsScreen(void);
+void startCreditsScreen();
 
 bool displayGameOver(bool success);
 void setPlayerHasLost(bool val);
-bool testPlayerHasLost(void);
-bool testPlayerHasWon(void);
+bool testPlayerHasLost();
+bool testPlayerHasWon();
 void setPlayerHasWon(bool val);
 void setScriptWinLoseVideo(UBYTE val);
-UBYTE getScriptWinLoseVideo(void);
+UBYTE getScriptWinLoseVideo();
 
 #endif // __INCLUDED_SRC_WRAPPERS_H__

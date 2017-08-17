@@ -10,7 +10,6 @@ stamp:
 
 BASELIST = \
 	palette.txt \
-	anims \
 	audio \
 	campaigns \
 	components \
@@ -21,6 +20,7 @@ BASELIST = \
 	images \
 	messages \
 	misc \
+	fonts \
 	script \
 	sequenceaudio \
 	shaders\
@@ -35,6 +35,7 @@ PATCHLIST = \
 	ruleset.json \
 	anims \
 	challenges \
+	tests \
 	components \
 	effects \
 	messages \

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -21,15 +21,30 @@
 #ifndef __INCLUDED_SRC_MODDING_H__
 #define __INCLUDED_SRC_MODDING_H__
 
-void addSubdirs(const char *basedir, const char *subdir, const bool appendToPath, char *checkList[], bool addToModList);
-void removeSubdirs(const char *basedir, const char *subdir, char *checkList[]);
-void printSearchPath(void);
+#include "lib/framework/crc.h"
+
+#include <string>
+#include <vector>
+
+
+void addSubdirs(const char *basedir, const char *subdir, const bool appendToPath, std::vector<std::string> const *checkList, bool addToModList);
+void removeSubdirs(const char *basedir, const char *subdir);
+void printSearchPath();
 
 void setOverrideMods(char *modlist);
-void clearOverrideMods(void);
+void clearOverrideMods();
 
-void addLoadedMod(const char *modname);
-void clearLoadedMods(void);
-char *getModList(void);
+void clearLoadedMods();
+std::string const &getModList();
+std::vector<Sha256> const &getModHashList();
+std::string getModFilename(Sha256 const &hash);
+
+extern std::vector<std::string> global_mods;
+extern std::vector<std::string> campaign_mods;
+extern std::vector<std::string> multiplay_mods;
+
+extern std::vector<std::string> override_mods;
+extern std::string override_mod_list;
+extern bool use_override_mods;
 
 #endif // __INCLUDED_SRC_MODDING_H__

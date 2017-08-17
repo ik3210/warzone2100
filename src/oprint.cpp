@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -61,7 +61,7 @@ static void printComponentInfo(const COMPONENT_STATS *psStats)
 	CONPRINTF(ConsoleString, (ConsoleString, "%s ref %d\n"
 	                          "   bPwr %d bPnts %d wt %d bdy %d imd %p\n",
 	                          getName(psStats), psStats->ref, psStats->buildPower,
-	                          psStats->buildPoints, psStats->weight, psStats->body,
+	                          psStats->buildPoints, psStats->weight, psStats->pBase->hitpoints,
 	                          psStats->pIMD));
 }
 

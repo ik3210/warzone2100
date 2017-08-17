@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -23,10 +23,12 @@
  * Pumpkin Studios, Eidos Interactive 1996.
  */
 #include "lib/framework/frame.h"
+#include "lib/framework/fixedpoint.h"
 
 #include "lib/gamelib/gtime.h"
 #include "lib/sound/audio.h"
 #include "lib/sound/audio_id.h"
+#include "lib/ivis_opengl/ivisdef.h"
 
 #include "visibility.h"
 
@@ -58,7 +60,7 @@ class SPOTTER
 {
 public:
 	SPOTTER(int x, int y, int plr, int radius, int type, uint32_t expiry = 0)
-		: pos(x, y, 0), player(plr), sensorRadius(radius), sensorType(type), expiryTime(expiry), numWatchedTiles(0), watchedTiles(NULL)
+		: pos(x, y, 0), player(plr), sensorRadius(radius), sensorType(type), expiryTime(expiry), numWatchedTiles(0), watchedTiles(nullptr)
 	{
 		id = generateSynchronisedObjectId();
 	}
@@ -80,14 +82,14 @@ static std::vector<SPOTTER *> apsInvisibleViewers;
 
 #define MIN_VIS_HEIGHT 80
 
-static int *gNumWalls = NULL;
-static Vector2i *gWall = NULL;
+static int *gNumWalls = nullptr;
+static Vector2i *gWall = nullptr;
 
 // forward declarations
 static void setSeenBy(BASE_OBJECT *psObj, unsigned viewer, int val);
 
 // initialise the visibility stuff
-bool visInitialise(void)
+bool visInitialise()
 {
 	visLevelInc = 1;
 	visLevelDec = 0;
@@ -96,7 +98,7 @@ bool visInitialise(void)
 }
 
 // update the visibility change levels
-void visUpdateLevel(void)
+void visUpdateLevel()
 {
 	visLevelInc = gameTimeAdjustedAverage(VIS_LEVEL_INC);
 	visLevelDec = gameTimeAdjustedAverage(VIS_LEVEL_DEC);
@@ -104,9 +106,7 @@ void visUpdateLevel(void)
 
 static inline void updateTileVis(MAPTILE *psTile)
 {
-	int i;
-
-	for (i = 0; i < MAX_PLAYERS; i++)
+	for (int i = 0; i < MAX_PLAYERS; i++)
 	{
 		/// The definition of whether a player can see something on a given tile or not
 		if (psTile->watchers[i] > 0 || (psTile->sensors[i] > 0 && !(psTile->jammerBits & ~alliancebits[i])))
@@ -126,7 +126,7 @@ uint32_t addSpotter(int x, int y, int player, int radius, bool radar, uint32_t e
 	size_t size;
 	const WavecastTile *tiles = getWavecastTable(radius, &size);
 	psSpot->watchedTiles = (TILEPOS *)malloc(size * sizeof(*psSpot->watchedTiles));
-	for (int i = 0; i < size; ++i)
+	for (unsigned i = 0; i < size; ++i)
 	{
 		const int mapX = x + tiles[i].dx;
 		const int mapY = y + tiles[i].dy;
@@ -151,7 +151,7 @@ uint32_t addSpotter(int x, int y, int player, int radius, bool radar, uint32_t e
 
 bool removeSpotter(uint32_t id)
 {
-	for (int i = 0; i < apsInvisibleViewers.size(); i++)
+	for (unsigned i = 0; i < apsInvisibleViewers.size(); i++)
 	{
 		SPOTTER *psSpot = apsInvisibleViewers.at(i);
 		if (psSpot->id == id)
@@ -177,7 +177,7 @@ void removeSpotters()
 static void updateSpotters()
 {
 	static GridList gridList;  // static to avoid allocations.
-	for (int i = 0; i < apsInvisibleViewers.size(); i++)
+	for (unsigned i = 0; i < apsInvisibleViewers.size(); i++)
 	{
 		SPOTTER *psSpot = apsInvisibleViewers.at(i);
 		if (psSpot->expiryTime != 0 && psSpot->expiryTime < gameTime)
@@ -230,7 +230,7 @@ static inline void visMarkTile(const BASE_OBJECT *psObj, int mapX, int mapY, MAP
 		TILEPOS tilePos = {uint8_t(mapX), uint8_t(mapY), uint8_t(inRange)};
 
 		visionType[rayPlayer]++;                        // we observe this tile
-		if (objJammerPower(psObj) > 0)                  // we are a jammer object
+		if (psObj->flags.test(OBJECT_FLAG_JAMMED_TILES))   // we are a jammer object
 		{
 			psTile->jammers[rayPlayer]++;
 			psTile->jammerBits |= (1 << rayPlayer); // mark it as being jammed
@@ -249,10 +249,8 @@ static void doWaveTerrain(const BASE_OBJECT *psObj, TILEPOS *recordTilePos, int 
 	const int sz = psObj->pos.z + MAX(MIN_VIS_HEIGHT, psObj->sDisplay.imd->max.y);
 	const unsigned radius = objSensorRange(psObj);
 	const int rayPlayer = psObj->player;
-	size_t i;
 	size_t size;
 	const WavecastTile *tiles = getWavecastTable(radius, &size);
-	int tileHeight, perspectiveHeight, perspectiveHeightLeeway;
 #define MAX_WAVECAST_LIST_SIZE 1360  // Trivial upper bound to what a fully upgraded WSS can use (its number of angles). Should probably be some factor times the maximum possible radius. Is probably a lot more than needed. Tested to need at least 180.
 	int heights[2][MAX_WAVECAST_LIST_SIZE];
 	int angles[2][MAX_WAVECAST_LIST_SIZE + 1];
@@ -266,21 +264,19 @@ static void doWaveTerrain(const BASE_OBJECT *psObj, TILEPOS *recordTilePos, int 
 	angles[!readList][writeListPos] = 0;               // Smallest angle.
 	++writeListPos;
 
-	for (i = 0; i < size; ++i)
+	for (size_t i = 0; i < size; ++i)
 	{
 		const int mapX = map_coord(sx) + tiles[i].dx;
 		const int mapY = map_coord(sy) + tiles[i].dy;
-		MAPTILE *psTile;
-		bool seen = false;
-
 		if (mapX < 0 || mapX >= mapWidth || mapY < 0 || mapY >= mapHeight)
 		{
 			continue;
 		}
-		psTile = mapTile(mapX, mapY);
-		tileHeight = psTile->height;
-		perspectiveHeight = (tileHeight - sz) * tiles[i].invRadius;
-		perspectiveHeightLeeway = (tileHeight - sz + MIN_VIS_HEIGHT) * tiles[i].invRadius;
+
+		MAPTILE *psTile = mapTile(mapX, mapY);
+		int tileHeight = std::max(psTile->height, psTile->waterLevel);  // If we can see the water surface, then let us see water-covered tiles too.
+		int perspectiveHeight = (tileHeight - sz) * tiles[i].invRadius;
+		int perspectiveHeightLeeway = (tileHeight - sz + MIN_VIS_HEIGHT) * tiles[i].invRadius;
 
 		if (tiles[i].angBegin < lastAngle)
 		{
@@ -301,6 +297,7 @@ static void doWaveTerrain(const BASE_OBJECT *psObj, TILEPOS *recordTilePos, int 
 			++readListPos;  // Skip, not relevant.
 		}
 
+		bool seen = false;
 		while (angles[readList][readListPos] < tiles[i].angEnd && readListPos < readListSize)
 		{
 			int oldHeight = heights[readList][readListPos];
@@ -321,7 +318,7 @@ static void doWaveTerrain(const BASE_OBJECT *psObj, TILEPOS *recordTilePos, int 
 		if (seen)
 		{
 			// Can see this tile.
-			psTile->tileExploredBits |= alliancebits[rayPlayer];                            // Share exploration with allies too
+			psTile->tileExploredBits |= alliancebits[rayPlayer];                        // Share exploration with allies too
 			visMarkTile(psObj, mapX, mapY, psTile, recordTilePos, lastRecordTilePos);   // Mark this tile as seen by our sensor
 		}
 	}
@@ -346,7 +343,7 @@ void visRemoveVisibility(BASE_OBJECT *psObj)
 			}
 			ASSERT(visionType[psObj->player] > 0, "No %s on watched tile (%d, %d)", pos.type ? "radar" : "vision", (int)pos.x, (int)pos.y);
 			visionType[psObj->player]--;
-			if (objJammerPower(psObj) > 0)                  // we are a jammer object
+			if (psObj->flags.test(OBJECT_FLAG_JAMMED_TILES))  // we are a jammer object — we cannot check objJammerPower(psObj) > 0 directly here, we may be in the BASE_OBJECT destructor).
 			{
 				// No jammers in campaign, no need for special hack
 				ASSERT(psTile->jammers[psObj->player] > 0, "Not jamming watched tile (%d, %d)", (int)pos.x, (int)pos.y);
@@ -360,14 +357,15 @@ void visRemoveVisibility(BASE_OBJECT *psObj)
 		}
 	}
 	free(psObj->watchedTiles);
-	psObj->watchedTiles = NULL;
+	psObj->watchedTiles = nullptr;
 	psObj->numWatchedTiles = 0;
+	psObj->flags.set(OBJECT_FLAG_JAMMED_TILES, false);
 }
 
 void visRemoveVisibilityOffWorld(BASE_OBJECT *psObj)
 {
 	free(psObj->watchedTiles);
-	psObj->watchedTiles = NULL;
+	psObj->watchedTiles = nullptr;
 	psObj->numWatchedTiles = 0;
 }
 
@@ -394,6 +392,7 @@ void visTilesUpdate(BASE_OBJECT *psObj)
 	}
 
 	// Do the whole circle in ∞ steps. No more pretty moiré patterns.
+	psObj->flags.set(OBJECT_FLAG_JAMMED_TILES, objJammerPower(psObj) > 0);
 	doWaveTerrain(psObj, recordTilePos, &lastRecordTilePos);
 
 	// Record new map visibility provided by object
@@ -430,10 +429,10 @@ void revealAll(UBYTE player)
  * psTarget can be any type of BASE_OBJECT (e.g. a tree).
  * struckBlock controls whether structures block LOS
  */
-int visibleObject(const BASE_OBJECT *psViewer, const BASE_OBJECT *psTarget, bool wallsBlock)
+int visibleObject(const BASE_OBJECT *psViewer, const BASE_OBJECT *psTarget, bool /*wallsBlock*/)
 {
-	ASSERT_OR_RETURN(0, psViewer != NULL, "Invalid viewer pointer!");
-	ASSERT_OR_RETURN(0, psTarget != NULL, "Invalid viewed pointer!");
+	ASSERT_OR_RETURN(0, psViewer != nullptr, "Invalid viewer pointer!");
+	ASSERT_OR_RETURN(0, psTarget != nullptr, "Invalid viewed pointer!");
 
 	int range = objSensorRange(psViewer);
 
@@ -489,7 +488,7 @@ int visibleObject(const BASE_OBJECT *psViewer, const BASE_OBJECT *psTarget, bool
 	}
 
 	/* First see if the target is in sensor range */
-	int dist = iHypot(removeZ(psTarget->pos - psViewer->pos));
+	int dist = iHypot((psTarget->pos - psViewer->pos).xy);
 	if (dist == 0)
 	{
 		return UBYTE_MAX;	// Should never be on top of each other, but ...
@@ -536,8 +535,8 @@ STRUCTURE *visGetBlockingWall(const BASE_OBJECT *psViewer, const BASE_OBJECT *ps
 
 	visibleObject(psViewer, psTarget, true);
 
-	gNumWalls = NULL;
-	gWall = NULL;
+	gNumWalls = nullptr;
+	gWall = nullptr;
 
 	// see if there was a wall in the way
 	if (numWalls > 0)
@@ -551,7 +550,7 @@ STRUCTURE *visGetBlockingWall(const BASE_OBJECT *psViewer, const BASE_OBJECT *ps
 
 			for (psWall = apsStructLists[player]; psWall; psWall = psWall->psNext)
 			{
-				if (map_coord(removeZ(psWall->pos)) == tile)
+				if (map_coord(psWall->pos.xy) == tile)
 				{
 					return psWall;
 				}
@@ -559,7 +558,7 @@ STRUCTURE *visGetBlockingWall(const BASE_OBJECT *psViewer, const BASE_OBJECT *ps
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 bool hasSharedVision(unsigned viewer, unsigned ally)
@@ -599,8 +598,6 @@ static void setSeenByInstantly(BASE_OBJECT *psObj, unsigned viewer, int val /*= 
 // Calculate which objects we should know about based on alliances and satellite view.
 static void processVisibilitySelf(BASE_OBJECT *psObj)
 {
-	int viewer;
-
 	if (psObj->type != OBJ_FEATURE && objSensorRange(psObj) > 0)
 	{
 		// one can trivially see oneself
@@ -609,7 +606,7 @@ static void processVisibilitySelf(BASE_OBJECT *psObj)
 
 	// if a player has a SAT_UPLINK structure, or has godMode enabled,
 	// they can see everything!
-	for (viewer = 0; viewer < MAX_PLAYERS; viewer++)
+	for (unsigned viewer = 0; viewer < MAX_PLAYERS; viewer++)
 	{
 		if (getSatUplinkExists(viewer) || (viewer == selectedPlayer && godMode))
 		{
@@ -617,19 +614,19 @@ static void processVisibilitySelf(BASE_OBJECT *psObj)
 		}
 	}
 
-	psObj->flags &= ~BASEFLAG_TARGETED;	// Remove any targetting locks from last update.
+	psObj->flags.set(OBJECT_FLAG_TARGETED, false); // Remove any targetting locks from last update.
 
 	// If we're a CB sensor, make our target visible instantly. Although this is actually checking visibility of our target, we do it here anyway.
 	STRUCTURE *psStruct = castStructure(psObj);
 	// you can always see anything that a CB sensor is targetting
 	// Anyone commenting this out again will get a knee capping from John.
 	// You have been warned!!
-	if (psStruct != NULL && (structCBSensor(psStruct) || structVTOLCBSensor(psStruct)) && psStruct->psTarget[0] != NULL)
+	if (psStruct != nullptr && (structCBSensor(psStruct) || structVTOLCBSensor(psStruct)) && psStruct->psTarget[0] != nullptr)
 	{
 		setSeenByInstantly(psStruct->psTarget[0], psObj->player, UBYTE_MAX);
 	}
 	DROID *psDroid = castDroid(psObj);
-	if (psDroid != NULL && psDroid->action == DACTION_OBSERVE && cbSensorDroid(psDroid))
+	if (psDroid != nullptr && psDroid->action == DACTION_OBSERVE && cbSensorDroid(psDroid))
 	{
 		// Anyone commenting this out will get a knee capping from John.
 		// You have been warned!!
@@ -678,10 +675,8 @@ static void processVisibilityVision(BASE_OBJECT *psViewer)
 // Fade in/out of view. Must be called after calculation of which objects are seen.
 static void processVisibilityLevel(BASE_OBJECT *psObj)
 {
-	int player;
-
 	// update the visibility levels
-	for (player = 0; player < MAX_PLAYERS; player++)
+	for (unsigned player = 0; player < MAX_PLAYERS; player++)
 	{
 		bool justBecameVisible = false;
 		int visLevel = psObj->seenThisTick[player];
@@ -740,7 +735,7 @@ static void processVisibilityLevel(BASE_OBJECT *psObj)
 					psMessage = addMessage(MSG_PROXIMITY, true, player);
 					if (psMessage)
 					{
-						psMessage->pViewData = (MSG_VIEWDATA *)psObj;
+						psMessage->psObj = psObj;
 						debug(LOG_MSG, "Added message for oil well or artefact, pViewData=%p", psMessage->pViewData);
 					}
 					if (!bInTutorial && player == selectedPlayer)
@@ -763,7 +758,7 @@ void processVisibility()
 		unsigned list;
 		for (list = 0; list < sizeof(lists) / sizeof(*lists); ++list)
 		{
-			for (BASE_OBJECT *psObj = lists[list]; psObj != NULL; psObj = psObj->psNext)
+			for (BASE_OBJECT *psObj = lists[list]; psObj != nullptr; psObj = psObj->psNext)
 			{
 				processVisibilitySelf(psObj);
 			}
@@ -775,21 +770,21 @@ void processVisibility()
 		unsigned list;
 		for (list = 0; list < sizeof(lists) / sizeof(*lists); ++list)
 		{
-			for (BASE_OBJECT *psObj = lists[list]; psObj != NULL; psObj = psObj->psNext)
+			for (BASE_OBJECT *psObj = lists[list]; psObj != nullptr; psObj = psObj->psNext)
 			{
 				processVisibilityVision(psObj);
 			}
 		}
 	}
-	for (BASE_OBJECT *psObj = apsSensorList[0]; psObj != NULL; psObj = psObj->psNextFunc)
+	for (BASE_OBJECT *psObj = apsSensorList[0]; psObj != nullptr; psObj = psObj->psNextFunc)
 	{
 		if (objRadarDetector(psObj))
 		{
-			for (BASE_OBJECT *psTarget = apsSensorList[0]; psTarget != NULL; psTarget = psTarget->psNextFunc)
+			for (BASE_OBJECT *psTarget = apsSensorList[0]; psTarget != nullptr; psTarget = psTarget->psNextFunc)
 			{
 				if (psObj != psTarget && psTarget->visible[psObj->player] < UBYTE_MAX / 2
 				    && objActiveRadar(psTarget)
-				    && iHypot(removeZ(psTarget->pos - psObj->pos)) < objSensorRange(psObj) * 10)
+				    && iHypot((psTarget->pos - psObj->pos).xy) < objSensorRange(psObj) * 10)
 				{
 					psTarget->visible[psObj->player] = UBYTE_MAX / 2;
 				}
@@ -802,7 +797,7 @@ void processVisibility()
 		unsigned list;
 		for (list = 0; list < sizeof(lists) / sizeof(*lists); ++list)
 		{
-			for (BASE_OBJECT *psObj = lists[list]; psObj != NULL; psObj = psObj->psNext)
+			for (BASE_OBJECT *psObj = lists[list]; psObj != nullptr; psObj = psObj->psNext)
 			{
 				processVisibilityLevel(psObj);
 			}
@@ -860,10 +855,10 @@ static int checkFireLine(const SIMPLE_OBJECT *psViewer, const BASE_OBJECT *psTar
  */
 bool lineOfFire(const SIMPLE_OBJECT *psViewer, const BASE_OBJECT *psTarget, int weapon_slot, bool wallsBlock)
 {
-	WEAPON_STATS *psStats = NULL;
+	WEAPON_STATS *psStats = nullptr;
 
-	ASSERT_OR_RETURN(false, psViewer != NULL, "Invalid shooter pointer!");
-	ASSERT_OR_RETURN(false, psTarget != NULL, "Invalid target pointer!");
+	ASSERT_OR_RETURN(false, psViewer != nullptr, "Invalid shooter pointer!");
+	ASSERT_OR_RETURN(false, psTarget != nullptr, "Invalid target pointer!");
 	ASSERT_OR_RETURN(false, psViewer->type == OBJ_DROID || psViewer->type == OBJ_STRUCTURE, "Bad viewer type");
 
 	if (psViewer->type == OBJ_DROID)
@@ -875,7 +870,7 @@ bool lineOfFire(const SIMPLE_OBJECT *psViewer, const BASE_OBJECT *psTarget, int 
 		psStats = asWeaponStats + ((STRUCTURE *)psViewer)->asWeaps[weapon_slot].nStat;
 	}
 	// 2d distance
-	int distance = iHypot(removeZ(psTarget->pos - psViewer->pos));
+	int distance = iHypot((psTarget->pos - psViewer->pos).xy);
 	int range = proj_GetLongRange(psStats, psViewer->player);
 	if (proj_Direct(psStats))
 	{
@@ -904,7 +899,7 @@ bool lineOfFire(const SIMPLE_OBJECT *psViewer, const BASE_OBJECT *psTarget, int 
 /* Check how much of psTarget is hitable from psViewer's gun position */
 int areaOfFire(const SIMPLE_OBJECT *psViewer, const BASE_OBJECT *psTarget, int weapon_slot, bool wallsBlock)
 {
-	if (psViewer == NULL)
+	if (psViewer == nullptr)
 	{
 		return 0;  // Lassat special case, avoid assertion.
 	}
@@ -962,8 +957,8 @@ static int checkFireLine(const SIMPLE_OBJECT *psViewer, const BASE_OBJECT *psTar
 	int distSq, partSq, oldPartSq;
 	int64_t angletan;
 
-	ASSERT(psViewer != NULL, "Invalid shooter pointer!");
-	ASSERT(psTarget != NULL, "Invalid target pointer!");
+	ASSERT(psViewer != nullptr, "Invalid shooter pointer!");
+	ASSERT(psTarget != nullptr, "Invalid target pointer!");
 	if (!psViewer || !psTarget)
 	{
 		return -1;
@@ -985,7 +980,7 @@ static int checkFireLine(const SIMPLE_OBJECT *psViewer, const BASE_OBJECT *psTar
 
 	pos = muzzle;
 	dest = psTarget->pos;
-	diff = removeZ(dest - pos);
+	diff = (dest - pos).xy;
 
 	distSq = diff * diff;
 	if (distSq == 0)
@@ -994,7 +989,7 @@ static int checkFireLine(const SIMPLE_OBJECT *psViewer, const BASE_OBJECT *psTar
 		return 1000;
 	}
 
-	current = removeZ(pos);
+	current = pos.xy;
 	start = current;
 	angletan = -1000 * 65536;
 	partSq = 0;

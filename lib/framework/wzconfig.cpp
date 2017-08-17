@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ WzConfig::~WzConfig()
 {
 	if (mWarning == ReadAndWrite)
 	{
-		ASSERT(mObjStack.size() == 0, "Some json groups have not been closed, stack size %d.", mObjStack.size());
+		ASSERT(mObjStack.empty(), "Some json groups have not been closed, stack size %d.", mObjStack.size());
 		QJsonDocument doc(mObj);
 		QByteArray json = doc.toJson();
 		saveFile(mFilename.toUtf8().constData(), json.constData(), json.size());
@@ -43,7 +43,7 @@ WzConfig::~WzConfig()
 	debug(LOG_SAVE, "%s %s", mWarning == ReadAndWrite? "Saving" : "Closing", mFilename.toUtf8().constData());
 }
 
-static QJsonObject jsonMerge(QJsonObject original, const QJsonObject override)
+static QJsonObject jsonMerge(QJsonObject original, const QJsonObject& override)
 {
 	for (const QString &key : override.keys())
 	{
@@ -100,7 +100,7 @@ WzConfig::WzConfig(const QString &name, WzConfig::warning warning, QObject *pare
 	mObj = mJson.object();
 	free(data);
 	char **diffList = PHYSFS_enumerateFiles("diffs");
-	for (char **i = diffList; *i != NULL; i++)
+	for (char **i = diffList; *i != nullptr; i++)
 	{
 		std::string str(std::string("diffs/") + *i + std::string("/") + name.toUtf8().constData());
 		if (!PHYSFS_exists(str.c_str()))
@@ -172,11 +172,7 @@ QJsonValue WzConfig::json(const QString &key, const QJsonValue &defaultValue) co
 
 void WzConfig::setVector3f(const QString &name, const Vector3f &v)
 {
-	QStringList l;
-	l.push_back(QString::number(v.x));
-	l.push_back(QString::number(v.y));
-	l.push_back(QString::number(v.z));
-	setValue(name, l);
+	mObj.insert(name, QJsonArray({ v.x, v.y, v.z }));
 }
 
 Vector3f WzConfig::vector3f(const QString &name)
@@ -196,11 +192,7 @@ Vector3f WzConfig::vector3f(const QString &name)
 
 void WzConfig::setVector3i(const QString &name, const Vector3i &v)
 {
-	QStringList l;
-	l.push_back(QString::number(v.x));
-	l.push_back(QString::number(v.y));
-	l.push_back(QString::number(v.z));
-	setValue(name, l);
+	mObj.insert(name, QJsonArray({ v.x, v.y, v.z }));
 }
 
 Vector3i WzConfig::vector3i(const QString &name)
@@ -220,10 +212,7 @@ Vector3i WzConfig::vector3i(const QString &name)
 
 void WzConfig::setVector2i(const QString &name, const Vector2i &v)
 {
-	QStringList l;
-	l.push_back(QString::number(v.x));
-	l.push_back(QString::number(v.y));
-	setValue(name, l);
+	mObj.insert(name, QJsonArray({ v.x, v.y }));
 }
 
 Vector2i WzConfig::vector2i(const QString &name)
@@ -265,7 +254,7 @@ bool WzConfig::beginGroup(const QString &prefix)
 
 void WzConfig::endGroup()
 {
-	ASSERT(mObjStack.size() > 0, "An endGroup() too much!");
+	ASSERT(!mObjStack.empty(), "An endGroup() too much!");
 	if (mWarning == ReadAndWrite)
 	{
 		QJsonObject latestObj = mObj;
@@ -314,7 +303,7 @@ void WzConfig::nextArrayItem()
 	else
 	{
 		mArray.removeFirst();
-		if (mArray.size() > 0)
+		if (!mArray.empty())
 		{
 			mObj = mArray.first().toObject();
 		}
@@ -356,4 +345,9 @@ void WzConfig::endArray()
 void WzConfig::setValue(const QString &key, const QVariant &value)
 {
 	mObj.insert(key, QJsonValue::fromVariant(value));
+}
+
+void WzConfig::set(const QString &key, const QJsonValue &value)
+{
+	mObj.insert(key, value);
 }

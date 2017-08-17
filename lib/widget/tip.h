@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 #include "lib/widget/widgbase.h"
 
 /* Initialise the tool tip module */
-extern void tipInitialise(void);
+void tipInitialise();
 
 /*
  * Setup a tool tip.
@@ -41,14 +41,14 @@ extern void tipInitialise(void);
  * x,y,width,height - specify the position of the button to place the
  * tip by.
  */
-void tipStart(WIDGET *psSource, QString pTip, iV_fonts NewFontID, int x, int y, int width, int height);
+void tipStart(WIDGET *psSource, const QString& pTip, iV_fonts NewFontID, int x, int y, int width, int height);
 
 /* Stop a tool tip (e.g. if the hilite is lost on a button).
  * psSource should be the same as the widget that started the tip.
  */
-extern void tipStop(WIDGET *psSource);
+void tipStop(WIDGET *psSource);
 
 /* Update and possibly display the tip */
-extern void tipDisplay(void);
+void tipDisplay();
 
 #endif // __INCLUDED_LIB_WIDGET_TIP_H__

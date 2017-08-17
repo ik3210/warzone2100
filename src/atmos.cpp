@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -25,11 +25,11 @@
 
 #include "lib/framework/frame.h"
 #include "lib/ivis_opengl/piematrix.h"
+#include "lib/ivis_opengl/piepalette.h"
 
 #include "atmos.h"
 #include "display3d.h"
 #include "effects.h"
-#include "hci.h"
 #include "loop.h"
 #include "map.h"
 #include "miscimd.h"
@@ -57,7 +57,7 @@ enum AP_STATUS
 	APS_ACTIVE
 };
 
-static ATPART	*asAtmosParts = NULL;
+static ATPART	*asAtmosParts = nullptr;
 static UDWORD	freeParticle;
 static WT_CLASS	weather = WT_NONE;
 
@@ -290,7 +290,7 @@ void atmosUpdateSystem()
 	}
 }
 
-void atmosDrawParticles()
+void atmosDrawParticles(const glm::mat4 &viewMatrix)
 {
 	UDWORD	i;
 
@@ -308,13 +308,13 @@ void atmosDrawParticles()
 			/* Is it on the grid */
 			if (clipXY(asAtmosParts[i].position.x, asAtmosParts[i].position.z))
 			{
-				renderParticle(&asAtmosParts[i]);
+				renderParticle(&asAtmosParts[i], viewMatrix);
 			}
 		}
 	}
 }
 
-void renderParticle(ATPART *psPart)
+void renderParticle(ATPART *psPart, const glm::mat4 &viewMatrix)
 {
 	Vector3i dv;
 
@@ -322,16 +322,14 @@ void renderParticle(ATPART *psPart)
 	dv.x = psPart->position.x - player.p.x;
 	dv.y = psPart->position.y;
 	dv.z = -(psPart->position.z - player.p.z);
-	pie_MatBegin(true);					/* Push the current matrix */
-	pie_TRANSLATE(dv.x, dv.y, dv.z);
 	/* Make it face camera */
-	pie_MatRotY(-player.r.y);
-	pie_MatRotY(-player.r.x);
 	/* Scale it... */
-	pie_MatScale(psPart->size / 100.f);
+	const glm::mat4 modelMatrix = glm::translate(dv) *
+		glm::rotate(UNDEG(-player.r.y), glm::vec3(0.f, 1.f, 0.f)) *
+		glm::rotate(UNDEG(-player.r.x), glm::vec3(0.f, 1.f, 0.f)) *
+		glm::scale(psPart->size / 100.f, psPart->size / 100.f, psPart->size / 100.f);
+	pie_Draw3DShape(psPart->imd, 0, 0, WZCOL_WHITE, 0, 0, viewMatrix * modelMatrix);
 	/* Draw it... */
-	pie_Draw3DShape(psPart->imd, 0, 0, WZCOL_WHITE, 0, 0);
-	pie_MatEnd();
 }
 
 void atmosSetWeatherType(WT_CLASS type)
@@ -344,7 +342,7 @@ void atmosSetWeatherType(WT_CLASS type)
 	if (type == WT_NONE && asAtmosParts)
 	{
 		free(asAtmosParts);
-		asAtmosParts = NULL;
+		asAtmosParts = nullptr;
 	}
 }
 

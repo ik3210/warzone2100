@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,11 +30,11 @@ enum GS_GAMEMODE
 
 //flag to indicate when initialisation is complete
 extern bool gameInitialised;
-extern bool bDisableLobby;
 extern bool customDebugfile;
-extern GS_GAMEMODE GetGameMode(void) WZ_DECL_PURE;
-extern void SetGameMode(GS_GAMEMODE status);
-extern void mainLoop(void);
+
+GS_GAMEMODE GetGameMode() WZ_DECL_PURE;
+void SetGameMode(GS_GAMEMODE status);
+void mainLoop();
 
 extern char SaveGamePath[PATH_MAX];
 extern char datadir[PATH_MAX];
@@ -42,15 +42,5 @@ extern char configdir[PATH_MAX];
 extern char KeyMapPath[PATH_MAX];
 extern char MultiPlayersPath[PATH_MAX];
 extern char rulesettag[40];
-
-#define MAX_MODS 100
-
-extern char *global_mods[MAX_MODS];
-extern char *campaign_mods[MAX_MODS];
-extern char *multiplay_mods[MAX_MODS];
-
-extern char *override_mods[MAX_MODS];
-extern char *override_mod_list;
-extern bool use_override_mods;
 
 #endif // __INCLUDED_SRC_MAIN_H__

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -233,8 +233,8 @@ PointTree::ResultVector &PointTree::queryMaybeFilter(Filter &filter, int32_t min
 	for (int r = 0; r != numRanges; ++r)
 	{
 		// Find range of points which may be close enough. Range is [i1 ... i2 - 1]. The pointers are ignored when searching.
-		unsigned i1 = std::lower_bound(points.begin(),      points.end(), Point(ranges[r].a, (void *)NULL), pointTreeSortFunction) - points.begin();
-		unsigned i2 = std::upper_bound(points.begin() + i1, points.end(), Point(ranges[r].z, (void *)NULL), pointTreeSortFunction) - points.begin();
+		unsigned i1 = std::lower_bound(points.begin(),      points.end(), Point(ranges[r].a, (void *)nullptr), pointTreeSortFunction) - points.begin();
+		unsigned i2 = std::upper_bound(points.begin() + i1, points.end(), Point(ranges[r].z, (void *)nullptr), pointTreeSortFunction) - points.begin();
 
 		for (unsigned i = current<IsFiltered>(filter.data, i1); i < i2; i = current<IsFiltered>(filter.data, i + 1))
 		{

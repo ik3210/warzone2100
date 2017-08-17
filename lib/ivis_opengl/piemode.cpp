@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@
 
 iSurface rendSurface;
 
-bool pie_Initialise(void)
+bool pie_Initialise()
 {
 	pie_SetUp();
 	pie_TexInit();
@@ -63,8 +63,6 @@ bool pie_Initialise(void)
 		debug(LOG_TEXTURE, "Texture compression: No");
 		wz_texture_compression = GL_RGBA;
 	}
-
-	pie_MatInit();
 
 	rendSurface.width	= pie_GetVideoBufferWidth();
 	rendSurface.height	= pie_GetVideoBufferHeight();
@@ -82,7 +80,7 @@ bool pie_Initialise(void)
 }
 
 
-void pie_ShutDown(void)
+void pie_ShutDown()
 {
 	pie_CleanUp();
 }
@@ -116,7 +114,7 @@ void pie_ScreenFlip(int clearMode)
 }
 
 /***************************************************************************/
-UDWORD	pie_GetResScalingFactor(void)
+UDWORD	pie_GetResScalingFactor()
 {
 	if (pie_GetVideoBufferWidth() * 4 > pie_GetVideoBufferHeight() * 5)
 	{

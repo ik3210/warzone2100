@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@
 #ifndef __INCLUDED_SRC_SCRIPTTABS_H__
 #define __INCLUDED_SRC_SCRIPTTABS_H__
 
-#include "lib/script/event.h" // needed for _scr_user_types
 #include "lib/script/parse.h"
 
 // How many game ticks for one event tick
@@ -46,9 +45,9 @@ extern VAR_SYMBOL asObjTable[];
 extern CONST_SYMBOL asConstantTable[];
 
 // Initialise the script system
-extern bool scrTabInitialise(void);
+bool scrTabInitialise();
 
 // Shut down the script system
-extern void scrShutDown(void);
+void scrShutDown();
 
 #endif // __INCLUDED_SRC_SCRIPTTABS_H__

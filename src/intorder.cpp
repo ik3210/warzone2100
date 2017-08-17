@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -335,7 +335,7 @@ static ORDERBUTTONS OrderButtons[NUM_ORDERS] =
 
 
 static std::vector<DROID *> SelectedDroids;
-static STRUCTURE *psSelectedFactory = NULL;
+static STRUCTURE *psSelectedFactory = nullptr;
 static std::vector<AVORDER> AvailableOrders;
 
 
@@ -344,7 +344,7 @@ bool OrderUp = false;
 // Build a list of currently selected droids.
 // Returns true if droids were selected.
 //
-static bool BuildSelectedDroidList(void)
+static bool BuildSelectedDroidList()
 {
 	DROID *psDroid;
 
@@ -361,16 +361,16 @@ static bool BuildSelectedDroidList(void)
 
 // Build a list of orders available for the selected group of droids.
 //
-static std::vector<AVORDER> buildDroidOrderList(void)
+static std::vector<AVORDER> buildDroidOrderList()
 {
 	std::set<AVORDER> orders;
 
-	for (unsigned j = 0; j < SelectedDroids.size(); j++)
+	for (auto &SelectedDroid : SelectedDroids)
 	{
 		for (unsigned OrdIndex = 0; OrdIndex < NUM_ORDERS; ++OrdIndex)
 		{
 			// Is the order available?
-			if (secondarySupported(SelectedDroids[j], OrderButtons[OrdIndex].Order))
+			if (secondarySupported(SelectedDroid, OrderButtons[OrdIndex].Order))
 			{
 				AVORDER avOrder;
 				avOrder.OrderIndex = OrdIndex;
@@ -416,9 +416,9 @@ static SECONDARY_STATE GetSecondaryStates(SECONDARY_ORDER sec)
 	}
 	else //droids
 	{
-		for (unsigned i = 0; i < SelectedDroids.size(); ++i)
+		for (auto &SelectedDroid : SelectedDroids)
 		{
-			currState = secondaryGetState(SelectedDroids[i], sec, ModeQueue);
+			currState = secondaryGetState(SelectedDroid, sec, ModeQueue);
 			if (bFirst)
 			{
 				state = currState;
@@ -469,13 +469,13 @@ bool intAddOrder(BASE_OBJECT *psObj)
 	}
 
 	// Is the form already up?
-	if (widgGetFromID(psWScreen, IDORDER_FORM) != NULL)
+	if (widgGetFromID(psWScreen, IDORDER_FORM) != nullptr)
 	{
 		intRemoveOrderNoAnim();
 		Animate = false;
 	}
 	// Is the stats window up?
-	if (widgGetFromID(psWScreen, IDSTAT_FORM) != NULL)
+	if (widgGetFromID(psWScreen, IDSTAT_FORM) != nullptr)
 	{
 		intRemoveStatsNoAnim();
 		Animate = false;
@@ -486,11 +486,11 @@ bool intAddOrder(BASE_OBJECT *psObj)
 		if (psObj->type == OBJ_DROID)
 		{
 			Droid = (DROID *)psObj;
-			psStructure =  NULL;
+			psStructure =  nullptr;
 		}
 		else if (psObj->type == OBJ_STRUCTURE)
 		{
-			Droid = NULL;
+			Droid = nullptr;
 			psStructure = (STRUCTURE *)psObj;
 			psSelectedFactory = psStructure;
 			ASSERT_OR_RETURN(false, StructIsFactory(psSelectedFactory), "Trying to select a %s as a factory!",
@@ -499,14 +499,14 @@ bool intAddOrder(BASE_OBJECT *psObj)
 		else
 		{
 			ASSERT(false, "Invalid object type");
-			Droid = NULL;
-			psStructure =  NULL;
+			Droid = nullptr;
+			psStructure =  nullptr;
 		}
 	}
 	else
 	{
-		Droid = NULL;
-		psStructure =  NULL;
+		Droid = nullptr;
+		psStructure =  nullptr;
 	}
 
 	setWidgetsStatus(true);
@@ -515,12 +515,12 @@ bool intAddOrder(BASE_OBJECT *psObj)
 	SelectedDroids.clear();
 
 	// Selected droid is a command droid?
-	if ((Droid != NULL) && (Droid->droidType == DROID_COMMAND))
+	if ((Droid != nullptr) && (Droid->droidType == DROID_COMMAND))
 	{
 		// displaying for a command droid - ignore any other droids
 		SelectedDroids.push_back(Droid);
 	}
-	else if (psStructure != NULL)
+	else if (psStructure != nullptr)
 	{
 		AvailableOrders = buildStructureOrderList(psStructure);
 		if (AvailableOrders.empty())
@@ -532,7 +532,7 @@ bool intAddOrder(BASE_OBJECT *psObj)
 	else if (!BuildSelectedDroidList())
 	{
 		// If no droids selected then see if we were given a specific droid.
-		if (Droid != NULL)
+		if (Droid != nullptr)
 		{
 			// and put it in the list.
 			SelectedDroids.push_back(Droid);
@@ -540,7 +540,7 @@ bool intAddOrder(BASE_OBJECT *psObj)
 	}
 
 	// Build a list of orders available for the list of selected droids. - if a factory has not been selected
-	if (psStructure == NULL)
+	if (psStructure == nullptr)
 	{
 		AvailableOrders = buildDroidOrderList();
 		if (AvailableOrders.empty())
@@ -782,22 +782,22 @@ bool intAddOrder(BASE_OBJECT *psObj)
 // Any droids that die now get set to NULL - John.
 // No droids being selected no longer removes the screen,
 // this lets the screen work with command droids - John.
-void intRunOrder(void)
+void intRunOrder()
 {
 	// Check to see if there all dead or unselected.
-	for (unsigned i = 0; i < SelectedDroids.size(); i++)
+	for (auto &SelectedDroid : SelectedDroids)
 	{
-		if (SelectedDroids[i]->died)
+		if (SelectedDroid->died)
 		{
-			SelectedDroids[i] = NULL;
+			SelectedDroid = nullptr;
 		}
 	}
 	// Remove any NULL pointers from SelectedDroids.
-	SelectedDroids.erase(std::remove(SelectedDroids.begin(), SelectedDroids.end(), (DROID *)NULL), SelectedDroids.end());
+	SelectedDroids.erase(std::remove(SelectedDroids.begin(), SelectedDroids.end(), (DROID *)nullptr), SelectedDroids.end());
 
-	if (psSelectedFactory != NULL && psSelectedFactory->died)
+	if (psSelectedFactory != nullptr && psSelectedFactory->died)
 	{
-		psSelectedFactory = NULL;
+		psSelectedFactory = nullptr;
 	}
 
 	// If all dead then remove the screen.
@@ -805,7 +805,7 @@ void intRunOrder(void)
 	if (SelectedDroids.empty())
 	{
 		// might have a factory selected
-		if (psSelectedFactory == NULL)
+		if (psSelectedFactory == nullptr)
 		{
 			intRemoveOrder();
 			return;
@@ -820,14 +820,14 @@ void intRunOrder(void)
 static bool SetSecondaryState(SECONDARY_ORDER sec, unsigned State)
 {
 	// This code is similar to kfsf_SetSelectedDroidsState() in keybind.cpp. Unfortunately, it seems hard to un-duplicate the code.
-	for (unsigned i = 0; i < SelectedDroids.size(); ++i)
+	for (auto &SelectedDroid : SelectedDroids)
 	{
-		if (SelectedDroids[i])
+		if (SelectedDroid)
 		{
 			//Only set the state if it's not a transporter.
-			if (!isTransporter(SelectedDroids[i]))
+			if (!isTransporter(SelectedDroid))
 			{
-				if (!secondarySetState(SelectedDroids[i], sec, (SECONDARY_STATE)State))
+				if (!secondarySetState(SelectedDroid, sec, (SECONDARY_STATE)State))
 				{
 					return false;
 				}
@@ -989,11 +989,11 @@ void intProcessOrder(UDWORD id)
 
 
 // check whether the order list has changed
-static bool CheckObjectOrderList(void)
+static bool CheckObjectOrderList()
 {
 	std::vector<AVORDER> NewAvailableOrders;
 
-	if (psSelectedFactory != NULL)
+	if (psSelectedFactory != nullptr)
 	{
 		NewAvailableOrders = buildStructureOrderList(psSelectedFactory);
 	}
@@ -1006,7 +1006,7 @@ static bool CheckObjectOrderList(void)
 	return NewAvailableOrders == AvailableOrders;
 }
 
-static bool intRefreshOrderButtons(void)
+static bool intRefreshOrderButtons()
 {
 	SECONDARY_STATE State;
 	UWORD OrdIndex;
@@ -1060,11 +1060,11 @@ static bool intRefreshOrderButtons(void)
 
 // Call to refresh the Order screen, ie when a droids boards it.
 //
-bool intRefreshOrder(void)
+bool intRefreshOrder()
 {
 	// Is the Order screen up?
 	if ((intMode == INT_ORDER) &&
-	    (widgGetFromID(psWScreen, IDORDER_FORM) != NULL))
+	    (widgGetFromID(psWScreen, IDORDER_FORM) != nullptr))
 	{
 		bool Ret;
 
@@ -1089,7 +1089,7 @@ bool intRefreshOrder(void)
 		else
 		{
 			// Refresh it by re-adding it.
-			Ret = intAddOrder(NULL);
+			Ret = intAddOrder(nullptr);
 			if (Ret == false)
 			{
 				intMode = INT_NORMAL;
@@ -1104,7 +1104,7 @@ bool intRefreshOrder(void)
 
 // Remove the droids order screen with animation.
 //
-void intRemoveOrder(void)
+void intRemoveOrder()
 {
 	widgDelete(psWScreen, IDORDER_CLOSE);
 
@@ -1115,20 +1115,20 @@ void intRemoveOrder(void)
 		form->closeAnimateDelete();
 		OrderUp = false;
 		SelectedDroids.clear();
-		psSelectedFactory = NULL;
+		psSelectedFactory = nullptr;
 	}
 }
 
 
 // Remove the droids order screen without animation.
 //
-void intRemoveOrderNoAnim(void)
+void intRemoveOrderNoAnim()
 {
 	widgDelete(psWScreen, IDORDER_CLOSE);
 	widgDelete(psWScreen, IDORDER_FORM);
 	OrderUp = false;
 	SelectedDroids.clear();
-	psSelectedFactory = NULL;
+	psSelectedFactory = nullptr;
 }
 
 //new function added to bring up the RMB order form for Factories as well as droids

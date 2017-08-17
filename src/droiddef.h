@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -38,13 +38,12 @@
 
 /*!
  * The number of components in the asParts / asBits arrays.
- * Weapons are stored seperately, thus the maximum index into the array
+ * Weapons are stored separately, thus the maximum index into the array
  * is 1 smaller than the number of components.
  */
 #define DROID_MAXCOMP (COMP_NUMCOMPONENTS - 1)
 
 /* The maximum number of droid weapons */
-#define DROID_MAXWEAPS		3
 #define	DROID_DAMAGE_SCALING	400
 // This should really be logarithmic
 #define	CALC_DROID_SMOKE_INTERVAL(x) ((((100-x)+10)/10) * DROID_DAMAGE_SCALING)
@@ -69,7 +68,7 @@ struct DROID_TEMPLATE : public BASE_STATS
 	uint8_t         asParts[DROID_MAXCOMP];
 	/* The weapon systems */
 	int8_t          numWeaps;                   ///< Number of weapons
-	uint8_t         asWeaps[DROID_MAXWEAPS];    ///< weapon indices
+	uint8_t         asWeaps[MAX_WEAPONS];       ///< weapon indices
 	DROID_TYPE      droidType;                  ///< The type of droid
 	UDWORD          multiPlayerID;              ///< multiplayer unique descriptor(cant use id's for templates). Used for save games as well now - AB 29/10/98
 	bool            prefab;                     ///< Not player designed, not saved, never delete or change
@@ -103,8 +102,6 @@ struct DROID : public BASE_OBJECT
 	uint32_t        experience;
 	UDWORD          lastFrustratedTime;             ///< Set when eg being stuck; used for eg firing indiscriminately at map features to clear the way
 	SWORD           resistance;                     ///< used in Electronic Warfare
-	UDWORD          numWeaps;                       ///< Watermelon:Re-enabled this,I need this one in droid.c
-	WEAPON          asWeaps[DROID_MAXWEAPS];
 	// The group the droid belongs to
 	DROID_GROUP    *psGroup;
 	DROID          *psGrpNext;
@@ -120,8 +117,8 @@ struct DROID : public BASE_OBJECT
 	// these are to help tracking down dangling pointers
 	char            targetFunc[MAX_EVENT_NAME_LEN];
 	int             targetLine;
-	char            actionTargetFunc[DROID_MAXWEAPS][MAX_EVENT_NAME_LEN];
-	int             actionTargetLine[DROID_MAXWEAPS];
+	char            actionTargetFunc[MAX_WEAPONS][MAX_EVENT_NAME_LEN];
+	int             actionTargetLine[MAX_WEAPONS];
 	char            baseFunc[MAX_EVENT_NAME_LEN];
 	int             baseLine;
 #endif
@@ -134,7 +131,7 @@ struct DROID : public BASE_OBJECT
 	/* Action data */
 	DROID_ACTION    action;
 	Vector2i        actionPos;
-	BASE_OBJECT    *psActionTarget[DROID_MAXWEAPS]; ///< Action target object
+	BASE_OBJECT    *psActionTarget[MAX_WEAPONS]; ///< Action target object
 	UDWORD          actionStarted;                  ///< Game time action started
 	UDWORD          actionPoints;                   ///< number of points done by action since start
 	UDWORD          expectedDamageDirect;                 ///< Expected damage to be caused by all currently incoming direct projectiles. This info is shared between all players,

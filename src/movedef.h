@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -35,7 +35,6 @@ enum MOVE_STATUS
 	MOVEPOINTTOPOINT,
 	MOVETURNTOTARGET,
 	MOVEHOVER,
-	MOVEDRIVE,
 	MOVEWAITROUTE,
 	MOVESHUFFLE,
 };
@@ -56,7 +55,7 @@ struct MOVE_CONTROL
 	UDWORD	bumpTime;					// time of first bump with something
 	UWORD	lastBump;					// time of last bump with a droid - relative to bumpTime
 	UWORD	pauseTime;					// when MOVEPAUSE started - relative to bumpTime
-	UWORD	bumpX, bumpY;				// position of last bump
+	Position bumpPos;					// position of last bump
 
 	UDWORD	shuffleStart;				// when a shuffle started
 

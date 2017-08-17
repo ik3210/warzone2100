@@ -1,6 +1,7 @@
 // General rules for the campaign
 //
 // * Enable unit design and minimap only when an HQ exists
+receiveAllEvents(true); //Needed to allow enemy research to apply to them
 
 function setupGame()
 {
@@ -32,44 +33,20 @@ function setupGame()
 function eventGameLoaded()
 {
 	setupGame();
+	queue("resetPower", 1000);
 }
 
 function eventGameInit()
 {
 	setupGame();
+	queue("resetPower", 1000)
 }
 
-function eventStartLevel()
-{
-	// Disable by default
-	setMiniMap(false);
-	setDesign(false);
-	setDroidLimit(0, 100, DROID_ANY);
-	setDroidLimit(0, 10, DROID_COMMAND);
-	setDroidLimit(0, 15, DROID_CONSTRUCT);
+function resetPower() {
+	const HARD_POWER_LIMIT = 50000;
+	const INSANE_POWER_LIMIT = 20000;
 
-	setStructureLimits("A0PowerGenerator", 5, 0);
-	setStructureLimits("A0ResourceExtractor", 200, 0);
-	setStructureLimits("A0ResearchFacility", 5, 0);
-	setStructureLimits("A0LightFactory", 5, 0);
-	setStructureLimits("A0CommandCentre", 1, 0);
-	setStructureLimits("A0ComDroidControl", 1, 0);
-	setStructureLimits("A0CyborgFactory", 5, 0);
-	setStructureLimits("A0VTolFactory1", 5, 0);
-
-	var structlist = enumStruct(me, HQ);
-	for (var i = 0; i < structlist.length; i++)
-	{
-		// Simulate build events to enable minimap/unit design when an HQ exists
-		eventStructureBuilt(structlist[i]);
-	}
-	structlist = enumStructOffWorld(me, HQ);
-	for (var i = 0; i < structlist.length; i++)
-	{
-		eventStructureBuilt(structlist[i]);
-	}
-
-	// set income modifier for player 0 (human)
+	// set income modifier/power storage for player 0 (human)
 	if (difficulty == EASY)
 	{
 		setPowerModifier(110);
@@ -77,7 +54,46 @@ function eventStartLevel()
 	else if (difficulty == HARD)
 	{
 		setPowerModifier(90);
+		setPowerStorageMaximum(HARD_POWER_LIMIT);
 	}
+	else if (difficulty == INSANE)
+	{
+		setPowerModifier(70);
+		setPowerStorageMaximum(INSANE_POWER_LIMIT);
+	}
+}
+
+function eventStartLevel()
+{
+	// Disable by default
+	setMiniMap(false);
+	setDesign(false);
+	setDroidLimit(selectedPlayer, 100, DROID_ANY);
+	setDroidLimit(selectedPlayer, 10, DROID_COMMAND);
+	setDroidLimit(selectedPlayer, 15, DROID_CONSTRUCT);
+
+	setStructureLimits("A0PowerGenerator", 5, selectedPlayer);
+	setStructureLimits("A0ResourceExtractor", 200, selectedPlayer);
+	setStructureLimits("A0ResearchFacility", 5, selectedPlayer);
+	setStructureLimits("A0LightFactory", 5, selectedPlayer);
+	setStructureLimits("A0CommandCentre", 1, selectedPlayer);
+	setStructureLimits("A0ComDroidControl", 1, selectedPlayer);
+	setStructureLimits("A0CyborgFactory", 5, selectedPlayer);
+	setStructureLimits("A0VTolFactory1", 5, selectedPlayer);
+
+	var structlist = enumStruct(selectedPlayer, HQ);
+	for (var i = 0; i < structlist.length; i++)
+	{
+		// Simulate build events to enable minimap/unit design when an HQ exists
+		eventStructureBuilt(structlist[i]);
+	}
+	structlist = enumStructOffWorld(selectedPlayer, HQ);
+	for (var i = 0; i < structlist.length; i++)
+	{
+		eventStructureBuilt(structlist[i]);
+	}
+
+	resetPower();
 }
 
 function eventStructureBuilt(struct)
@@ -128,7 +144,7 @@ function eventResearched(research, structure, player)
 
 var lastHitTime = 0;
 function eventAttacked(victim, attacker) {
-	if (gameTime > lastHitTime + 5000)
+	if ((victim.player == selectedPlayer) && gameTime > lastHitTime + 5000)
 	{
 		lastHitTime = gameTime;
 		if (victim.type === STRUCTURE)

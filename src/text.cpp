@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,19 +28,19 @@
 #include "text.h"
 
 /* The string resource object */
-struct STR_RES *psStringRes = NULL;
+struct STR_RES *psStringRes = nullptr;
 
 /* Initialise the string system */
-bool stringsInitialise(void)
+bool stringsInitialise()
 {
 	psStringRes = strresCreate();
 
-	return psStringRes != NULL;
+	return psStringRes != nullptr;
 }
 
 
 /* Shut down the string system */
-void stringsShutDown(void)
+void stringsShutDown()
 {
 	strresDestroy(psStringRes);
 }

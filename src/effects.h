@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -143,7 +143,7 @@ struct EFFECT
 
 	EFFECT() : player(MAX_PLAYERS), control(0), group(EFFECT_FREED), type(EXPLOSION_TYPE_SMALL), frameNumber(0), size(0),
 	           baseScale(0), specific(0), birthTime(0), lastFrame(0), frameDelay(0), lifeSpan(0), radius(0),
-	           imd(NULL), prev(NULL), next(NULL) {}
+	           imd(nullptr), prev(nullptr), next(nullptr) {}
 };
 
 /* Maximum number of effects in the world - need to investigate what this should be */
@@ -151,15 +151,15 @@ struct EFFECT
 void	effectGiveAuxVar(UDWORD var);		// naughty
 void	effectGiveAuxVarSec(UDWORD var);	// and so's this
 
-void	initEffectsSystem(void);
-void	shutdownEffectsSystem(void);
-void	processEffects(void);
+void	initEffectsSystem();
+void	shutdownEffectsSystem();
+void	processEffects(const glm::mat4 &viewMatrix);
 void 	addEffect(const Vector3i *pos, EFFECT_GROUP group, EFFECT_TYPE type, bool specified, iIMDShape *imd, int lit);
 void    addEffect(const Vector3i *pos, EFFECT_GROUP group, EFFECT_TYPE type, bool specified, iIMDShape *imd, int lit, unsigned effectTime);
 void    addMultiEffect(const Vector3i *basePos, Vector3i *scatter, EFFECT_GROUP group, EFFECT_TYPE type, bool specified, iIMDShape *imd, unsigned int number, bool lit, unsigned int size, unsigned effectTime);
 
-void	renderEffect(const EFFECT *psEffect);
-void	effectResetUpdates(void);
+void	renderEffect(const EFFECT *psEffect, const glm::mat4 &viewMatrix);
+void	effectResetUpdates();
 
 void	initPerimeterSmoke(iIMDShape *pImd, Vector3i base);
 

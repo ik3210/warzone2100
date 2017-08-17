@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,8 +30,7 @@
 #include "cluster.h"
 #include "map.h"
 #include "scriptcb.h"
-#include "scripttabs.h"
-#include "projectile.h"
+#include "objmem.h"
 
 // distance between units for them to be in the same cluster
 #define CLUSTER_DIST	(TILE_UNITS*8)
@@ -56,7 +55,7 @@ static UDWORD aClusterAttacked[CLUSTER_MAX];
 UBYTE	aClusterInfo[CLUSTER_MAX];
 
 // initialise the cluster system
-void clustInitialise(void)
+void clustInitialise()
 {
 	DROID		*psDroid;
 	STRUCTURE	*psStruct;
@@ -95,7 +94,7 @@ void clustInitialise(void)
 }
 
 // update routine for the cluster system
-void clusterUpdate(void)
+void clusterUpdate()
 {
 	SDWORD	i;
 
@@ -296,7 +295,7 @@ void clustNewStruct(STRUCTURE *psStruct)
 
 
 // find an unused cluster number for a droid
-static SDWORD clustFindUnused(void)
+static SDWORD clustFindUnused()
 {
 	SDWORD	cluster;
 
@@ -441,8 +440,8 @@ void clustObjectSeen(BASE_OBJECT *psObj, BASE_OBJECT *psViewer)
 				break;
 			}
 
-			psScrCBObjSeen = NULL;
-			psScrCBObjViewer = NULL;
+			psScrCBObjSeen = nullptr;
+			psScrCBObjViewer = nullptr;
 		}
 	}
 }
@@ -460,12 +459,12 @@ void clustObjectAttacked(BASE_OBJECT *psObj)
 		case OBJ_DROID:
 			psLastDroidHit = (DROID *)psObj;
 			eventFireCallbackTrigger((TRIGGER_TYPE)CALL_DROID_ATTACKED);
-			psLastDroidHit = NULL;
+			psLastDroidHit = nullptr;
 			break;
 		case OBJ_STRUCTURE:
 			psLastStructHit = (STRUCTURE *)psObj;
 			eventFireCallbackTrigger((TRIGGER_TYPE)CALL_STRUCT_ATTACKED);
-			psLastStructHit = NULL;
+			psLastStructHit = nullptr;
 			break;
 		default:
 			ASSERT(!"invalid object type", "clustObjectAttacked: invalid object type");

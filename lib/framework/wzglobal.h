@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1992-2007  Trolltech ASA.
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -430,9 +430,13 @@
  * GCC: "Many functions do not examine any values except their arguments, and have no effects
  *       except the return value. Basically this is just slightly more strict class than
  *       the pure attribute below, since function is not allowed to read global memory."
+ *
+ * Note that __attribute__((__const__)) doesn't work with some versions of gcc, in C++, at least
+ * for functions returning structures, and may silently return random results instead. So use
+ * constexpr instead, which seems to work (although can't be added to all types of function).
  */
 #if WZ_CC_GNU_PREREQ(2,5) && !defined(WZ_CC_INTEL)
-#  define WZ_DECL_CONST __attribute__((__const__,__warn_unused_result__))
+#  define WZ_DECL_CONST constexpr __attribute__((__warn_unused_result__))
 #else
 #  define WZ_DECL_CONST
 #endif
@@ -651,11 +655,11 @@ static inline char _WZ_ASSERT_STATIC_STRING_FUNCTION(char const(&)[N])
 }
 static inline char *_WZ_ASSERT_STATIC_STRING_FUNCTION(char const *&)
 {
-	return NULL;    // Eeek, it's a pointer!
+	return nullptr;    // Eeek, it's a pointer!
 }
 static inline char *_WZ_ASSERT_STATIC_STRING_FUNCTION(char *&)
 {
-	return NULL;    // Eeek, it's a pointer!
+	return nullptr;    // Eeek, it's a pointer!
 }
 #  define WZ_ASSERT_STATIC_STRING(_var) STATIC_ASSERT(sizeof(_WZ_ASSERT_STATIC_STRING_FUNCTION(_var)) == sizeof(char))
 #elif defined(WZ_CC_GNU) || defined(WZ_CC_INTEL)
@@ -680,7 +684,7 @@ static inline char _WZ_ASSERT_ARRAY_EXPR_FUNCTION(void const *)
 template <typename T>
 static inline char *_WZ_ASSERT_ARRAY_EXPR_FUNCTION(T *&)
 {
-	return NULL;    // Eeek, it's a pointer!
+	return nullptr;    // Eeek, it's a pointer!
 }
 #  define WZ_ASSERT_ARRAY_EXPR(_var) STATIC_ASSERT_EXPR(sizeof(_WZ_ASSERT_ARRAY_EXPR_FUNCTION(_var)) == sizeof(char))
 #elif defined(WZ_CC_GNU) || defined(WZ_CC_INTEL)

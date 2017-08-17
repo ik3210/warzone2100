@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -20,8 +20,6 @@
 
 #include <locale.h>
 #include <physfs.h>
-
-#include "string_ext.h"
 
 #ifdef WZ_OS_MAC
 # include <CoreFoundation/CoreFoundation.h>
@@ -384,7 +382,7 @@ void setNextLanguage(bool prev)
 
 void initI18n()
 {
-	const char *textdomainDirectory = NULL;
+	const char *textdomainDirectory = nullptr;
 
 	if (!setLanguage("")) // set to system default
 	{

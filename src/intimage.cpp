@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -77,38 +77,6 @@ struct IMAGEFRAME
 
 IMAGEFILE *IntImages;	// All the 2d graphics for the user interface.
 
-static const uint16_t MousePointerImageIDs[CURSOR_MAX] =
-{
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_ARROW
-	IMAGE_CURSOR_DEST,	// CURSOR_DEST
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_SIGHT
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_TARGET
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_LARROW
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_RARROW
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_DARROW
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_UARROW
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_DEFAULT
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_EDGEOFMAP
-	IMAGE_CURSOR_ATTACH,	// CURSOR_ATTACH
-	IMAGE_CURSOR_ATTACK,	// CURSOR_ATTACK
-	IMAGE_CURSOR_BOMB,	// CURSOR_BOMB
-	IMAGE_CURSOR_BRIDGE,	// CURSOR_BRIDGE
-	IMAGE_CURSOR_BUILD,	// CURSOR_BUILD
-	IMAGE_CURSOR_EMBARK,	// CURSOR_EMBARK
-	IMAGE_CURSOR_DISEMBARK,	// CURSOR_DISEMBARK
-	IMAGE_CURSOR_FIX,	// CURSOR_FIX
-	IMAGE_CURSOR_GUARD,	// CURSOR_GUARD
-	IMAGE_CURSOR_ECM,	// CURSOR_JAM
-	IMAGE_CURSOR_LOCKON,	// CURSOR_LOCKON
-	IMAGE_CURSOR_SCOUT,	// CURSOR_SCOUT
-	IMAGE_CURSOR_DEFAULT,	// CURSOR_MENU
-	IMAGE_CURSOR_MOVE,	// CURSOR_MOVE
-	IMAGE_CURSOR_NOTPOS,	// CURSOR_NOTPOSSIBLE
-	IMAGE_CURSOR_PICKUP,	// CURSOR_PICKUP
-	IMAGE_CURSOR_REPAIR,	// CURSOR_SEEKREPAIR
-	IMAGE_CURSOR_SELECT,	// CURSOR_SELECT
-};
-
 /** Form frame definition for normal frames. */
 IMAGEFRAME FrameNormal =
 {
@@ -151,7 +119,7 @@ IMAGEFRAME FrameRadar =
 
 // Read bitmaps used by the interface.
 //
-bool imageInitBitmaps(void)
+bool imageInitBitmaps()
 {
 	IntImages = (IMAGEFILE *)resGetData("IMG", "intfac.img");
 
@@ -160,7 +128,7 @@ bool imageInitBitmaps(void)
 
 // Render a window frame.
 //
-void RenderWindowFrame(FRAMETYPE frame, UDWORD x, UDWORD y, UDWORD Width, UDWORD Height)
+void RenderWindowFrame(FRAMETYPE frame, UDWORD x, UDWORD y, UDWORD Width, UDWORD Height, const glm::mat4 &modelViewProjectionMatrix)
 {
 	SWORD WTopRight = 0;
 	SWORD WTopLeft = 0;
@@ -241,24 +209,24 @@ void RenderWindowFrame(FRAMETYPE frame, UDWORD x, UDWORD y, UDWORD Width, UDWORD
 	if (Frame->TopEdge >= 0)
 	{
 		iV_DrawImageRepeatX(IntImages, Frame->TopEdge, x + iV_GetImageWidth(IntImages, Frame->TopLeft), y,
-		                    Width - WTopLeft - WTopRight);
+		                    Width - WTopLeft - WTopRight, modelViewProjectionMatrix);
 	}
 
 	if (Frame->BottomEdge >= 0)
 	{
 		iV_DrawImageRepeatX(IntImages, Frame->BottomEdge, x + WBottomLeft, y + Height - iV_GetImageHeight(IntImages, Frame->BottomEdge),
-		                    Width - WBottomLeft - WBottomRight);
+		                    Width - WBottomLeft - WBottomRight, modelViewProjectionMatrix);
 	}
 
 	if (Frame->LeftEdge >= 0)
 	{
-		iV_DrawImageRepeatY(IntImages, Frame->LeftEdge, x, y + HTopLeft, Height - HTopLeft - HBottomLeft);
+		iV_DrawImageRepeatY(IntImages, Frame->LeftEdge, x, y + HTopLeft, Height - HTopLeft - HBottomLeft, modelViewProjectionMatrix);
 	}
 
 	if (Frame->RightEdge >= 0)
 	{
 		iV_DrawImageRepeatY(IntImages, Frame->RightEdge, x + Width - iV_GetImageWidth(IntImages, Frame->RightEdge), y + HTopRight,
-		                    Height - HTopRight - HBottomRight);
+		                    Height - HTopRight - HBottomRight, modelViewProjectionMatrix);
 	}
 }
 

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 
 #define NUM_GAME_PACKETS 256
 
-static PHYSFS_file	*pFileHandle = NULL;
+static PHYSFS_file	*pFileHandle = nullptr;
 static uint32_t		packetcount[2][NUM_GAME_PACKETS];
 static uint32_t		packetsize[2][NUM_GAME_PACKETS];
 
@@ -132,7 +132,7 @@ bool NETstopLogging(void)
 		debug(LOG_ERROR, "Could not close net log: %s", PHYSFS_getLastError());
 		return false;
 	}
-	pFileHandle = NULL;
+	pFileHandle = nullptr;
 
 	return true;
 }

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -103,12 +103,12 @@ BASE_OBJECT::BASE_OBJECT(OBJECT_TYPE type, uint32_t id, unsigned player)
 	, body(0)
 	, periodicalDamageStart(0)
 	, periodicalDamage(0)
-	, flags(0)
-	, watchedTiles(NULL)
-	, psCurAnim(NULL)
+	, watchedTiles(nullptr)
+	, timeAnimationStarted(0)
+	, animationEvent(ANIM_EVENT_NONE)
 {
 	memset(visible, 0, sizeof(visible));
-	sDisplay.imd = NULL;
+	sDisplay.imd = nullptr;
 	sDisplay.frameNumber = 0;
 	sDisplay.screenX = 0;
 	sDisplay.screenY = 0;
@@ -117,9 +117,6 @@ BASE_OBJECT::BASE_OBJECT(OBJECT_TYPE type, uint32_t id, unsigned player)
 
 BASE_OBJECT::~BASE_OBJECT()
 {
-	// Make sure to get rid of some final references in the sound code to this object first
-	audio_RemoveObj(this);
-
 	visRemoveVisibility(this);
 	free(watchedTiles);
 
@@ -136,7 +133,7 @@ void checkObject(const SIMPLE_OBJECT *psObject, const char *const location_descr
 		return;
 	}
 
-	ASSERT(psObject != NULL, "NULL pointer");
+	ASSERT(psObject != nullptr, "NULL pointer");
 
 	switch (psObject->type)
 	{
@@ -194,11 +191,11 @@ StructureBounds getStructureBounds(BASE_OBJECT const *object)
 	STRUCTURE const *psStructure = castStructure(object);
 	FEATURE const *psFeature = castFeature(object);
 
-	if (psStructure != NULL)
+	if (psStructure != nullptr)
 	{
 		return getStructureBounds(psStructure);
 	}
-	else if (psFeature != NULL)
+	else if (psFeature != nullptr)
 	{
 		return getStructureBounds(psFeature);
 	}

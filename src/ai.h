@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,7 +24,10 @@
 #ifndef __INCLUDED_SRC_AI_H__
 #define __INCLUDED_SRC_AI_H__
 
-#include "droiddef.h"
+struct BASE_OBJECT;
+struct DROID;
+
+#include "weapondef.h"
 
 #define ALLIANCE_BROKEN		0			// states of alliance between players
 #define ALLIANCE_REQUESTED	1
@@ -52,13 +55,10 @@ extern PlayerMask satuplinkbits;
 #define aiCheckAlliances(_s1, _s2) (alliances[_s1][_s2] == ALLIANCE_FORMED)
 
 /* Initialise the AI system */
-bool aiInitialise(void);
+bool aiInitialise();
 
 /* Shutdown the AI system */
-bool aiShutdown(void);
-
-/* Initialise a droid structure for AI */
-//extern bool aiInitDroid(DROID *psDroid);
+bool aiShutdown();
 
 /* Do the AI for a droid */
 void aiUpdateDroid(DROID *psDroid);

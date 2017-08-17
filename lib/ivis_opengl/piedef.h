@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -33,28 +33,10 @@
 
 #include "lib/framework/frame.h"
 #include "lib/framework/vector.h"
-#include "ivisdef.h"
+#include "glm/core/type.hpp"
 #include "pietypes.h"
 
-/***************************************************************************/
-/*
- *	Global Definitions (STRUCTURES)
- */
-/***************************************************************************/
-
-struct PIELIGHTBYTES
-{
-	uint8_t r, g, b, a;
-};
-
-/** Our basic colour type. Use whenever you want to define a colour.
- *  Set bytes separetely, and do not assume a byte order between the components. */
-union PIELIGHT
-{
-	PIELIGHTBYTES byte;
-	UDWORD rgba;
-	UBYTE vector[4];
-};
+struct iIMDShape;
 
 /***************************************************************************/
 /*
@@ -75,22 +57,21 @@ union PIELIGHT
  *	Global ProtoTypes
  */
 /***************************************************************************/
-void pie_Draw3DShape(iIMDShape *shape, int frame, int team, PIELIGHT colour, int pieFlag, int pieFlagData);
+void pie_Draw3DShape(iIMDShape *shape, int frame, int team, PIELIGHT colour, int pieFlag, int pieFlagData, const glm::mat4 &modelView);
 
-extern void pie_GetResetCounts(unsigned int *pPieCount, unsigned int *pPolyCount, unsigned int *pStateCount);
+void pie_GetResetCounts(unsigned int *pPieCount, unsigned int *pPolyCount);
 
 /** Setup stencil shadows and OpenGL lighting. */
-void pie_BeginLighting(const Vector3f *light);
+void pie_BeginLighting(const Vector3f &light);
 void pie_setShadows(bool drawShadows);
 
 /** Set light parameters */
 void pie_InitLighting();
-void pie_SetupLighting();
-void pie_Lighting0(LIGHTING_TYPE entry, float value[4]);
+void pie_Lighting0(LIGHTING_TYPE entry, const float value[4]);
 
-void pie_RemainingPasses(void);
+void pie_RemainingPasses();
 
-void pie_SetUp(void);
-void pie_CleanUp(void);
+void pie_SetUp();
+void pie_CleanUp();
 
 #endif // _piedef_h

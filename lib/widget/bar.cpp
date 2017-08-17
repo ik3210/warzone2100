@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -26,9 +26,6 @@
 #include "tip.h"
 #include "form.h"
 #include "bar.h"
-#if defined(WZ_CC_MSVC)
-#include "bar_moc.h"		// this is generated on the pre-build event.
-#endif
 #include "lib/ivis_opengl/pieblitfunc.h"
 #include "lib/ivis_opengl/piepalette.h"
 
@@ -79,7 +76,7 @@ W_BARGRAPH::W_BARGRAPH(W_BARINIT const *init)
 void widgSetBarSize(W_SCREEN *psScreen, UDWORD id, UDWORD iValue)
 {
 	W_BARGRAPH *psBGraph = (W_BARGRAPH *)widgGetFromID(psScreen, id);
-	ASSERT_OR_RETURN(, psBGraph != NULL, "Could not find widget from ID");
+	ASSERT_OR_RETURN(, psBGraph != nullptr, "Could not find widget from ID");
 	ASSERT_OR_RETURN(, psBGraph->type == WIDG_BARGRAPH, "Wrong widget type");
 
 	psBGraph->iOriginal = iValue;
@@ -101,7 +98,7 @@ void widgSetBarSize(W_SCREEN *psScreen, UDWORD id, UDWORD iValue)
 void widgSetMinorBarSize(W_SCREEN *psScreen, UDWORD id, UDWORD iValue)
 {
 	W_BARGRAPH *psBGraph = (W_BARGRAPH *)widgGetFromID(psScreen, id);
-	ASSERT_OR_RETURN(, psBGraph != NULL, "Could not find widget from ID");
+	ASSERT_OR_RETURN(, psBGraph != nullptr, "Could not find widget from ID");
 	ASSERT_OR_RETURN(, psBGraph->type == WIDG_BARGRAPH, "Wrong widget type");
 	psBGraph->minorSize = MIN(WBAR_SCALE * iValue / MAX(psBGraph->iRange, 1), WBAR_SCALE);
 	psBGraph->dirty = true;
@@ -130,18 +127,21 @@ static void barGraphDisplayText(W_BARGRAPH *barGraph, int x0, int x1, int y1)
 	if (!barGraph->text.isEmpty())
 	{
 		QByteArray utf = barGraph->text.toUtf8();
-		iV_SetFont(font_small);
-		int textWidth = iV_GetTextWidth(utf.constData());
+		int textWidth = iV_GetTextWidth(utf.constData(), font_bar);
 		Vector2i pos((x0 + x1 - textWidth) / 2, y1);
 		iV_SetTextColour(WZCOL_BLACK);  // Add a shadow, to make it visible against any background.
-		for (int dx = -1; dx <= 1; ++dx)
-			for (int dy = -1; dy <= 1; ++dy)
+		for (int dx = -2; dx <= 2; ++dx)
+		{
+			for (int dy = -2; dy <= 2; ++dy)
 			{
-				iV_DrawText(utf.constData(), pos.x + dx * 1.25f, pos.y + dy * 1.25f);
+				if (dx*dx + dy*dy <= 4)
+				{
+					iV_DrawText(utf.constData(), pos.x + dx, pos.y + dy, font_bar);
+				}
 			}
+		}
 		iV_SetTextColour(barGraph->textCol);
-		iV_DrawText(utf.constData(), pos.x, pos.y - 0.25f);
-		iV_DrawText(utf.constData(), pos.x, pos.y + 0.25f);  // Draw twice, to make it more visible.
+		iV_DrawText(utf.constData(), pos.x, pos.y, font_bar);
 	}
 }
 

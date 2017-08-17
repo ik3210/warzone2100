@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@
 #include "lib/framework/frameresource.h"
 #include "lib/framework/strres.h"
 #include "lib/framework/crc.h"
-#include "lib/framework/resly.h"
 #include "lib/gamelib/parser.h"
 #include "lib/ivis_opengl/bitimage.h"
 #include "lib/ivis_opengl/png_util.h"
@@ -115,7 +114,7 @@ static void calcDataHash(uint8_t *pBuffer, uint32_t size, uint32_t index)
 	return;
 }
 
-void resetDataHash(void)
+void resetDataHash()
 {
 	UDWORD i;
 	for (i = 0; i < DATA_MAXDATA; i++)
@@ -128,11 +127,11 @@ void resetDataHash(void)
 /**********************************************************/
 
 
-void dataSetSaveFlag(void)
+void dataSetSaveFlag()
 {
 	saveFlag = true;
 }
-void dataClearSaveFlag(void)
+void dataClearSaveFlag()
 {
 	saveFlag = false;
 }
@@ -166,7 +165,7 @@ static bool bufferSWEAPONLoad(const char *fileName, void **ppData)
 	}
 
 	// not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -180,7 +179,7 @@ static bool bufferSCONSTRLoad(const char *fileName, void **ppData)
 	}
 
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -194,7 +193,7 @@ static bool bufferSECMLoad(const char *fileName, void **ppData)
 	}
 
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -220,7 +219,7 @@ static bool bufferSSENSORLoad(const char *fileName, void **ppData)
 	}
 
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -233,7 +232,7 @@ static bool bufferSREPAIRLoad(const char *fileName, void **ppData)
 	}
 
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -245,7 +244,7 @@ static bool bufferSBRAINLoad(const char *fileName, void **ppData)
 		return false;
 	}
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -259,7 +258,7 @@ static bool bufferSPROPTYPESLoad(const char *fileName, void **ppData)
 
 
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -272,7 +271,7 @@ static bool bufferSPROPSNDLoad(const char *fileName, void **ppData)
 	}
 
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -285,7 +284,7 @@ static bool bufferSTERRTABLELoad(const char *fileName, void **ppData)
 	}
 
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -293,7 +292,7 @@ static bool bufferSTERRTABLELoad(const char *fileName, void **ppData)
 static bool bufferSBPIMDLoad(const char *fileName, void **ppData)
 {
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -306,7 +305,7 @@ static bool bufferSWEAPMODLoad(const char *fileName, void **ppData)
 	}
 
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -365,7 +364,7 @@ static bool bufferSSTRMODLoad(const char *fileName, void **ppData)
 	}
 
 	//not interested in this value
-	*ppData = NULL;
+	*ppData = nullptr;
 	return true;
 }
 
@@ -403,7 +402,7 @@ static bool bufferRESCHLoad(const char *fileName, void **ppData)
 	if (!asResearch.empty())
 	{
 		//release previous data before loading in the new
-		dataRESCHRelease(NULL);
+		dataRESCHRelease(nullptr);
 	}
 
 	if (!loadResearch(QString(fileName)))
@@ -483,7 +482,7 @@ static bool dataTERTILESLoad(const char *fileName, void **ppData)
 	ASSERT_OR_RETURN(false, status, "Error loading tertiles!");
 	debug(LOG_TEXTURE, "HW Tiles loaded");
 
-	*ppData = NULL;	// don't bother calling cleanup
+	*ppData = nullptr;	// don't bother calling cleanup
 
 	return true;
 }
@@ -491,7 +490,7 @@ static bool dataTERTILESLoad(const char *fileName, void **ppData)
 static bool dataIMGLoad(const char *fileName, void **ppData)
 {
 	*ppData = iV_LoadImageFile(fileName);
-	if (*ppData == NULL)
+	if (*ppData == nullptr)
 	{
 		return false;
 	}
@@ -524,7 +523,7 @@ static bool dataAudioLoad(const char *fileName, void **ppData)
 {
 	if (audio_Disabled() == true)
 	{
-		*ppData = NULL;
+		*ppData = nullptr;
 		// No error occurred (sound is just disabled), so we return true
 		return true;
 	}
@@ -532,7 +531,7 @@ static bool dataAudioLoad(const char *fileName, void **ppData)
 	// Load the track from a file
 	*ppData = sound_LoadTrackFromFile(fileName);
 
-	return *ppData != NULL;
+	return *ppData != nullptr;
 }
 
 /* Load an audio file */
@@ -541,7 +540,7 @@ static bool dataAudioCfgLoad(const char *fileName, void **ppData)
 	bool success;
 	PHYSFS_file *fileHandle;
 
-	*ppData = NULL;
+	*ppData = nullptr;
 
 	if (audio_Disabled())
 	{
@@ -550,7 +549,7 @@ static bool dataAudioCfgLoad(const char *fileName, void **ppData)
 	debug(LOG_WZ, "Reading...[directory: %s] %s", PHYSFS_getRealDir(fileName), fileName);
 	fileHandle = PHYSFS_openRead(fileName);
 
-	if (fileHandle == NULL)
+	if (fileHandle == nullptr)
 	{
 		return false;
 	}
@@ -560,57 +559,13 @@ static bool dataAudioCfgLoad(const char *fileName, void **ppData)
 	PHYSFS_close(fileHandle);
 
 	return success;
-}
-
-/* Load an anim file */
-static bool dataAnimLoad(const char *fileName, void **ppData)
-{
-	PHYSFS_file *fileHandle = PHYSFS_openRead(fileName);
-	debug(LOG_WZ, "Reading...[directory: %s] %s", PHYSFS_getRealDir(fileName), fileName);
-	if (fileHandle == NULL)
-	{
-		*ppData = NULL;
-		return false;
-	}
-
-	*ppData = anim_LoadFromFile(fileHandle);
-
-	PHYSFS_close(fileHandle);
-
-	return *ppData != NULL;
-}
-
-/* Load an audio config file */
-static bool dataAnimCfgLoad(const char *fileName, void **ppData)
-{
-	bool success;
-	PHYSFS_file *fileHandle = PHYSFS_openRead(fileName);
-	*ppData = NULL;
-
-	debug(LOG_WZ, "Reading...[directory: %s] %s", PHYSFS_getRealDir(fileName), fileName);
-	if (fileHandle == NULL)
-	{
-		return false;
-	}
-
-	success = ParseResourceFile(fileHandle);
-
-	PHYSFS_close(fileHandle);
-
-	return success;
-}
-
-
-static void dataAnimRelease(void *pData)
-{
-	anim_ReleaseAnim((BASEANIM *)pData);
 }
 
 /* Load a string resource file */
 static bool dataStrResLoad(const char *fileName, void **ppData)
 {
 	// recreate the string resource if it was freed by a WRF release
-	if (psStringRes == NULL)
+	if (psStringRes == nullptr)
 	{
 		if (!stringsInitialise())
 		{
@@ -629,10 +584,10 @@ static bool dataStrResLoad(const char *fileName, void **ppData)
 
 static void dataStrResRelease(WZ_DECL_UNUSED void *pData)
 {
-	if (psStringRes != NULL)
+	if (psStringRes != nullptr)
 	{
 		strresDestroy(psStringRes);
-		psStringRes = NULL;
+		psStringRes = nullptr;
 	}
 }
 
@@ -651,7 +606,7 @@ static bool dataScriptLoad(const char *fileName, void **ppData)
 
 	fileHandle = PHYSFS_openRead(fileName);
 	debug(LOG_WZ, "Reading...[directory: %s] %s", PHYSFS_getRealDir(fileName), fileName);
-	if (fileHandle == NULL)
+	if (fileHandle == nullptr)
 	{
 		return false;
 	}
@@ -698,7 +653,7 @@ static void dataScriptRelease(void *pData)
 static bool jsLoad(const char *fileName, void **ppData)
 {
 	debug(LOG_WZ, "jsload: %s", fileName);
-	*ppData = NULL;
+	*ppData = nullptr;
 	return loadGlobalScript(fileName);
 }
 
@@ -710,7 +665,7 @@ static bool dataScriptLoadVals(const char *fileName, void **ppData)
 	uint8_t *pBuffer;
 	PHYSFS_sint64 fileSize = 0;
 
-	*ppData = NULL;
+	*ppData = nullptr;
 
 	// don't load anything if a saved game is being loaded
 	if (saveFlag)
@@ -722,7 +677,7 @@ static bool dataScriptLoadVals(const char *fileName, void **ppData)
 
 	fileHandle = PHYSFS_openRead(fileName);
 	debug(LOG_WZ, "Reading...[directory: %s] %s", PHYSFS_getRealDir(fileName), fileName);
-	if (fileHandle == NULL)
+	if (fileHandle == nullptr)
 	{
 		return false;
 	}
@@ -766,7 +721,7 @@ struct RES_TYPE_MIN_BUF
 static const RES_TYPE_MIN_BUF BufferResourceTypes[] =
 {
 	{"SMSG", bufferSMSGLoad, dataSMSGRelease},
-	{"IMD", NULL, NULL}, // ignored
+	{"IMD", nullptr, nullptr}, // ignored
 };
 
 struct RES_TYPE_MIN_FILE
@@ -794,26 +749,24 @@ static const RES_TYPE_MIN_FILE FileResourceTypes[] =
 	{"SBODY", bufferSBODYLoad, dataReleaseStats},
 	{"SWEAPMOD", bufferSWEAPMODLoad, dataReleaseStats},
 	{"SPROPSND", bufferSPROPSNDLoad, dataReleaseStats},
-	{"AUDIOCFG", dataAudioCfgLoad, NULL},
-	{"ANI", dataAnimLoad, dataAnimRelease},
-	{"ANIMCFG", dataAnimCfgLoad, NULL},
+	{"AUDIOCFG", dataAudioCfgLoad, nullptr},
 	{"IMGPAGE", dataImageLoad, dataImageRelease},
-	{"TERTILES", dataTERTILESLoad, NULL},
+	{"TERTILES", dataTERTILESLoad, nullptr},
 	{"IMG", dataIMGLoad, dataIMGRelease},
-	{"TEXPAGE", NULL, NULL}, // ignored
-	{"TCMASK", NULL, NULL}, // ignored
+	{"TEXPAGE", nullptr, nullptr}, // ignored
+	{"TCMASK", nullptr, nullptr}, // ignored
 	{"SCRIPT", dataScriptLoad, dataScriptRelease},
-	{"SCRIPTVAL", dataScriptLoadVals, NULL},
+	{"SCRIPTVAL", dataScriptLoadVals, nullptr},
 	{"STR_RES", dataStrResLoad, dataStrResRelease},
 	{"RESEARCHMSG", dataResearchMsgLoad, dataSMSGRelease },
-	{"SSTRMOD", bufferSSTRMODLoad, NULL},
-	{"JAVASCRIPT", jsLoad, NULL},
+	{"SSTRMOD", bufferSSTRMODLoad, nullptr},
+	{"JAVASCRIPT", jsLoad, nullptr},
 	{"SSTRUCT", bufferSSTRUCTLoad, dataSSTRUCTRelease},            //structure stats and associated files
 	{"RESCH", bufferRESCHLoad, dataRESCHRelease},                  //research stats files
 };
 
 /* Pass all the data loading functions to the framework library */
-bool dataInitLoadFuncs(void)
+bool dataInitLoadFuncs()
 {
 	// init the data integrity hash;
 	resetDataHash();

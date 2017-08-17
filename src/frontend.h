@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -61,29 +61,28 @@ extern bool	bLimiterLoaded;
 
 
 void changeTitleMode(tMode mode);
-bool runTitleMenu(void);
-bool runSinglePlayerMenu(void);
+bool runTitleMenu();
+bool runSinglePlayerMenu();
 bool runCampaignSelector();
-bool runMultiPlayerMenu(void);
-bool runGameOptionsMenu(void);
-bool runOptionsMenu(void);
-bool runGraphicsOptionsMenu(void);
-bool runAudioOptionsMenu(void);
-bool runVideoOptionsMenu(void);
-bool runMouseOptionsMenu(void);
-bool runTutorialMenu(void);
+bool runMultiPlayerMenu();
+bool runGameOptionsMenu();
+bool runOptionsMenu();
+bool runGraphicsOptionsMenu();
+bool runAudioOptionsMenu();
+bool runVideoOptionsMenu();
+bool runMouseOptionsMenu();
+bool runTutorialMenu();
 
-void addTopForm(void);
-void addBottomForm(void);
-void addBackdrop(void);
-void addTextButton(UDWORD id, UDWORD PosX, UDWORD PosY, const char *txt, unsigned int style);
-void addSmallTextButton(UDWORD id, UDWORD PosX, UDWORD PosY, const char *txt, unsigned int style);
+void addTopForm();
+void addBottomForm();
+void addBackdrop();
+void addTextButton(UDWORD id, UDWORD PosX, UDWORD PosY, const std::string &txt, unsigned int style);
 void addSideText(UDWORD id, UDWORD PosX, UDWORD PosY, const char *txt);
 void addFESlider(UDWORD id, UDWORD parent, UDWORD x, UDWORD y, UDWORD stops, UDWORD pos);
 
 void displayTextOption(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset);
 
-bool CancelPressed(void);
+bool CancelPressed();
 
 
 // ////////////////////////////////////////////////////////////////////////////
@@ -160,6 +159,7 @@ enum
 	FRONTEND_HYPERLINK,
 	FRONTEND_UPGRDLINK,
 	FRONTEND_DONATELINK,
+	FRONTEND_CHATLINK,
 	// begin menu
 	FRONTEND_SINGLEPLAYER	= 20100,	// title screen
 	FRONTEND_MULTIPLAYER,
@@ -207,8 +207,6 @@ enum
 	FRONTEND_SCROLLSPEED,				// screen scroll speed
 
 	FRONTEND_GRAPHICSOPTIONS = 22000,       // Graphics Options Menu
-	FRONTEND_SSHAKE,
-	FRONTEND_SSHAKE_R,
 	FRONTEND_FMVMODE,
 	FRONTEND_FMVMODE_R,
 	FRONTEND_SCANLINES,

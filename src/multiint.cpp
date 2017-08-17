@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 /* Includes direct access to render library */
 #include "lib/ivis_opengl/bitimage.h"
 #include "lib/ivis_opengl/pieblitfunc.h"
-#include "lib/ivis_opengl/piedef.h"
+#include "lib/ivis_opengl/pietypes.h"
 #include "lib/ivis_opengl/piestate.h"
 #include "lib/ivis_opengl/pieclip.h"
 #include "lib/ivis_opengl/piemode.h"
@@ -55,6 +55,7 @@
 
 #include "challenge.h"
 #include "main.h"
+#include "levels.h"
 #include "objects.h"
 #include "display.h"// pal stuff
 #include "display3d.h"
@@ -83,9 +84,6 @@
 
 #include "multiplay.h"
 #include "multiint.h"
-#if defined(WZ_CC_MSVC)
-#include "multiint_moc.h"	// this is generated on the pre-build event.
-#endif
 #include "multijoin.h"
 #include "multistat.h"
 #include "multirecv.h"
@@ -177,33 +175,33 @@ static void displayMultiEditBox(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset
 static Image getFrontHighlightImage(Image image);
 
 // find games
-static void addGames(void);
-static void removeGames(void);
+static void addGames();
+static void removeGames();
 
 // password form functions
-static void hidePasswordForm(void);
-static void showPasswordForm(void);
+static void hidePasswordForm();
+static void showPasswordForm();
 
 // Game option functions
 static	void	addGameOptions();
 static void addChatBox(bool preserveOldChat = false);
-static void		addConsoleBox(void);
-static	void	disableMultiButs(void);
+static void		addConsoleBox();
+static	void	disableMultiButs();
 static	void	processMultiopWidgets(UDWORD);
-static	void	SendFireUp(void);
+static	void	SendFireUp();
 
-static	void	decideWRF(void);
+static	void	decideWRF();
 
-static void		closeColourChooser(void);
-static void		closeTeamChooser(void);
-static void		closePositionChooser(void);
-static void		closeAiChooser(void);
-static void		closeDifficultyChooser(void);
+static void		closeColourChooser();
+static void		closeTeamChooser();
+static void		closePositionChooser();
+static void		closeAiChooser();
+static void		closeDifficultyChooser();
 static bool		SendColourRequest(UBYTE player, UBYTE col);
 static bool		SendPositionRequest(UBYTE player, UBYTE chosenPlayer);
 static bool		safeToUseColour(UDWORD player, UDWORD col);
 static bool		changeReadyStatus(UBYTE player, bool bReady);
-static	void stopJoining(void);
+static	void stopJoining();
 static int difficultyIcon(int difficulty);
 // ////////////////////////////////////////////////////////////////////////////
 // map previews..
@@ -249,6 +247,19 @@ struct WzMultiButton : public W_BUTTON
 	unsigned tc;
 };
 
+const QStringList getAINames()
+{
+	QStringList l;
+	for (const auto &i : aidata)
+	{
+		if (i.js[0] != '\0')
+		{
+			l.append(i.js);
+		}
+	}
+	return l;
+}
+
 const char *getAIName(int player)
 {
 	if (NetPlay.players[player].ai >= 0)
@@ -287,8 +298,6 @@ void loadMultiScripts()
 	bool defaultRules = true;
 	char aFileName[256];
 	char aPathName[256];
-	const char *ininame = challengeActive ? sRequestResult : aFileName;
-	const char *path = challengeActive ? "challenges/" : aPathName;
 	LEVEL_DATASET *psLevel = levFindDataSet(game.map, &game.hash);
 	ASSERT_OR_RETURN(, psLevel, "No level found for %s", game.map);
 	sstrcpy(aFileName, psLevel->apDataFiles[psLevel->game]);
@@ -296,6 +305,14 @@ void loadMultiScripts()
 	sstrcpy(aPathName, aFileName);
 	sstrcat(aFileName, ".json");
 	sstrcat(aPathName, "/");
+	QString ininame = challengeActive ? sRequestResult : aFileName;
+	QString path = challengeActive ? "challenges/" : aPathName;
+
+	if (hostlaunch == 2)
+	{
+		ininame = "tests/" + QString::fromStdString(wz_skirmish_test());
+		path = "tests/";
+	}
 
 	// Reset assigned counter
 	for (auto it = aidata.begin(); it < aidata.end(); ++it)
@@ -304,7 +321,7 @@ void loadMultiScripts()
 	}
 
 	// Load map scripts
-	if (PHYSFS_exists(ininame))
+	if (PHYSFS_exists(ininame.toUtf8().constData()))
 	{
 		WzConfig ini(ininame, WzConfig::ReadOnly);
 		debug(LOG_SAVE, "Loading map scripts");
@@ -338,7 +355,7 @@ void loadMultiScripts()
 
 	// Load AI players
 	resForceBaseDir("multiplay/skirmish/");
-	for (int i = 0; i < game.maxPlayers; i++)
+	for (unsigned i = 0; i < game.maxPlayers; i++)
 	{
 		if (NetPlay.players[i].ai < 0 && i == selectedPlayer)
 		{
@@ -346,12 +363,12 @@ void loadMultiScripts()
 		}
 		// The i == selectedPlayer hack is to enable autogames
 		if (bMultiPlayer && game.type == SKIRMISH && (!NetPlay.players[i].allocated || i == selectedPlayer)
-		    && NetPlay.players[i].ai >= 0 && myResponsibility(i))
+		    && (NetPlay.players[i].ai >= 0 || hostlaunch == 2) && myResponsibility(i))
 		{
-			if (PHYSFS_exists(ininame)) // challenge file may override AI
+			if (PHYSFS_exists(ininame.toUtf8().constData())) // challenge file may override AI
 			{
 				WzConfig ini(ininame, WzConfig::ReadOnly);
-				ini.beginGroup("player_" + QString::number(i + 1));
+				ini.beginGroup("player_" + QString::number(i));
 				if (ini.contains("ai"))
 				{
 					QString val = ini.value("ai").toString();
@@ -362,6 +379,7 @@ void loadMultiScripts()
 					}
 					loadPlayerScript(val, i, NetPlay.players[i].difficulty);
 					NetPlay.players[i].ai = AI_CUSTOM;
+					debug(LOG_WZ, "Custom AI %s loaded for player %u", val.toUtf8().constData(), i);
 					continue;
 				}
 				ini.endGroup();
@@ -458,15 +476,15 @@ void loadMapPreview(bool hideInterface)
 {
 	static char		aFileName[256];
 	UDWORD			fileSize;
-	char			*pFileData = NULL;
-	LEVEL_DATASET	*psLevel = NULL;
+	char			*pFileData = nullptr;
+	LEVEL_DATASET	*psLevel = nullptr;
 	PIELIGHT		plCliffL, plCliffH, plWater, plRoadL, plRoadH, plGroundL, plGroundH;
 	UDWORD			x, y, height;
 	UBYTE			col;
 	MAPTILE			*psTile, *WTile;
 	UDWORD oursize;
 	Vector2i playerpos[MAX_PLAYERS];	// Will hold player positions
-	char  *ptr = NULL, *imageData = NULL;
+	char  *ptr = nullptr, *imageData = nullptr;
 
 	// absurd hack, since there is a problem with updating this crap piece of info, we're setting it to
 	// true by default for now, like it used to be
@@ -479,13 +497,13 @@ void loadMapPreview(bool hideInterface)
 
 	// load the terrain types
 	psLevel = levFindDataSet(game.map, &game.hash);
-	if (psLevel == NULL)
+	if (psLevel == nullptr)
 	{
-		debug(LOG_INFO, "Could not find level dataset \"%s\" %s. We %s waiting for a download.", game.map, game.hash.toString().c_str(), NetPlay.players[selectedPlayer].needFile ? "are" : "aren't");
+		debug(LOG_INFO, "Could not find level dataset \"%s\" %s. We %s waiting for a download.", game.map, game.hash.toString().c_str(), !NetPlay.wzFiles.empty() ? "are" : "aren't");
 		loadEmptyMapPreview();
 		return;
 	}
-	if (psLevel->realFileName == NULL)
+	if (psLevel->realFileName == nullptr)
 	{
 		debug(LOG_WZ, "Loading map preview: \"%s\" builtin t%d", psLevel->pName, psLevel->dataDir);
 	}
@@ -653,7 +671,7 @@ void readAIs()
 
 	sstrcpy(basepath, sSearchPath);
 	files = PHYSFS_enumerateFiles(basepath);
-	for (i = files; *i != NULL; ++i)
+	for (i = files; *i != nullptr; ++i)
 	{
 		char path[PATH_MAX];
 		// See if this filename contains the extension we're looking for
@@ -687,7 +705,7 @@ void readAIs()
 }
 
 //sets sWRFILE form game.map
-static void decideWRF(void)
+static void decideWRF()
 {
 	// try and load it from the maps directory first,
 	sstrcpy(aLevelName, MultiCustomMapsPath);
@@ -706,7 +724,7 @@ static void decideWRF(void)
 // ////////////////////////////////////////////////////////////////////////////
 // Connection Options Screen.
 
-static bool OptionsInet(void)			//internet options
+static bool OptionsInet()			//internet options
 {
 	psConScreen = new W_SCREEN;
 
@@ -766,7 +784,7 @@ static bool OptionsInet(void)			//internet options
 
 // ////////////////////////////////////////////////////////////////////////////
 // Draw the connections screen.
-bool startConnectionScreen(void)
+bool startConnectionScreen()
 {
 	addBackdrop();										//background
 	addTopForm();										// logo
@@ -790,7 +808,7 @@ bool startConnectionScreen(void)
 	return true;
 }
 
-void runConnectionScreen(void)
+void runConnectionScreen()
 {
 	static char addr[128];
 
@@ -825,7 +843,7 @@ void runConnectionScreen(void)
 		if (SettingsUp == true)
 		{
 			delete psConScreen;
-			psConScreen = NULL;
+			psConScreen = nullptr;
 			SettingsUp = false;
 		}
 
@@ -835,7 +853,7 @@ void runConnectionScreen(void)
 		if (SettingsUp == true)
 		{
 			delete psConScreen;
-			psConScreen = NULL;
+			psConScreen = nullptr;
 			SettingsUp = false;
 		}
 		break;
@@ -855,7 +873,7 @@ void runConnectionScreen(void)
 
 // ////////////////////////////////////////////////////////////////////////
 // Lobby error reading
-LOBBY_ERROR_TYPES getLobbyError(void)
+LOBBY_ERROR_TYPES getLobbyError()
 {
 	return LobbyError;
 }
@@ -944,11 +962,10 @@ bool joinGame(const char *host, uint32_t port)
 // ////////////////////////////////////////////////////////////////////////////
 // Game Chooser Screen.
 
-static void addGames(void)
+static void addGames()
 {
 	int i, gcount = 0, added = 0;
-	static const char *wrongVersionTip = "Your version of Warzone is incompatible with this game.";
-	static const char *badModTip = "Your loaded mods are incompatible with this game. (Check mods/autoload/?)";
+	static const char *wrongVersionTip = _("Your version of Warzone is incompatible with this game.");
 
 	//count games to see if need two columns.
 	for (i = 0; i < MaxGames; i++)
@@ -989,7 +1006,7 @@ static void addGames(void)
 				// either display all games, or games that are the client's specific version
 				if (toggleFilter)
 				{
-					if ((NetPlay.games[i].game_version_major != NETGetMajorVersion()) || (NetPlay.games[i].game_version_minor != NETGetMinorVersion()))
+					if ((NetPlay.games[i].game_version_major != (unsigned)NETGetMajorVersion()) || (NetPlay.games[i].game_version_minor != (unsigned)NETGetMinorVersion()))
 					{
 						continue;
 					}
@@ -1003,10 +1020,6 @@ static void addGames(void)
 				if (!NETisCorrectVersion(NetPlay.games[i].game_version_major, NetPlay.games[i].game_version_minor))
 				{
 					sButInit.pTip = wrongVersionTip;
-				}
-				else if (strcmp(NetPlay.games[i].modlist, getModList()) != 0)
-				{
-					sButInit.pTip = badModTip;
 				}
 				else
 				{
@@ -1137,7 +1150,7 @@ static void addGames(void)
 	displayConsoleMessages();
 }
 
-static void removeGames(void)
+static void removeGames()
 {
 	int i;
 	for (i = 0; i < MaxGames; i++)
@@ -1147,7 +1160,7 @@ static void removeGames(void)
 	widgDelete(psWScreen, FRONTEND_NOGAMESAVAILABLE);
 }
 
-void runGameFind(void)
+void runGameFind()
 {
 	static UDWORD lastupdate = 0;
 	static char game_password[StringSize];
@@ -1235,8 +1248,7 @@ void runGameFind(void)
 	widgDisplayScreen(psWScreen);								// show the widgets currently running
 	if (safeSearch)
 	{
-		iV_SetFont(font_large);
-		iV_DrawText(_("Searching"), D_W + 260, D_H + 460);
+		iV_DrawText(_("Searching"), D_W + 260, D_H + 460, font_large);
 	}
 
 	if (CancelPressed())
@@ -1245,7 +1257,6 @@ void runGameFind(void)
 	}
 
 	// console box handling
-	iV_SetFont(font_small);
 	if (widgGetFromID(psWScreen, MULTIOP_CONSOLEBOX))
 	{
 		while (getNumberConsoleMessages() > getConsoleLineInfo())
@@ -1258,7 +1269,7 @@ void runGameFind(void)
 }
 
 // This is what starts the lobby screen
-void startGameFind(void)
+void startGameFind()
 {
 	addBackdrop();										//background image
 
@@ -1333,7 +1344,7 @@ void startGameFind(void)
 	EnablePasswordPrompt = false;
 }
 
-static void hidePasswordForm(void)
+static void hidePasswordForm()
 {
 	EnablePasswordPrompt = false;
 
@@ -1360,7 +1371,7 @@ static void hidePasswordForm(void)
 	addGames();
 }
 
-static void showPasswordForm(void)
+static void showPasswordForm()
 {
 	W_CONTEXT sContext;
 	EnablePasswordPrompt = true;
@@ -1550,7 +1561,7 @@ void updateLimitFlags()
 	for (i = 0; i < ARRAY_SIZE(limitIcons); ++i)
 	{
 		int stat = getStructStatFromName(limitIcons[i].stat);
-		bool disabled = asStructLimits[0] != NULL && stat >= 0 && asStructLimits[0][stat].limit == 0;
+		bool disabled = asStructLimits[0] != nullptr && stat >= 0 && asStructLimits[0][stat].limit == 0;
 		flags |= disabled << i;
 	}
 
@@ -1562,8 +1573,6 @@ static void addGameOptions()
 {
 	widgDelete(psWScreen, MULTIOP_OPTIONS);  				// clear options list
 	widgDelete(psWScreen, FRONTEND_SIDETEXT3);				// del text..
-
-	iV_SetFont(font_regular);
 
 	WIDGET *parent = widgGetFromID(psWScreen, FRONTEND_BACKDROP);
 
@@ -1938,7 +1947,7 @@ static void addColourChooser(UDWORD player)
 	colourChooserUp = player;
 }
 
-static void closeColourChooser(void)
+static void closeColourChooser()
 {
 	colourChooserUp = -1;
 	widgDelete(psWScreen, MULTIOP_COLCHOOSER_FORM);
@@ -2057,7 +2066,7 @@ bool recvReadyRequest(NETQUEUE queue)
 
 	// do not allow players to select 'ready' if we are sending a map too them!
 	// TODO: make a new icon to show this state?
-	if (NetPlay.players[player].wzFile.isSending)
+	if (!NetPlay.players[player].wzFiles.empty())
 	{
 		return false;
 	}
@@ -2325,7 +2334,7 @@ static void addTeamChooser(UDWORD player)
 /*
  * Closes Team Chooser dialog box, if there was any open
  */
-static void closeTeamChooser(void)
+static void closeTeamChooser()
 {
 	teamChooserUp = -1;
 	widgDelete(psWScreen, MULTIOP_TEAMCHOOSER_FORM);	//only once!
@@ -2351,7 +2360,7 @@ static void drawReadyButton(UDWORD player)
 	{
 		int icon = difficultyIcon(NetPlay.players[player].difficulty);
 		addMultiBut(psWScreen, MULTIOP_READY_FORM_ID + player, MULTIOP_DIFFICULTY_INIT_START + player, 6, 4, MULTIOP_READY_WIDTH, MULTIOP_READY_HEIGHT,
-		            locked.difficulty ? _("Difficulty locked") : (NetPlay.isHost ? _("Click to change difficulty") : NULL), icon, icon, icon);
+		            locked.difficulty ? _("Difficulty locked") : (NetPlay.isHost ? _("Click to change difficulty") : nullptr), icon, icon, icon);
 		return;
 	}
 	else if (!NetPlay.players[player].allocated)
@@ -2365,9 +2374,9 @@ static void drawReadyButton(UDWORD player)
 	}
 
 	bool isMe = player == selectedPlayer;
-	bool isReady = NetPlay.players[player].ready;
-	char const *const toolTips[2][2] = {{_("Waiting for player"), _("Player is ready")}, {_("Click when ready"), _("Waiting for other players")}};
-	unsigned images[2][2] = {{IMAGE_CHECK_OFF, IMAGE_CHECK_ON}, {IMAGE_CHECK_OFF_HI, IMAGE_CHECK_ON_HI}};
+	int isReady = NETgetDownloadProgress(player) != 100 ? 2 : NetPlay.players[player].ready ? 1 : 0;
+	char const *const toolTips[2][3] = {{_("Waiting for player"), _("Player is ready"), _("Player is downloading")}, {_("Click when ready"), _("Waiting for other players"), _("Waiting for download")}};
+	unsigned images[2][3] = {{IMAGE_CHECK_OFF, IMAGE_CHECK_ON, IMAGE_CHECK_DOWNLOAD}, {IMAGE_CHECK_OFF_HI, IMAGE_CHECK_ON_HI, IMAGE_CHECK_DOWNLOAD_HI}};
 
 	// draw 'ready' button
 	addMultiBut(psWScreen, MULTIOP_READY_FORM_ID + player, MULTIOP_READY_START + player, 3, 10, MULTIOP_READY_WIDTH, MULTIOP_READY_HEIGHT,
@@ -2392,7 +2401,7 @@ static bool canChooseTeamFor(int i)
 void addPlayerBox(bool players)
 {
 	// if background isn't there, then return since were not ready to draw the box yet!
-	if (widgGetFromID(psWScreen, FRONTEND_BACKDROP) == NULL)
+	if (widgGetFromID(psWScreen, FRONTEND_BACKDROP) == nullptr)
 	{
 		return;
 	}
@@ -2568,7 +2577,7 @@ void addPlayerBox(bool players)
 /*
  * Notify all players of host launching the game
  */
-static void SendFireUp(void)
+static void SendFireUp()
 {
 	uint32_t randomSeed = rand();  // Pick a random random seed for the synchronised random number generator.
 
@@ -2635,26 +2644,22 @@ static void addChatBox(bool preserveOldChat)
 	sEdInit.width = MULTIOP_CHATEDITW;
 	sEdInit.height = MULTIOP_CHATEDITH;
 
-	sEdInit.pUserData = NULL;
+	sEdInit.pUserData = nullptr;
 	sEdInit.pBoxDisplay = displayChatEdit;
 
 	widgAddEditBox(psWScreen, &sEdInit);
 
-	if (*getModList())
+	if (!getModList().empty())
 	{
 		QString modListMessage = _("Mod: ");
-		modListMessage += getModList();
+		modListMessage += getModList().c_str();
 		addConsoleMessage(modListMessage.toUtf8().constData(), DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
-		if (NetPlay.bComms)
-		{
-			addConsoleMessage(_("All players need to have the same mods to join your game."), DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
-		}
 	}
 
 	return;
 }
 
-static void addConsoleBox(void)
+static void addConsoleBox()
 {
 	if (widgGetFromID(psWScreen, FRONTEND_TOPFORM))
 	{
@@ -2686,7 +2691,7 @@ static void addConsoleBox(void)
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-static void disableMultiButs(void)
+static void disableMultiButs()
 {
 
 	// edit box icons.
@@ -2706,7 +2711,7 @@ static void disableMultiButs(void)
 }
 
 ////////////////////////////////////////////////////////////////////////////
-static void stopJoining(void)
+static void stopJoining()
 {
 	dwSelectedGame	 = 0;
 	reloadMPConfig(); // reload own settings
@@ -2734,12 +2739,12 @@ static void stopJoining(void)
 		NETclose();										// quit running game.
 
 		// if we were in a midle of transfering a file, then close the file handle
-		if (NetPlay.pMapFileHandle)
+		for (auto const &file : NetPlay.wzFiles)
 		{
 			debug(LOG_NET, "closing aborted file");		// no need to delete it, we do size check on (map) file
-			PHYSFS_close(NetPlay.pMapFileHandle);
-			NetPlay.pMapFileHandle = NULL;
+			PHYSFS_close(file.handle);
 		}
+		NetPlay.wzFiles.clear();
 		ingame.localJoiningInProgress = false;			// reset local flags
 		ingame.localOptionsReceived = false;
 		if (!ingame.bHostSetup && NetPlay.isHost)			// joining and host was transfered.
@@ -2767,19 +2772,23 @@ static void stopJoining(void)
 static void loadMapSettings1()
 {
 	char aFileName[256];
-	const char *ininame = challengeActive ? sRequestResult : aFileName;
 	LEVEL_DATASET *psLevel = levFindDataSet(game.map, &game.hash);
 
 	ASSERT_OR_RETURN(, psLevel, "No level found for %s", game.map);
 	sstrcpy(aFileName, psLevel->apDataFiles[psLevel->game]);
-	aFileName[strlen(aFileName) - 4] = '\0';
+	aFileName[std::max<size_t>(strlen(aFileName), 4) - 4] = '\0';
 	sstrcat(aFileName, ".json");
-	WzConfig ini(ininame, WzConfig::ReadOnly);
 
-	if (!PHYSFS_exists(ininame))
+	QString ininame = challengeActive ? sRequestResult : aFileName;
+	if (hostlaunch == 2)
+	{
+		ininame = "tests/" + QString::fromStdString(wz_skirmish_test());
+	}
+	if (!PHYSFS_exists(ininame.toUtf8().constData()))
 	{
 		return;
 	}
+	WzConfig ini(ininame, WzConfig::ReadOnly);
 
 	ini.beginGroup("locked"); // GUI lockdown
 	locked.power = ini.value("power", challengeActive).toBool();
@@ -2806,15 +2815,19 @@ static void loadMapSettings1()
 static void loadMapSettings2()
 {
 	char aFileName[256];
-	const char *ininame = challengeActive ? sRequestResult : aFileName;
 	LEVEL_DATASET *psLevel = levFindDataSet(game.map, &game.hash);
 
 	ASSERT_OR_RETURN(, psLevel, "No level found for %s", game.map);
 	sstrcpy(aFileName, psLevel->apDataFiles[psLevel->game]);
-	aFileName[strlen(aFileName) - 4] = '\0';
+	aFileName[std::max<size_t>(strlen(aFileName), 4) - 4] = '\0';
 	sstrcat(aFileName, ".json");
 
-	if (!PHYSFS_exists(ininame))
+	QString ininame = challengeActive ? sRequestResult : aFileName;
+	if (hostlaunch == 2)
+	{
+		ininame = "tests/" + QString::fromStdString(wz_skirmish_test());
+	}
+	if (!PHYSFS_exists(ininame.toUtf8().constData()))
 	{
 		return;
 	}
@@ -2843,7 +2856,7 @@ static void loadMapSettings2()
 		if (ini.contains("difficulty"))
 		{
 			QString value = ini.value("difficulty", "Medium").toString();
-			for (int j = 0; j < ARRAY_SIZE(difficultyList); j++)
+			for (unsigned j = 0; j < ARRAY_SIZE(difficultyList); ++j)
 			{
 				if (strcasecmp(difficultyList[j], value.toUtf8().constData()) == 0)
 				{
@@ -2990,7 +3003,7 @@ static void processMultiopWidgets(UDWORD id)
 					break;
 				}
 			}
-		// Continue, do not break, since we just set a password.
+			// fallthrough
 		case MULTIOP_PASSWORD_BUT:
 			{
 				char buf[255];
@@ -3011,7 +3024,7 @@ static void processMultiopWidgets(UDWORD id)
 				else
 				{
 					NETresetGamePassword();
-					ssprintf(buf, _("*** password is NOT required! ***"));
+					ssprintf(buf, "%s", _("*** password is NOT required! ***"));
 					addConsoleMessage(buf, DEFAULT_JUSTIFY, NOTIFY_MESSAGE);
 				}
 				NETGameLocked(willSet);
@@ -3025,7 +3038,7 @@ static void processMultiopWidgets(UDWORD id)
 	{
 	case MULTIOP_MAP_MOD:
 		char buf[256];
-		ssprintf(buf, _("This is a map-mod, it can change your playing experience!"));
+		ssprintf(buf, "%s", _("This is a map-mod, it can change your playing experience!"));
 		addConsoleMessage(buf, DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
 		break;
 
@@ -3293,7 +3306,7 @@ static void processMultiopWidgets(UDWORD id)
 }
 
 /* Start a multiplayer or skirmish game */
-void startMultiplayerGame(void)
+void startMultiplayerGame()
 {
 	if (!bHosted)
 	{
@@ -3348,7 +3361,7 @@ void startMultiplayerGame(void)
 // ////////////////////////////////////////////////////////////////////////////
 // Net message handling
 
-void frontendMultiMessages(void)
+void frontendMultiMessages()
 {
 	NETQUEUE queue;
 	uint8_t type;
@@ -3371,42 +3384,22 @@ void frontendMultiMessages(void)
 
 		case NET_FILE_CANCELLED:					// host only routine
 			{
-				uint32_t reason;
-				uint32_t victim;
-
 				if (!NetPlay.isHost)				// only host should act
 				{
 					ASSERT(false, "Host only routine detected for client!");
 					break;
 				}
 
+				Sha256 hash;
+				hash.setZero();
+
 				NETbeginDecode(queue, NET_FILE_CANCELLED);
-				NETuint32_t(&victim);
-				NETuint32_t(&reason);
+				NETbin(hash.bytes, hash.Bytes);
 				NETend();
 
-				if (whosResponsible(victim) != queue.index)
-				{
-					HandleBadParam("NET_FILE_CANCELLED given incorrect params.", victim, queue.index);
-					return;
-				}
-
-				switch (reason)
-				{
-				case STUCK_IN_FILE_LOOP:
-					debug(LOG_WARNING, "Received file cancel request from player %u, They are stuck in a loop?", victim);
-					kickPlayer(victim, "the host couldn't send a file for some reason.", ERROR_UNKNOWNFILEISSUE);
-					NetPlay.players[victim].wzFile.isCancelled = true;
-					NetPlay.players[victim].wzFile.isSending = false;
-					break;
-
-				case ALREADY_HAVE_FILE:
-				default:
-					debug(LOG_WARNING, "Received file cancel request from player %u, they already have the file.", victim);
-					NetPlay.players[victim].wzFile.isCancelled = true;
-					NetPlay.players[victim].wzFile.isSending = false;
-					break;
-				}
+				debug(LOG_WARNING, "Received file cancel request from player %u, they weren't expecting the file.", queue.index);
+				auto &wzFiles = NetPlay.players[queue.index].wzFiles;
+				wzFiles.erase(std::remove_if(wzFiles.begin(), wzFiles.end(), [&](WZFile const &file) { return file.hash == hash; }), wzFiles.end());
 			}
 			break;
 
@@ -3601,7 +3594,7 @@ void frontendMultiMessages(void)
 	}
 }
 
-void runMultiOptions(void)
+void runMultiOptions()
 {
 	static UDWORD	lastrefresh = 0;
 	char                    oldGameMap[128];
@@ -3612,14 +3605,8 @@ void runMultiOptions(void)
 	frontendMultiMessages();
 	if (NetPlay.isHost)
 	{
-		for (unsigned i = 0; i < MAX_PLAYERS; i++)
-		{
-			// send it for each player that needs it
-			if (NetPlay.players[i].wzFile.isSending)
-			{
-				sendMap();
-			}
-		}
+		// send it for each player that needs it
+		sendMap();
 	}
 
 	// update boxes?
@@ -3760,7 +3747,6 @@ void runMultiOptions(void)
 
 	if (widgGetFromID(psWScreen, MULTIOP_CHATBOX))
 	{
-		iV_SetFont(font_regular);											// switch to small font.
 		displayConsoleMessages();									// draw the chatbox
 	}
 
@@ -3773,6 +3759,23 @@ void runMultiOptions(void)
 		changeTitleMode(GAMEFIND);
 		screen_RestartBackDrop();
 	}
+}
+
+static bool loadSettings(const QString &filename)
+{
+	WzConfig ini(filename, WzConfig::ReadOnlyAndRequired);
+	ini.beginGroup("challenge");
+	sstrcpy(game.map, ini.value("map", game.map).toString().toUtf8().constData());
+	game.hash = levGetMapNameHash(game.map);
+	game.maxPlayers = ini.value("maxPlayers", game.maxPlayers).toInt();	// TODO, read from map itself, not here!!
+	game.scavengers = ini.value("scavengers", game.scavengers).toBool();
+	game.alliance = ini.value("alliances", ALLIANCES_TEAMS).toInt();
+	game.power = ini.value("powerLevel", game.power).toInt();
+	game.base = ini.value("bases", game.base + 1).toInt() - 1;		// count from 1 like the humans do
+	sstrcpy(game.name, ini.value("name").toString().toUtf8().constData());
+	locked.position = !ini.value("allowPositionChange", !locked.position).toBool();
+	ini.endGroup();
+	return true;
 }
 
 bool startMultiOptions(bool bReenter)
@@ -3798,7 +3801,7 @@ bool startMultiOptions(bool bReenter)
 		{
 			ingame.numStructureLimits = 0;
 			free(ingame.pStructureLimits);
-			ingame.pStructureLimits = NULL;
+			ingame.pStructureLimits = nullptr;
 		}
 	}
 
@@ -3845,20 +3848,8 @@ bool startMultiOptions(bool bReenter)
 		loadMapSettings1();
 		loadMapSettings2();
 
-		WzConfig ini(sRequestResult, WzConfig::ReadOnly);
-		ini.beginGroup("challenge");
-		sstrcpy(game.map, ini.value("map", game.map).toString().toUtf8().constData());
-		game.hash = levGetMapNameHash(game.map);
-		game.maxPlayers = ini.value("maxPlayers", game.maxPlayers).toInt();	// TODO, read from map itself, not here!!
-		game.scavengers = ini.value("scavengers", game.scavengers).toBool();
-		game.alliance = ALLIANCES_TEAMS;
+		loadSettings(sRequestResult);
 		netPlayersUpdated = true;
-		mapDownloadProgress = 100;
-		game.power = ini.value("powerLevel", game.power).toInt();
-		game.base = ini.value("bases", game.base + 1).toInt() - 1;		// count from 1 like the humans do
-		sstrcpy(game.name, ini.value("name").toString().toUtf8().constData());
-		locked.position = ini.value("allowPositionChange", locked.position).toBool();
-		ini.endGroup();
 
 		ingame.localOptionsReceived = true;
 		addGameOptions();									// update game options box.
@@ -3881,34 +3872,34 @@ bool startMultiOptions(bool bReenter)
 				{
 					if (NetPlay.isUPNP_CONFIGURED)
 					{
-						ssprintf(buf, _("UPnP has been enabled."));
+						ssprintf(buf, "%s", _("UPnP has been enabled."));
 					}
 					else
 					{
 						if (NetPlay.isUPNP_ERROR)
 						{
-							ssprintf(buf, _("UPnP detection faled. You must manually configure router yourself."));
+							ssprintf(buf, "%s", _("UPnP detection faled. You must manually configure router yourself."));
 						}
 						else
 						{
-							ssprintf(buf, _("UPnP detection is in progress..."));
+							ssprintf(buf, "%s", _("UPnP detection is in progress..."));
 						}
 					}
 					addConsoleMessage(buf, DEFAULT_JUSTIFY, NOTIFY_MESSAGE);
 				}
 				else
 				{
-					ssprintf(buf, _("UPnP detection disabled by user. Autoconfig of port 2100 will not happen."));
+					ssprintf(buf, "%s", _("UPnP detection disabled by user. Autoconfig of port 2100 will not happen."));
 					addConsoleMessage(buf, DEFAULT_JUSTIFY, NOTIFY_MESSAGE);
 				}
 			}
 			if (challengeActive)
 			{
-				ssprintf(buf, _("Hit the ready box to begin your challenge!"));
+				ssprintf(buf, "%s", _("Hit the ready box to begin your challenge!"));
 			}
 			else if (!bHosted)
 			{
-				ssprintf(buf, _("Press the start hosting button to begin hosting a game."));
+				ssprintf(buf, "%s", _("Press the start hosting button to begin hosting a game."));
 			}
 			addConsoleMessage(buf, DEFAULT_JUSTIFY, NOTIFY_MESSAGE);
 		}
@@ -3928,6 +3919,13 @@ bool startMultiOptions(bool bReenter)
 			processMultiopWidgets(MULTIOP_HOST);
 		}
 		SendReadyRequest(selectedPlayer, true);
+		if (hostlaunch == 2)
+		{
+			loadSettings("tests/" + QString::fromStdString(wz_skirmish_test()));
+			startMultiplayerGame();
+			// reset flag in case people dropped/quit on join screen
+			NETsetPlayerConnectionStatus(CONNECTIONSTATUS_NORMAL, NET_ALL_PLAYERS);
+		}
 	}
 
 	return true;
@@ -3969,9 +3967,6 @@ void displayRemoteGame(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	drawBlueBox(x, y, GAMES_PLAYERS_START - 4 , psWidget->height());
 	drawBlueBox(x, y, GAMES_MAPNAME_START - 4, psWidget->height());
 
-	//draw game info
-	iV_SetFont(font_regular);
-
 	int lamp = IMAGE_LAMP_RED;
 	int statusStart = IMAGE_NOJOIN;
 	bool disableButton = true;
@@ -3980,12 +3975,7 @@ void displayRemoteGame(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	// As long as they got room, and mods are the same then we proccess the button(s)
 	if (NETisCorrectVersion(NetPlay.games[gameID].game_version_major, NetPlay.games[gameID].game_version_minor))
 	{
-		if (strcmp(NetPlay.games[gameID].modlist, getModList()) != 0)
-		{
-			// If wrong mod loaded.
-			statusStart = IMAGE_NOJOIN_MOD;
-		}
-		else if (NetPlay.games[gameID].desc.dwCurrentPlayers >= NetPlay.games[gameID].desc.dwMaxPlayers)
+		if (NetPlay.games[gameID].desc.dwCurrentPlayers >= NetPlay.games[gameID].desc.dwMaxPlayers)
 		{
 			// If game is full.
 			statusStart = IMAGE_NOJOIN_FULL;
@@ -3994,8 +3984,8 @@ void displayRemoteGame(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		{
 			// Game is ok to join!
 			iV_SetTextColour(WZCOL_FORM_TEXT);
-			lamp = IMAGE_LAMP_GREEN;
 			statusStart = IMAGE_SKIRMISH_OVER;
+			lamp = IMAGE_LAMP_GREEN;
 			disableButton = false;
 
 			if (NetPlay.games[gameID].privateGame)  // check to see if it is a private game
@@ -4003,10 +3993,14 @@ void displayRemoteGame(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 				statusStart = IMAGE_LOCKED_NOBG;
 				lamp = IMAGE_LAMP_AMBER;
 			}
+			else if (NetPlay.games[gameID].modlist[0] != '\0')
+			{
+				statusStart = IMAGE_MOD_OVER;
+			}
 		}
 
 		ssprintf(tmp, "%d/%d", NetPlay.games[gameID].desc.dwCurrentPlayers, NetPlay.games[gameID].desc.dwMaxPlayers);
-		iV_DrawText(tmp, x + GAMES_PLAYERS_START + 4 , y + 18);
+		iV_DrawText(tmp, x + GAMES_PLAYERS_START + 4 , y + 18, font_regular);
 
 		// see what host limits are... then draw them.
 		if (NetPlay.games[gameID].limits)
@@ -4036,11 +4030,11 @@ void displayRemoteGame(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	//draw game name, chop when we get a too long name
 	sstrcpy(name, NetPlay.games[gameID].name);
 	// box size in pixels
-	while (iV_GetTextWidth(name) > (GAMES_MAPNAME_START - GAMES_GAMENAME_START - 4))
+	while (iV_GetTextWidth(name, font_regular) > (GAMES_MAPNAME_START - GAMES_GAMENAME_START - 4))
 	{
 		name[strlen(name) - 1] = '\0';
 	}
-	iV_DrawText(name, x + GAMES_GAMENAME_START, y + 12);
+	iV_DrawText(name, x + GAMES_GAMENAME_START, y + 12, font_regular);
 
 	if (NetPlay.games[gameID].pureMap)
 	{
@@ -4053,14 +4047,13 @@ void displayRemoteGame(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	// draw map name, chop when we get a too long name
 	sstrcpy(name, NetPlay.games[gameID].mapname);
 	// box size in pixels
-	while (iV_GetTextWidth(name) > (GAMES_PLAYERS_START - GAMES_MAPNAME_START - 4))
+	while (iV_GetTextWidth(name, font_regular) > (GAMES_PLAYERS_START - GAMES_MAPNAME_START - 4))
 	{
 		name[strlen(name) - 1] = '\0';
 	}
-	iV_DrawText(name, x + GAMES_MAPNAME_START, y + 12);	// map name
+	iV_DrawText(name, x + GAMES_MAPNAME_START, y + 12, font_regular);	// map name
 
 	iV_SetTextColour(WZCOL_FORM_TEXT);
-	iV_SetFont(font_small);
 	// draw mod name (if any)
 	if (strlen(NetPlay.games[gameID].modlist))
 	{
@@ -4069,27 +4062,26 @@ void displayRemoteGame(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		sprintf(tmp, _("Mods: %s"), NetPlay.games[gameID].modlist);
 		tmp[StringSize] = '\0';
 		sstrcpy(name, tmp);
-
 	}
 	else
 	{
 		sstrcpy(name, _("Mods: None!"));
 	}
 	// box size in pixels
-	while (iV_GetTextWidth(name) > (GAMES_PLAYERS_START - GAMES_MAPNAME_START - 8))
+	while (iV_GetTextWidth(name, font_small) > (GAMES_PLAYERS_START - GAMES_MAPNAME_START - 8))
 	{
 		name[strlen(name) - 1] = '\0';
 	}
-	iV_DrawText(name, x + GAMES_MODNAME_START, y + 24);
+	iV_DrawText(name, x + GAMES_MODNAME_START, y + 24, font_small);
 
 	// draw version string
 	sprintf(name, _("Version: %s"), NetPlay.games[gameID].versionstring);
 	// box size in pixels
-	while (iV_GetTextWidth(name) > (GAMES_MAPNAME_START - 6 - GAMES_GAMENAME_START - 4))
+	while (iV_GetTextWidth(name, font_small) > (GAMES_MAPNAME_START - 6 - GAMES_GAMENAME_START - 4))
 	{
 		name[strlen(name) - 1] = '\0';
 	}
-	iV_DrawText(name, x + GAMES_GAMENAME_START + 6, y + 24);
+	iV_DrawText(name, x + GAMES_GAMENAME_START + 6, y + 24, font_small);
 
 	// crappy hack to only draw this once for the header.  TODO fix GUI
 	if (gameID == 0)
@@ -4097,10 +4089,10 @@ void displayRemoteGame(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		iV_SetTextColour(WZCOL_YELLOW);
 		// make the 'header' for the table...
 		drawBlueBox(x , y - 12 , GAMES_GAMEWIDTH, 12);
-		iV_DrawText(_("Game Name"), x - 2 + GAMES_GAMENAME_START + 48, y - 3);
-		iV_DrawText(_("Map Name"), x - 2 + GAMES_MAPNAME_START + 48, y - 3);
-		iV_DrawText(_("Players"), x - 2 + GAMES_PLAYERS_START, y - 3);
-		iV_DrawText(_("Status"), x - 2 + GAMES_STATUS_START + 48, y - 3);
+		iV_DrawText(_("Game Name"), x - 2 + GAMES_GAMENAME_START + 48, y - 3, font_small);
+		iV_DrawText(_("Map Name"), x - 2 + GAMES_MAPNAME_START + 48, y - 3, font_small);
+		iV_DrawText(_("Players"), x - 2 + GAMES_PLAYERS_START, y - 3, font_small);
+		iV_DrawText(_("Status"), x - 2 + GAMES_STATUS_START + 48, y - 3, font_small);
 	}
 }
 
@@ -4128,10 +4120,9 @@ void displayPosition(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	char text[80];
 
 	drawBlueBox(x, y, psWidget->width(), psWidget->height());
-	iV_SetFont(font_regular);
 	iV_SetTextColour(WZCOL_FORM_TEXT);
 	ssprintf(text, _("Click to take player slot %d"), NetPlay.players[i].position);
-	iV_DrawText(text, x + 10, y + 22);
+	iV_DrawText(text, x + 10, y + 22, font_regular);
 }
 
 static void displayAi(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
@@ -4142,9 +4133,8 @@ static void displayAi(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	const char *commsText[] = { N_("Open"), N_("Closed") };
 
 	drawBlueBox(x, y, psWidget->width(), psWidget->height());
-	iV_SetFont(font_regular);
 	iV_SetTextColour(WZCOL_FORM_TEXT);
-	iV_DrawText((j >= 0) ? aidata[j].name : gettext(commsText[j + 2]), x + 10, y + 22);
+	iV_DrawText((j >= 0) ? aidata[j].name : gettext(commsText[j + 2]), x + 10, y + 22, font_regular);
 }
 
 static int difficultyIcon(int difficulty)
@@ -4167,10 +4157,9 @@ static void displayDifficulty(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 
 	ASSERT_OR_RETURN(, j < ARRAY_SIZE(difficultyList), "Bad difficulty found: %d", j);
 	drawBlueBox(x, y, psWidget->width(), psWidget->height());
-	iV_SetFont(font_regular);
 	iV_SetTextColour(WZCOL_FORM_TEXT);
 	iV_DrawImage(FrontImages, difficultyIcon(j), x + 5, y + 5);
-	iV_DrawText(gettext(difficultyList[j]), x + 42, y + 22);
+	iV_DrawText(gettext(difficultyList[j]), x + 42, y + 22, font_regular);
 }
 
 static bool isKnownPlayer(std::map<std::string, EcKey::Key> const &knownPlayers, std::string const &name, EcKey const &key)
@@ -4192,25 +4181,15 @@ void displayPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 
 	const int nameX = 32;
 
-	//bluboxes.
-	drawBlueBox(x, y, psWidget->width(), psWidget->height());
-	if (NetPlay.isHost && NetPlay.players[j].wzFile.isSending)
-	{
-		static char mapProgressString[MAX_STR_LENGTH] = {'\0'};
-		int progress = (NetPlay.players[j].wzFile.currPos * 100) / NetPlay.players[j].wzFile.fileSize_32;
+	int downloadProgress = NETgetDownloadProgress(j);
 
-		snprintf(mapProgressString, MAX_STR_LENGTH, _("Sending Map: %d%% "), progress);
-		iV_SetFont(font_regular); // font
-		iV_SetTextColour(WZCOL_FORM_TEXT);
-		iV_DrawText(mapProgressString, x + 15, y + 22);
-	}
-	else if (mapDownloadProgress != 100 && j == selectedPlayer)
+	drawBlueBox(x, y, psWidget->width(), psWidget->height());
+	if (downloadProgress != 100)
 	{
-		static char mapProgressString[MAX_STR_LENGTH] = {'\0'};
-		snprintf(mapProgressString, MAX_STR_LENGTH, _("Map: %d%% downloaded"), mapDownloadProgress);
-		iV_SetFont(font_regular); // font
+		char progressString[MAX_STR_LENGTH];
+		ssprintf(progressString, j != selectedPlayer ? _("Sending Map: %d%% ") : _("Map: %d%% downloaded"), downloadProgress);
 		iV_SetTextColour(WZCOL_FORM_TEXT);
-		iV_DrawText(mapProgressString, x + 5, y + 22);
+		iV_DrawText(progressString, x + 5, y + 22, font_regular);
 		return;
 	}
 	else if (ingame.localOptionsReceived && NetPlay.players[j].allocated)					// only draw if real player!
@@ -4219,7 +4198,6 @@ void displayPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 
 		drawBlueBox(x, y, psWidget->width(), psWidget->height());
 
-		iV_SetFont(font_regular);											// font
 		std::map<std::string, EcKey::Key> serverPlayers;  // TODO Fill this with players known to the server (needs implementing on the server, too). Currently useless.
 		if (ingame.PingTimes[j] >= PING_LIMIT)
 		{
@@ -4239,9 +4217,9 @@ void displayPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		}
 
 		// name
-		if (iV_GetTextWidth(name.c_str()) > psWidget->width() - nameX)
+		if ((int)iV_GetTextWidth(name.c_str(), font_regular) > psWidget->width() - nameX)
 		{
-			while (!name.empty() && iV_GetTextWidth((name + "...").c_str()) > psWidget->width() - nameX)
+			while (!name.empty() && (int)iV_GetTextWidth((name + "...").c_str(), font_regular) > psWidget->width() - nameX)
 			{
 				name.resize(name.size() - 1);  // Clip name.
 			}
@@ -4269,13 +4247,11 @@ void displayPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 			}
 			subText += buf;
 		}
-		iV_DrawText(name.c_str(), x + nameX, y + (subText.empty() ? 22 : 18));
+		iV_DrawText(name.c_str(), x + nameX, y + (subText.empty() ? 22 : 18), font_regular);
 		if (!subText.empty())
 		{
-			iV_SetFont(font_small);
 			iV_SetTextColour(WZCOL_TEXT_MEDIUM);
-			iV_DrawText(subText.c_str(), x + nameX, y + 28);
-			iV_SetFont(font_regular);
+			iV_DrawText(subText.c_str(), x + nameX, y + 28, font_small);
 			iV_SetTextColour(WZCOL_FORM_TEXT);
 		}
 
@@ -4363,7 +4339,6 @@ void displayPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		{
 			iV_DrawImage(FrontImages, IMAGE_PLAYER_PC, x, y + 11);
 		}
-		iV_SetFont(font_regular);
 		iV_SetTextColour(WZCOL_FORM_TEXT);
 		ASSERT_OR_RETURN(, NetPlay.players[j].ai < (int)aidata.size(), "Uh-oh, AI index out of bounds");
 		switch (NetPlay.players[j].ai)
@@ -4372,7 +4347,7 @@ void displayPlayer(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 		case AI_CLOSED: sstrcpy(aitext, _("Closed")); break;
 		default: sstrcpy(aitext, nameOverrides[j][0] == '\0' ? NetPlay.isHost ? aidata[NetPlay.players[j].ai].name : NetPlay.players[j].name : nameOverrides[j]); break;
 		}
-		iV_DrawText(aitext, x + nameX, y + 22);
+		iV_DrawText(aitext, x + nameX, y + 22, font_regular);
 	}
 }
 
@@ -4383,7 +4358,7 @@ void displayColour(WIDGET *psWidget, UDWORD xOffset, UDWORD yOffset)
 	const int j = psWidget->UserData;
 
 	drawBlueBox(x, y, psWidget->width(), psWidget->height());
-	if (!NetPlay.players[j].wzFile.isSending && game.skDiff[j])
+	if (NetPlay.players[j].wzFiles.empty() && game.skDiff[j])
 	{
 		int player = getPlayerColour(j);
 		STATIC_ASSERT(MAX_PLAYERS <= 16);
@@ -4447,7 +4422,7 @@ void WzMultiButton::display(int xOffset, int yOffset)
 {
 	int x0 = xOffset + x();
 	int y0 = yOffset + y();
-	Image hiToUse(NULL, 0);
+	Image hiToUse(nullptr, 0);
 
 	// FIXME: This seems to be a way to conserve space, so you can use a
 	// transparent icon with these edit boxes.
@@ -4481,7 +4456,7 @@ void WzMultiButton::display(int xOffset, int yOffset)
 	{
 		toDraw[numToDraw++] = imDown;
 	}
-	if (highlight && !grey && hiToUse.images != NULL)
+	if (highlight && !grey && hiToUse.images != nullptr)
 	{
 		toDraw[numToDraw++] = hiToUse;
 	}

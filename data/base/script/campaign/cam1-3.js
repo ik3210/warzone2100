@@ -2,11 +2,24 @@
 include("script/campaign/libcampaign.js");
 include("script/campaign/templates.js");
 
+const NEW_PARADIGM_RES = [
+	"R-Wpn-MG-Damage03", "R-Wpn-MG-ROF01", "R-Defense-WallUpgrade01",
+	"R-Struc-Materials01", "R-Struc-Factory-Upgrade01",
+	"R-Struc-Factory-Cyborg-Upgrade01", "R-Vehicle-Engine01",
+	"R-Vehicle-Metals01", "R-Cyborg-Metals01", "R-Wpn-Cannon-Damage01",
+	"R-Wpn-Flamer-Damage03", "R-Wpn-Flamer-ROF01",
+	"R-Wpn-Mortar-Damage01", "R-Wpn-Rocket-Accuracy01",
+	"R-Wpn-Rocket-Damage02", "R-Wpn-Rocket-ROF01",
+	"R-Wpn-RocketSlow-Damage01", "R-Struc-RprFac-Upgrade03",
+];
+const SCAVENGER_RES = [
+	"R-Wpn-MG-Damage02", "R-Wpn-Rocket-Damage01", "R-Wpn-Cannon-Damage01",
+];
 var NPDefenseGroup, NPScoutGroup, NPFactory;
 
 camAreaEvent("RemoveBeacon", function(droid)
 {
-	hackRemoveMessage("C1-3_OBJ1", PROX_MSG, 0);
+	hackRemoveMessage("C1-3_OBJ1", PROX_MSG, CAM_HUMAN_PLAYER);
 });
 
 camAreaEvent("NorthConvoyTrigger", function(droid)
@@ -38,7 +51,7 @@ camAreaEvent("WestConvoyTrigger", function(droid)
 
 function playYouAreInContraventionOfTheNewParadigm()
 {
-	hackAddMessage("SB1_3_MSG4", MISS_MSG, 0, true);
+	hackAddMessage("SB1_3_MSG4", MISS_MSG, CAM_HUMAN_PLAYER, true);
 	camManageGroup(NPScoutGroup, CAM_ORDER_COMPROMISE, {
 		pos: camMakePos("RTLZ"),
 		repair: 30,
@@ -82,9 +95,9 @@ camAreaEvent("NPTrigger", function(droid)
 });
 
 function eventAttacked(victim, attacker) {
-	if (!camDef(victim) || !victim || victim.player === 0)
+	if (!camDef(victim) || !victim || victim.player === CAM_HUMAN_PLAYER)
 		return;
-	if (victim.player === 1)
+	if (victim.player === NEW_PARADIGM)
 	{
 		camCallOnce("enableNP");
 		var commander = getObject("NPCommander");
@@ -122,7 +135,7 @@ function camEnemyBaseEliminated_ScavBaseGroup()
 
 function playNPWarningMessage()
 {
-	hackAddMessage("SB1_3_MSG3", MISS_MSG, 0, true);
+	hackAddMessage("SB1_3_MSG3", MISS_MSG, CAM_HUMAN_PLAYER, true);
 }
 
 function playNPWarningSound()
@@ -157,18 +170,16 @@ function eventStartLevel()
 	var startpos = getObject("StartPosition");
 	centreView(startpos.x, startpos.y);
 	var lz = getObject("LandingZone");
-	setNoGoArea(lz.x, lz.y, lz.x2, lz.y2, 0);
+	setNoGoArea(lz.x, lz.y, lz.x2, lz.y2, CAM_HUMAN_PLAYER);
 	var tent = getObject("TransporterEntry");
-	startTransporterEntry(tent.x, tent.y, 0);
+	startTransporterEntry(tent.x, tent.y, CAM_HUMAN_PLAYER);
 	var text = getObject("TransporterExit");
-	setTransporterExit(text.x, text.y, 0);
+	setTransporterExit(text.x, text.y, CAM_HUMAN_PLAYER);
 
-	setPower(50000, 1);
-	completeResearch("R-Wpn-Flamer-Damage03", 1);
-	completeResearch("R-Wpn-MG-Damage02", 1);
-	completeResearch("R-Struc-RprFac-Upgrade03", 1);
-	setPower(200, 7);
-	completeResearch("R-Wpn-MG-Damage02", 7);
+	setPower(camChangeOnDiff(50000, true), NEW_PARADIGM);
+	setPower(camChangeOnDiff(400, true), 7);
+	camCompleteRequiredResearch(NEW_PARADIGM_RES, NEW_PARADIGM);
+	camCompleteRequiredResearch(SCAVENGER_RES, 7);
 	setAlliance(1, 7, true);
 
 	camSetEnemyBases({
@@ -186,8 +197,8 @@ function eventStartLevel()
 		},
 	});
 
-	hackAddMessage("SB1_3_MSG", MISS_MSG, 0, false);
-	hackAddMessage("C1-3_OBJ1", PROX_MSG, 0, false); // south-west beacon
+	hackAddMessage("SB1_3_MSG", MISS_MSG, CAM_HUMAN_PLAYER, false);
+	hackAddMessage("C1-3_OBJ1", PROX_MSG, CAM_HUMAN_PLAYER, false); // south-west beacon
 
 	camSetArtifacts({
 		"ScavFactory": { tech: "R-Wpn-Cannon1Mk1" },
@@ -206,7 +217,7 @@ function eventStartLevel()
 			},
 			groupSize: 4,
 			maxSize: 10,
-			throttle: 40000,
+			throttle: camChangeOnDiff(40000),
 			templates: [ rbuggy, bloke, rbjeep, buggy ]
 		},
 		"NPFactory": {
@@ -217,7 +228,7 @@ function eventStartLevel()
 			},
 			groupSize: 4, // sic! scouts, at most
 			maxSize: 20,
-			throttle: 60000,
+			throttle: camChangeOnDiff(60000),
 			templates: [ nppod, nphmg, npsmc, npsmc ]
 		},
 	});

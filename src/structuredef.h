@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -72,9 +72,6 @@ struct FLAG_POSITION : public OBJECT_POSITION
 	FLAG_POSITION *psNext;
 };
 
-
-#define STRUCT_MAXWEAPS		4
-
 enum STRUCT_STRENGTH
 {
 	STRENGTH_SOFT,
@@ -103,7 +100,7 @@ enum STRUCT_ANIM_STATES
 //this structure is used to hold the permenant stats for each type of building
 struct STRUCTURE_STATS : public BASE_STATS
 {
-	STRUCTURE_STATS() : pBaseIMD(NULL), pECM(NULL), pSensor(NULL) {};
+	STRUCTURE_STATS() : pBaseIMD(nullptr), pECM(nullptr), pSensor(nullptr) {};
 
 	STRUCTURE_TYPE type;            /* the type of structure */
 	STRUCT_STRENGTH strength;       /* strength against the weapon effects */
@@ -118,7 +115,7 @@ struct STRUCTURE_STATS : public BASE_STATS
 	struct SENSOR_STATS *pSensor;   /*Which Sensor is standard for the structure -if any*/
 	UDWORD weaponSlots;             /*Number of weapons that can be attached to the building*/
 	UDWORD numWeaps;                /*Number of weapons for default */
-	struct WEAPON_STATS *psWeapStat[STRUCT_MAXWEAPS];
+	struct WEAPON_STATS *psWeapStat[MAX_WEAPONS];
 	uint64_t flags;
 
 	struct
@@ -244,15 +241,11 @@ struct STRUCTURE : public BASE_OBJECT
 	FUNCTIONALITY       *pFunctionality;            /* pointer to structure that contains fields necessary for functionality */
 	int                 buildRate;                  ///< Rate that this structure is being built, calculated each tick. Only meaningful if status == SS_BEING_BUILT. If construction hasn't started and build rate is 0, remove the structure.
 	int                 lastBuildRate;              ///< Needed if wanting the buildRate between buildRate being reset to 0 each tick and the trucks calculating it.
-	/* The weapons on the structure */
-	UWORD numWeaps;
-	WEAPON asWeaps[STRUCT_MAXWEAPS];
-	BASE_OBJECT *psTarget[STRUCT_MAXWEAPS];
-	UWORD targetOrigin[STRUCT_MAXWEAPS];
+	BASE_OBJECT *psTarget[MAX_WEAPONS];
 #ifdef DEBUG
 	// these are to help tracking down dangling pointers
-	char targetFunc[STRUCT_MAXWEAPS][MAX_EVENT_NAME_LEN];
-	int targetLine[STRUCT_MAXWEAPS];
+	char targetFunc[MAX_WEAPONS][MAX_EVENT_NAME_LEN];
+	int targetLine[MAX_WEAPONS];
 #endif
 
 	UDWORD expectedDamage;           ///< Expected damage to be caused by all currently incoming projectiles. This info is shared between all players,
@@ -292,7 +285,7 @@ static const int NUM_FACMOD_TYPES = 2;
 
 struct ProductionRunEntry
 {
-	ProductionRunEntry() : quantity(0), built(0), psTemplate(NULL) {}
+	ProductionRunEntry() : quantity(0), built(0), psTemplate(nullptr) {}
 	void restart()
 	{
 		built = 0;
@@ -312,7 +305,7 @@ struct ProductionRunEntry
 	}
 	bool isValid() const
 	{
-		return psTemplate != NULL && quantity > 0 && built <= quantity;
+		return psTemplate != nullptr && quantity > 0 && built <= quantity;
 	}
 	bool operator ==(DROID_TEMPLATE *t) const;
 
@@ -322,13 +315,13 @@ struct ProductionRunEntry
 };
 typedef std::vector<ProductionRunEntry> ProductionRun;
 
-struct UPGRADE
+struct UPGRADE_MOD
 {
 	UWORD modifier;      //% to increase the stat by
 };
 
-typedef UPGRADE REPAIR_FACILITY_UPGRADE;
-typedef UPGRADE POWER_UPGRADE;
-typedef UPGRADE REARM_UPGRADE;
+typedef UPGRADE_MOD REPAIR_FACILITY_UPGRADE;
+typedef UPGRADE_MOD POWER_UPGRADE;
+typedef UPGRADE_MOD REARM_UPGRADE;
 
 #endif // __INCLUDED_STRUCTUREDEF_H__

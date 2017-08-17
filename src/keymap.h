@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -42,59 +42,45 @@ enum KEY_STATUS
 
 struct KEY_MAPPING
 {
-	void (*function)(void);
-	bool		active;
+	void (*function)();
 	KEY_STATUS	status;
 	UDWORD		lastCalled;
 	KEY_CODE	metaKeyCode;
 	KEY_CODE	altMetaKeyCode;
 	KEY_CODE	subKeyCode;
 	KEY_ACTION	action;
-	char		*pName;
-	KEY_MAPPING    *psNext;
+	std::string name;
 };
 
-extern KEY_MAPPING	*keyAddMapping(KEY_STATUS status, KEY_CODE metaCode, KEY_CODE subcode,
-                                   KEY_ACTION action, void (*pKeyMapFunc)(void), const char *name);
-extern bool	keyRemoveMapping(KEY_CODE metaCode, KEY_CODE subCode);
-extern	KEY_MAPPING	*keyGetMappingFromFunction(void	*function);
-extern bool	keyRemoveMappingPt(KEY_MAPPING *psToRemove);
-extern KEY_MAPPING *keyFindMapping(KEY_CODE metaCode, KEY_CODE subCode);
-extern void	keyClearMappings(void);
-extern void	keyProcessMappings(bool bExclude);
-extern void	keyInitMappings(bool bForceDefaults);
-extern UDWORD	getNumMappings(void);
-extern KEY_CODE	getLastSubKey(void);
-extern KEY_CODE	getLastMetaKey(void);
-extern KEY_MAPPING	*getLastMapping(void);
-extern void	keyEnableProcessing(bool val);
-extern void keyStatusAllInactive(void);
-extern void keyAllMappingsInactive(void);
-extern void	keyAllMappingsActive(void);
-extern void	keySetMappingStatus(KEY_MAPPING *psMapping, bool state);
+KEY_MAPPING *keyAddMapping(KEY_STATUS status, KEY_CODE metaCode, KEY_CODE subcode, KEY_ACTION action, void (*pKeyMapFunc)(), const char *name);
+KEY_MAPPING *keyGetMappingFromFunction(void (*function)());
+KEY_MAPPING *keyFindMapping(KEY_CODE metaCode, KEY_CODE subCode);
+void keyClearMappings();
+void keyProcessMappings(bool bExclude);
+void keyInitMappings(bool bForceDefaults);
+KEY_CODE getLastSubKey();
+KEY_CODE getLastMetaKey();
 void processDebugMappings(unsigned player, bool val);
 bool getDebugMappingStatus();
 bool getWantedDebugMappingStatus(unsigned player);
 std::string getWantedDebugMappingStatuses(bool val);
-extern	bool	keyReAssignMappingName(char *pName, KEY_CODE newMetaCode, KEY_CODE newSubCode);
 
-extern	bool	keyReAssignMapping(KEY_CODE origMetaCode, KEY_CODE origSubCode,
-                                   KEY_CODE newMetaCode, KEY_CODE newSubCode);
-extern	KEY_MAPPING	*getKeyMapFromName(char *pName);
+bool keyReAssignMapping(KEY_CODE origMetaCode, KEY_CODE origSubCode, KEY_CODE newMetaCode, KEY_CODE newSubCode);
 
-
-extern KEY_CODE	getQwertyKey(void);
-
-extern UDWORD	getMarkerX(KEY_CODE code);
-extern UDWORD	getMarkerY(KEY_CODE code);
-extern SDWORD	getMarkerSpin(KEY_CODE code);
+UDWORD	getMarkerX(KEY_CODE code);
+UDWORD	getMarkerY(KEY_CODE code);
+SDWORD	getMarkerSpin(KEY_CODE code);
 
 // for keymap editor.
-typedef void (*_keymapsave)(void);
-extern _keymapsave	keyMapSaveTable[];
-extern KEY_MAPPING	*keyMappings;
+struct KeyMapSaveEntry
+{
+	void (*function)();
+	char const *name;
+};
+KeyMapSaveEntry const *keymapEntryByFunction(void (*function)());
+KeyMapSaveEntry const *keymapEntryByName(std::string const &name);
+extern std::list<KEY_MAPPING> keyMappings;
 
-//remove this one below
-extern void	keyShowMappings(void);
+void	keyShowMappings();
 
 #endif // __INCLUDED_SRC_KEYMAP_H__

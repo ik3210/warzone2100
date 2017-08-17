@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 2008  Giel van Schijndel
-	Copyright (C) 2008-2015  Warzone 2100 Project
+	Copyright (C) 2008-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -25,10 +25,10 @@
 #define __INCLUDED_LIB_SDL_CURSORS_SDL_H__
 
 #include "lib/framework/cursors.h"
-#include <SDL2/SDL_mouse.h>
+#include <SDL_mouse.h>
 
-void sdlInitCursors(void);
-void sdlInitColoredCursors(void);
-void sdlFreeCursors(void);
+void sdlInitCursors();
+void sdlInitColoredCursors();
+void sdlFreeCursors();
 
 #endif // __INCLUDED_LIB_SDL_CURSORS_SDL_H__

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #ifndef __INCLUDED_SRC_COMPONENT_H__
 #define __INCLUDED_SRC_COMPONENT_H__
 
+#include "lib/ivis_opengl/pietypes.h"
 #include "droiddef.h"
 #include "structuredef.h"
 
@@ -66,14 +67,14 @@ void displayComponentButton(BASE_STATS *Stat, const Vector3i *Rotation, const Ve
 void displayResearchButton(BASE_STATS *Stat, const Vector3i *Rotation, const Vector3i *Position, int scale);
 void displayComponentButtonTemplate(DROID_TEMPLATE *psTemplate, const Vector3i *Rotation, const Vector3i *Position, int scale);
 void displayComponentButtonObject(DROID *psDroid, const Vector3i *Rotation, const Vector3i *Position, int scale);
-void displayComponentObject(DROID *psDroid);
+void displayComponentObject(DROID *psDroid, const glm::mat4 &viewMatrix);
 
 void compPersonToBits(DROID *psDroid);
 
 SDWORD rescaleButtonObject(SDWORD radius, SDWORD baseScale, SDWORD baseRadius);
 void destroyFXDroid(DROID *psDroid, unsigned impactTime);
 
-void drawMuzzleFlash(WEAPON sWeap, iIMDShape *weaponImd, iIMDShape *flashImd, PIELIGHT buildingBrightness, int pieFlag, int pieFlagData, UBYTE colour = 0);
+void drawMuzzleFlash(WEAPON sWeap, iIMDShape *weaponImd, iIMDShape *flashImd, PIELIGHT buildingBrightness, int pieFlag, int pieFlagData, const glm::mat4 &viewMatrix, UBYTE colour = 0);
 
 /* Pass in the stats you're interested in and the COMPONENT - double reference, but works. NOTE: Unused!*/
 #define PART_IMD(STATS,DROID,COMPONENT,PLAYER)	(STATS[DROID->asBits[COMPONENT]].pIMD)

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -32,13 +32,14 @@
 #include "lib/framework/frame.h"
 #include "lib/ivis_opengl/piedef.h"
 #include "lib/ivis_opengl/pieclip.h"
+#include <array>
 
-void pie_TransColouredTriangle(Vector3f *vrt, PIELIGHT c);
+void pie_TransColouredTriangle(const std::array<Vector3f, 3> &vrt, PIELIGHT c, const glm::mat4 &modelViewMatrix);
 
 void pie_SetViewingWindow(Vector3i *v, PIELIGHT colour);
-void pie_DrawViewingWindow();
+void pie_DrawViewingWindow(const glm::mat4 &modelViewProjectionMatrix);
 
-void pie_DrawSkybox(float scale);
+void pie_DrawSkybox(float scale, const glm::mat4 &viewMatrix);
 void pie_Skybox_Init();
 void pie_Skybox_Shutdown();
 void pie_Skybox_Texture(const char *filename);

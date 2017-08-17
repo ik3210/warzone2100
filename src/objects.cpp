@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 
 
 /* Initialise the object system */
-bool objInitialise(void)
+bool objInitialise()
 {
 	if (!objmemInitialise())
 	{
@@ -42,7 +42,7 @@ bool objInitialise(void)
 
 
 /* Shutdown the object system */
-bool objShutdown(void)
+bool objShutdown()
 {
 	objmemShutdown();
 
@@ -54,10 +54,10 @@ bool objShutdown(void)
 the last and the last entry becomes the first!*/
 void reverseObjectList(BASE_OBJECT **ppsList)
 {
-	BASE_OBJECT *psPrev = NULL;
+	BASE_OBJECT *psPrev = nullptr;
 	BASE_OBJECT *psCurrent = *ppsList;
 
-	while (psCurrent != NULL)
+	while (psCurrent != nullptr)
 	{
 		BASE_OBJECT *psNext = psCurrent->psNext;
 		psCurrent->psNext = psPrev;

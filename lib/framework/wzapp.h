@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -65,6 +65,7 @@ void StopTextInput();
 // Thread related
 WZ_THREAD *wzThreadCreate(int (*threadFunc)(void *), void *data);
 WZ_DECL_NONNULL(1) int wzThreadJoin(WZ_THREAD *thread);
+WZ_DECL_NONNULL(1) void wzThreadDetach(WZ_THREAD *thread);
 WZ_DECL_NONNULL(1) void wzThreadStart(WZ_THREAD *thread);
 void wzYieldCurrentThread();
 WZ_MUTEX *wzMutexCreate();
@@ -75,5 +76,109 @@ WZ_SEMAPHORE *wzSemaphoreCreate(int startValue);
 WZ_DECL_NONNULL(1) void wzSemaphoreDestroy(WZ_SEMAPHORE *semaphore);
 WZ_DECL_NONNULL(1) void wzSemaphoreWait(WZ_SEMAPHORE *semaphore);
 WZ_DECL_NONNULL(1) void wzSemaphorePost(WZ_SEMAPHORE *semaphore);
+
+#if !defined(WZ_CC_MINGW)
+
+#include <mutex>
+#include <future>
+
+namespace wz
+{
+	using mutex = std::mutex;
+	template <typename R>
+	using future = std::future<R>;
+	template <typename RA>
+	using packaged_task = std::packaged_task<RA>;
+	using thread = std::thread;
+}
+
+#else  // Workaround for cross-compiler without std::mutex.
+
+#include <memory>
+#include <functional>
+
+namespace wz
+{
+	class mutex
+	{
+	public:
+		mutex() : handle(wzMutexCreate()) {}
+		~mutex() { wzMutexDestroy(handle); }
+
+		mutex(mutex const &) = delete;
+		mutex &operator =(mutex const &) = delete;
+
+		void lock() { wzMutexLock(handle); }
+		//bool try_lock();
+		void unlock() { wzMutexUnlock(handle); }
+
+	private:
+		WZ_MUTEX *handle;
+	};
+
+	template <typename R>
+	class future
+	{
+	public:
+		future() = default;
+		future(future &&other) : internal(std::move(other.internal)) {}
+		future(future const &) = delete;
+		future &operator =(future &&other) = default;
+		future &operator =(future const &) = delete;
+		//std::shared_future<T> share();
+		R get() { auto &data = *internal; wzSemaphoreWait(data.sem); return std::move(data.ret); }
+		//valid(), wait*();
+
+		struct Internal  // Should really be a promise.
+		{
+			Internal() : sem(wzSemaphoreCreate(0)) {}
+			~Internal() { wzSemaphoreDestroy(sem); }
+			R ret;
+			WZ_SEMAPHORE *sem;
+		};
+
+		std::shared_ptr<Internal> internal;
+	};
+
+	template <typename RA>
+	class packaged_task;
+
+	template <typename R, typename... A>
+	class packaged_task<R (A...)>
+	{
+	public:
+		packaged_task() = default;
+		template <typename F>
+		explicit packaged_task(F &&f) { function = std::move(f); internal = std::make_shared<typename future<R>::Internal>(); }
+		packaged_task(packaged_task &&) = default;
+		packaged_task(packaged_task const &) = delete;
+
+		future<R> get_future() { future<R> future; future.internal = internal; return std::move(future); }
+		void operator ()(A &&... args) { auto &data = *internal; data.ret = function(std::forward<A>(args)...); wzSemaphorePost(data.sem); }
+
+	private:
+		std::function<R (A...)> function;
+		std::shared_ptr<typename future<R>::Internal> internal;
+	};
+
+	class thread
+	{
+	public:
+		thread() : internal(nullptr) {}
+		thread(thread &&other) : internal(other.internal) { other.internal = nullptr; }
+		template <typename Function, typename... Args>
+		explicit thread(Function &&f, Args &&...args) : internal(wzThreadCreate([](void *vf) { auto F = (std::function<void ()> *)vf; (*F)(); delete F; return 0; }, new std::function<void ()>(std::bind(std::forward<Function>(f), std::forward<Args>(args)...)))) { wzThreadStart(internal); }
+		thread(thread const &) = delete;
+		~thread() { if (internal) { std::terminate(); } }
+		thread &operator =(thread &&other) { std::swap(internal, other.internal); return *this; }
+		void join() { if (!internal) { std::terminate(); } wzThreadJoin(internal); internal = nullptr; }
+		void detach() { if (!internal) { std::terminate(); } wzThreadDetach(internal); internal = nullptr; }
+
+	private:
+		WZ_THREAD *internal;
+	};
+}
+
+#endif
 
 #endif

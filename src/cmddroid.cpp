@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -29,49 +29,43 @@
 #include "objects.h"
 #include "cmddroiddef.h"
 #include "cmddroid.h"
-#include "lib/netplay/netplay.h"
-#include "lib/gamelib/gtime.h"
 #include "group.h"
 #include "order.h"
-#include "multiplay.h"
 #include "lib/sound/audio.h"
 #include "lib/sound/audio_id.h"
 #include "console.h"
+#include "objmem.h"
+#include "droid.h"
 
 /**This represents the current selected player, which is the client's player.*/
 extern UDWORD selectedPlayer;
-
 
 /** This global instance is responsible for dealing with the each player's target designator.*/
 DROID	*apsCmdDesignator[MAX_PLAYERS];
 
 
-/** This global instance says whether experience should be boosted due to a multi game.*/
-static bool bMultiExpBoost = false;
-
-
 /** This function allocs the global instance apsCmdDesignator.*/
-bool cmdDroidInit(void)
+bool cmdDroidInit()
 {
 	memset(apsCmdDesignator, 0, sizeof(DROID *)*MAX_PLAYERS);
 	return true;
 }
 
 // ShutDown the command droids
-void cmdDroidShutDown(void)
+void cmdDroidShutDown()
 {
 }
 
 /** This function runs on all players to check if the player's current target designator as died.
  * If it does, sets the target designator to NULL.
  */
-void cmdDroidUpdate(void)
+void cmdDroidUpdate()
 {
-	for (int i = 0; i < MAX_PLAYERS; i++)
+	for (auto &i : apsCmdDesignator)
 	{
-		if (apsCmdDesignator[i] && apsCmdDesignator[i]->died)
+		if (i && i->died)
 		{
-			apsCmdDesignator[i] = NULL;
+			i = nullptr;
 		}
 	}
 }
@@ -84,7 +78,7 @@ void cmdDroidAddDroid(DROID *psCommander, DROID *psDroid)
 {
 	DROID_GROUP	*psGroup;
 
-	if (psCommander->psGroup == NULL)
+	if (psCommander->psGroup == nullptr)
 	{
 		psGroup = grpCreate();
 		psGroup->add(psCommander);
@@ -116,7 +110,7 @@ DROID *cmdDroidGetDesignator(UDWORD player)
 
 void cmdDroidSetDesignator(DROID *psDroid)
 {
-	ASSERT_OR_RETURN(, psDroid != NULL, "Invalid droid!");
+	ASSERT_OR_RETURN(, psDroid != nullptr, "Invalid droid!");
 	if (psDroid->droidType != DROID_COMMAND)
 	{
 		return;
@@ -127,7 +121,7 @@ void cmdDroidSetDesignator(DROID *psDroid)
 
 void cmdDroidClearDesignator(UDWORD player)
 {
-	apsCmdDesignator[player] = NULL;
+	apsCmdDesignator[player] = nullptr;
 }
 
 /** This function returns the index of the command droid.
@@ -156,27 +150,17 @@ SDWORD cmdDroidGetIndex(DROID *psCommander)
 	return index;
 }
 
-void cmdDroidMultiExpBoost(bool bDoit)
-{
-	bMultiExpBoost = bDoit;
-}
-
-bool cmdGetDroidMultiExpBoost()
-{
-	return bMultiExpBoost;
-}
-
 /** This function returns the maximum group size of the command droid.*/
 unsigned int cmdDroidMaxGroup(const DROID *psCommander)
 {
-	return getDroidLevel(psCommander) * getBrainStats(const_cast<DROID *>(psCommander))->maxDroidsMult
-	       + getBrainStats(const_cast<DROID *>(psCommander))->maxDroids;
+	const BRAIN_STATS *psStats = getBrainStats(psCommander);
+	return getDroidLevel(psCommander) * psStats->upgrade[psCommander->player].maxDroidsMult + psStats->upgrade[psCommander->player].maxDroids;
 }
 
 /** This function adds experience to the command droid of the psKiller's command group.*/
 void cmdDroidUpdateKills(DROID *psKiller, uint32_t experienceInc)
 {
-	ASSERT_OR_RETURN(, psKiller != NULL, "invalid Unit pointer");
+	ASSERT_OR_RETURN(, psKiller != nullptr, "invalid Unit pointer");
 
 	if (hasCommander(psKiller))
 	{
@@ -188,10 +172,10 @@ void cmdDroidUpdateKills(DROID *psKiller, uint32_t experienceInc)
 /** This function returns true if the droid is assigned to a commander group and it is not the commander.*/
 bool hasCommander(const DROID *psDroid)
 {
-	ASSERT_OR_RETURN(false, psDroid != NULL, "invalid droid pointer");
+	ASSERT_OR_RETURN(false, psDroid != nullptr, "invalid droid pointer");
 
 	if (psDroid->droidType != DROID_COMMAND &&
-	    psDroid->psGroup != NULL &&
+	    psDroid->psGroup != nullptr &&
 	    psDroid->psGroup->type == GT_COMMAND)
 	{
 		return true;
@@ -205,7 +189,7 @@ unsigned int cmdGetCommanderLevel(const DROID *psDroid)
 {
 	const DROID *psCommander;
 
-	ASSERT(psDroid != NULL, "invalid droid pointer");
+	ASSERT(psDroid != nullptr, "invalid droid pointer");
 
 	// If this droid is not the member of a Commander's group
 	// Return an experience level of 0

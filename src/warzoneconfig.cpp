@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -31,67 +31,32 @@
 #include "component.h"
 
 /***************************************************************************/
-/*
- *	Global Variables
- */
-/***************************************************************************/
-
-
-/***************************************************************************/
-/*
- *	Local Definitions
- */
-/***************************************************************************/
 
 struct WARZONE_GLOBALS
 {
-	FMV_MODE	FMVmode;
-	SWORD		effectsLevel;
-	UDWORD		width;
-	UDWORD		height;
-	int		screen;
-	int8_t		SPcolor;
-	int			MPcolour;
-	FSAA_LEVEL  fsaa;
-	bool		Fullscreen;
-	bool		soundEnabled;
-	bool		trapCursor;
-	bool		vsync;
-	bool		pauseOnFocusLoss;
-	bool		ColouredCursor;
-	bool		MusicEnabled;
+	FMV_MODE FMVmode = FMV_FULLSCREEN;
+	UDWORD width = 1024;
+	UDWORD height = 768;
+	int screen = 0;
+	int8_t SPcolor = 0;
+	int MPcolour = -1;
+	int antialiasing = 0;
+	bool Fullscreen = false;
+	bool soundEnabled = true;
+	bool trapCursor = false;
+	bool vsync = true;
+	bool pauseOnFocusLoss = true;
+	bool ColouredCursor = true;
+	bool MusicEnabled = true;
 };
 
-/***************************************************************************/
-/*
- *	Local Variables
- */
-/***************************************************************************/
-
-static WARZONE_GLOBALS	warGlobs;//STATIC use or write an access function if you need any of this
+static WARZONE_GLOBALS warGlobs;
 
 /***************************************************************************/
-/*
- *	Local ProtoTypes
- */
-/***************************************************************************/
 
-/***************************************************************************/
-/*
- *	Source
- */
-/***************************************************************************/
-void war_SetDefaultStates(void)//Sets all states
+void war_SetDefaultStates()
 {
-	//set those here and reset in clParse or loadConfig
-	war_setFSAA(0);
-	war_SetVsync(true);
-	war_setSoundEnabled(true);
-	war_SetPauseOnFocusLoss(false);
-	war_SetColouredCursor(true);
-	war_SetMusicEnabled(true);
-	war_SetSPcolor(0);		//default color is green
-	war_setMPcolour(-1);            // Default color is random.
+	warGlobs = WARZONE_GLOBALS();
 }
 
 void war_SetSPcolor(int color)
@@ -104,7 +69,7 @@ void war_SetSPcolor(int color)
 	setPlayerColour(0, color);
 }
 
-int8_t war_GetSPcolor(void)
+int8_t war_GetSPcolor()
 {
 	return warGlobs.SPcolor;
 }
@@ -124,19 +89,19 @@ void war_setFullscreen(bool b)
 	warGlobs.Fullscreen = b;
 }
 
-bool war_getFullscreen(void)
+bool war_getFullscreen()
 {
 	return warGlobs.Fullscreen;
 }
 
-void war_setFSAA(unsigned int fsaa)
+void war_setAntialiasing(int antialiasing)
 {
-	warGlobs.fsaa = (FSAA_LEVEL)(fsaa % FSAA_MAX);
+	warGlobs.antialiasing = antialiasing;
 }
 
-FSAA_LEVEL war_getFSAA()
+int war_getAntialiasing()
 {
-	return warGlobs.fsaa;
+	return warGlobs.antialiasing;
 }
 
 void war_SetTrapCursor(bool b)
@@ -144,7 +109,7 @@ void war_SetTrapCursor(bool b)
 	warGlobs.trapCursor = b;
 }
 
-bool war_GetTrapCursor(void)
+bool war_GetTrapCursor()
 {
 	return warGlobs.trapCursor;
 }
@@ -154,7 +119,7 @@ void war_SetVsync(bool b)
 	warGlobs.vsync = b;
 }
 
-bool war_GetVsync(void)
+bool war_GetVsync()
 {
 	return warGlobs.vsync;
 }
@@ -164,7 +129,7 @@ void war_SetWidth(UDWORD width)
 	warGlobs.width = width;
 }
 
-UDWORD war_GetWidth(void)
+UDWORD war_GetWidth()
 {
 	return warGlobs.width;
 }
@@ -174,7 +139,7 @@ void war_SetHeight(UDWORD height)
 	warGlobs.height = height;
 }
 
-UDWORD war_GetHeight(void)
+UDWORD war_GetHeight()
 {
 	return warGlobs.height;
 }
@@ -189,14 +154,12 @@ int war_GetScreen()
 	return warGlobs.screen;
 }
 
-/***************************************************************************/
-/***************************************************************************/
 void war_SetFMVmode(FMV_MODE mode)
 {
 	warGlobs.FMVmode = (FMV_MODE)(mode % FMV_MAX);
 }
 
-FMV_MODE war_GetFMVmode(void)
+FMV_MODE war_GetFMVmode()
 {
 	return  warGlobs.FMVmode;
 }
@@ -207,7 +170,7 @@ void war_setScanlineMode(SCANLINE_MODE mode)
 	seq_setScanlineMode(mode);
 }
 
-SCANLINE_MODE war_getScanlineMode(void)
+SCANLINE_MODE war_getScanlineMode()
 {
 	debug(LOG_VIDEO, "%d", seq_getScanlineMode());
 	return seq_getScanlineMode();
@@ -228,7 +191,7 @@ void war_SetColouredCursor(bool enabled)
 	warGlobs.ColouredCursor = enabled;
 }
 
-bool war_GetColouredCursor(void)
+bool war_GetColouredCursor()
 {
 	return warGlobs.ColouredCursor;
 }
@@ -238,12 +201,12 @@ void war_setSoundEnabled(bool soundEnabled)
 	warGlobs.soundEnabled = soundEnabled;
 }
 
-bool war_getSoundEnabled(void)
+bool war_getSoundEnabled()
 {
 	return warGlobs.soundEnabled;
 }
 
-bool war_GetMusicEnabled(void)
+bool war_GetMusicEnabled()
 {
 	return warGlobs.MusicEnabled;
 }

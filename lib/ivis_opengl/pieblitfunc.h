@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -33,7 +33,13 @@
 
 #include "lib/framework/frame.h"
 #include "lib/framework/string_ext.h"
+#include "lib/framework/vector.h"
+#include "glm/core/type.hpp"
 #include "piedef.h"
+#include "ivisdef.h"
+#include "pietypes.h"
+#include "piepalette.h"
+#include "pieclip.h"
 
 /***************************************************************************/
 /*
@@ -75,7 +81,7 @@ public:
 
 	/// Allocate space on the GPU for texture of given parameters. If image is non-NULL,
 	/// then that memory buffer is uploaded to the GPU.
-	void makeTexture(int width, int height, GLenum filter = GL_LINEAR, GLenum format = GL_RGBA, const GLvoid *image = NULL);
+	void makeTexture(int width, int height, GLenum filter = GL_LINEAR, GLenum format = GL_RGBA, const GLvoid *image = nullptr);
 
 	/// Upload given memory buffer to already allocated texture space on the GPU
 	void updateTexture(const GLvoid *image, int width = -1, int height = -1);
@@ -84,7 +90,7 @@ public:
 	void buffers(int vertices, const GLvoid *vertBuf, const GLvoid *texBuf);
 
 	/// Draw everything
-	void draw();
+	void draw(const glm::mat4 &modelViewProjectionMatrix);
 
 private:
 	GFXTYPE mType;
@@ -103,19 +109,23 @@ private:
  *	Global ProtoTypes
  */
 /***************************************************************************/
+glm::mat4 defaultProjectionMatrix();
 void iV_ShadowBox(int x0, int y0, int x1, int y1, int pad, PIELIGHT first, PIELIGHT second, PIELIGHT fill);
-extern void iV_Line(int x0, int y0, int x1, int y1, PIELIGHT colour);
-extern void iV_Box2(int x0, int y0, int x1, int y1, PIELIGHT first, PIELIGHT second);
+void iV_Line(int x0, int y0, int x1, int y1, PIELIGHT colour);
+void iV_Lines(const std::vector<glm::ivec4> &lines, PIELIGHT colour);
+void iV_Box2(int x0, int y0, int x1, int y1, PIELIGHT first, PIELIGHT second);
 static inline void iV_Box(int x0, int y0, int x1, int y1, PIELIGHT first)
 {
 	iV_Box2(x0, y0, x1, y1, first, first);
 }
-extern void pie_BoxFill(int x0, int y0, int x1, int y1, PIELIGHT colour);
-extern void iV_DrawImage(IMAGEFILE *ImageFile, UWORD ID, int x, int y);
+void pie_BoxFill(int x0, int y0, int x1, int y1, PIELIGHT colour, REND_MODE rendermode = REND_OPAQUE);
+void iV_DrawImage(GLuint TextureID, Vector2i position, Vector2i offset, Vector2i size, float angle, REND_MODE mode, PIELIGHT colour);
+void iV_DrawImageText(GLuint TextureID, Vector2i position, Vector2i offset, Vector2i size, float angle, REND_MODE mode, PIELIGHT colour);
+void iV_DrawImage(IMAGEFILE *ImageFile, UWORD ID, int x, int y, const glm::mat4 &modelViewProjection = defaultProjectionMatrix());
 void iV_DrawImage2(const QString &filename, float x, float y, float width = -0.0f, float height = -0.0f);
-void iV_DrawImageTc(Image image, Image imageTc, int x, int y, PIELIGHT colour);
-void iV_DrawImageRepeatX(IMAGEFILE *ImageFile, UWORD ID, int x, int y, int Width);
-void iV_DrawImageRepeatY(IMAGEFILE *ImageFile, UWORD ID, int x, int y, int Height);
+void iV_DrawImageTc(Image image, Image imageTc, int x, int y, PIELIGHT colour, const glm::mat4 &modelViewProjection = defaultProjectionMatrix());
+void iV_DrawImageRepeatX(IMAGEFILE *ImageFile, UWORD ID, int x, int y, int Width, const glm::mat4 &modelViewProjection = defaultProjectionMatrix());
+void iV_DrawImageRepeatY(IMAGEFILE *ImageFile, UWORD ID, int x, int y, int Height, const glm::mat4 &modelViewProjection = defaultProjectionMatrix());
 
 static inline void iV_DrawImage(Image image, int x, int y)
 {
@@ -126,13 +136,13 @@ static inline void iV_DrawImageTc(IMAGEFILE *imageFile, unsigned id, unsigned id
 	iV_DrawImageTc(Image(imageFile, id), Image(imageFile, idTc), x, y, colour);
 }
 
-extern void iV_TransBoxFill(float x0, float y0, float x1, float y1);
-extern void pie_UniTransBoxFill(float x0, float y0, float x1, float y1, PIELIGHT colour);
+void iV_TransBoxFill(float x0, float y0, float x1, float y1);
+void pie_UniTransBoxFill(float x0, float y0, float x1, float y1, PIELIGHT colour);
 
 bool pie_InitRadar();
 bool pie_ShutdownRadar();
 void pie_DownLoadRadar(UDWORD *buffer);
-void pie_RenderRadar();
+void pie_RenderRadar(const glm::mat4 &modelViewProjectionMatrix);
 void pie_SetRadar(GLfloat x, GLfloat y, GLfloat width, GLfloat height, int twidth, int theight, bool filter);
 
 enum SCREENTYPE
@@ -142,6 +152,6 @@ enum SCREENTYPE
 	SCREEN_MISSIONEND,
 };
 
-extern void pie_LoadBackDrop(SCREENTYPE screenType);
+void pie_LoadBackDrop(SCREENTYPE screenType);
 
 #endif //

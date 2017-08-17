@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 
 #include "lib/framework/frame.h"
 #include "lib/framework/wzapp.h"
+#include "lib/framework/math_ext.h"
 #include "lib/ivis_opengl/screen.h"
 #include "widget.h"
 #include "widgint.h"
@@ -85,9 +86,9 @@ void widgSetTipColour(PIELIGHT colour)
  * x,y,width,height - specify the position of the button to place the
  * tip by.
  */
-void tipStart(WIDGET *psSource, QString pNewTip, iV_fonts NewFontID, int x, int y, int width, int height)
+void tipStart(WIDGET *psSource, const QString& pNewTip, iV_fonts NewFontID, int x, int y, int width, int height)
 {
-	ASSERT(psSource != NULL, "Invalid widget pointer");
+	ASSERT(psSource != nullptr, "Invalid widget pointer");
 
 	tipState = TIP_WAIT;
 	startTime = wzGetTicks();
@@ -106,7 +107,7 @@ void tipStart(WIDGET *psSource, QString pNewTip, iV_fonts NewFontID, int x, int 
  */
 void tipStop(WIDGET *psSource)
 {
-	ASSERT(psSource != NULL,
+	ASSERT(psSource != nullptr,
 	       "tipStop: Invalid widget pointer");
 
 	if (tipState != TIP_NONE && psSource == psWidget)
@@ -138,17 +139,16 @@ void tipDisplay()
 
 			/* Calculate the size of the tip box */
 			topGap = TIP_VGAP;
-			iV_SetFont(FontID);
 
-			lineHeight = iV_GetTextLineSize();
+			lineHeight = iV_GetTextLineSize(FontID);
 
 			fw = 0;
 			for (int n = 0; n < pTip.size(); ++n)
 			{
-				fw = std::max<int>(fw, iV_GetTextWidth(pTip[n].toUtf8().constData()));
+				fw = std::max<int>(fw, iV_GetTextWidth(pTip[n].toUtf8().constData(), FontID));
 			}
 			tw = fw + TIP_HGAP * 2;
-			th = topGap * 2 + lineHeight * pTip.size() + iV_GetTextBelowBase();
+			th = topGap * 2 + lineHeight * pTip.size() + iV_GetTextBelowBase(FontID);
 
 			/* Position the tip box */
 			tx = clip(wx + ww / 2, 0, screenWidth - tw - 1);
@@ -161,7 +161,7 @@ void tipDisplay()
 
 			/* Position the text */
 			fx = tx + TIP_HGAP;
-			fy = ty + (th - lineHeight * pTip.size()) / 2 - iV_GetTextAboveBase();
+			fy = ty + (th - lineHeight * pTip.size()) / 2 - iV_GetTextAboveBase(FontID);
 
 			/* Note the time */
 			startTime = wzGetTicks();
@@ -177,18 +177,11 @@ void tipDisplay()
 		break;
 	case TIP_ACTIVE:
 		/* Draw the tool tip */
-		pie_BoxFill(tx, ty, tx + tw, ty + th, WZCOL_FORM_TIP_BACKGROUND);
-		iV_Line(tx + 1,  ty + th - 2, tx + 1,      ty + 1,  WZCOL_FORM_DARK);
-		iV_Line(tx + 2,  ty + 1,      tx + tw - 2, ty + 1,  WZCOL_FORM_DARK);
-		iV_Line(tx,      ty + th,     tx + tw,     ty + th, WZCOL_FORM_DARK);
-		iV_Line(tx + tw, ty + th - 1, tx + tw,     ty,      WZCOL_FORM_DARK);
-		iV_Box(tx, ty, tx + tw - 1, ty + th - 1, WZCOL_FORM_LIGHT);
-
-		iV_SetFont(FontID);
+		iV_ShadowBox(tx - 2, ty - 2, tx + tw + 2, ty + th + 2, 1, WZCOL_FORM_LIGHT, WZCOL_FORM_DARK, WZCOL_FORM_TIP_BACKGROUND);
 		iV_SetTextColour(TipColour);
 		for (int n = 0; n < pTip.size(); ++n)
 		{
-			iV_DrawText(pTip[n].toUtf8().constData(), fx, fy + lineHeight * n);
+			iV_DrawText(pTip[n].toUtf8().constData(), fx, fy + lineHeight * n, FontID);
 		}
 
 		break;

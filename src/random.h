@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ void gameSRand(uint32_t seed);
 
 /// Generates a random number in the interval [0...UINT32_MAX].
 /// Must not be called from graphics routines, only for making game decisions.
-uint32_t gameRandU32(void);
+uint32_t gameRandU32();
 
 /// Generates a random number in the interval [0...limit - 1]. Not equidistributed for large non-powers of 2.
 /// Must not be called from graphics routines, only for making game decisions.

@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -50,7 +50,7 @@ protected:
 	virtual void initializeGL();
 
 public:
-	QtGameWidget(QSize curResolution, const QGLFormat &format, QWidget *parent = 0, Qt::WindowFlags f = 0, const QGLWidget *shareWidget = 0);
+	QtGameWidget(QSize curResolution, const QGLFormat &format, QWidget *parent = 0, Qt::WindowFlags f = 0, const QGLWidget *shareWidget = nullptr);
 	~QtGameWidget()
 	{
 		if (mResolutionChanged)

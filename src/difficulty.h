@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ enum DIFFICULTY_LEVEL
 };
 
 void setDifficultyLevel(DIFFICULTY_LEVEL lev);
-DIFFICULTY_LEVEL getDifficultyLevel(void);
+DIFFICULTY_LEVEL getDifficultyLevel();
 int modifyForDifficultyLevel(int basicVal, bool IsPlayer);
 
 #endif // __INCLUDED_SRC_DIFFICULTY_H__

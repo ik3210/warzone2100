@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -31,6 +31,9 @@
 #include "lib/ivis_opengl/tex.h"
 #include "lib/ivis_opengl/piepalette.h"
 #include "screen.h"
+#include "pieclip.h"
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/transform.hpp>
 
 #ifndef GLEW_VERSION_4_3
 #define GLEW_VERSION_4_3 false
@@ -43,16 +46,10 @@
  *	Global Variables
  */
 
-struct SHADER_PROGRAM
-{
-	GLuint program;
-	GLint locTeam, locStretch, locTCMask, locFog, locNormalMap, locSpecularMap, locEcm, locTime;
-};
-
-static QList<SHADER_PROGRAM> shaderProgram;
+std::vector<pie_internal::SHADER_PROGRAM> pie_internal::shaderProgram;
 static GLfloat shaderStretch = 0;
-static int currentShaderMode = SHADER_NONE;
-unsigned int pieStateCount = 0; // Used in pie_GetResetCounts
+SHADER_MODE pie_internal::currentShaderMode = SHADER_NONE;
+GLuint pie_internal::rectBuffer = 0;
 static RENDER_STATE rendStates;
 static GLint ecmState = 0;
 static GLfloat timeState = 0.0f;
@@ -66,7 +63,7 @@ void rendStatesRendModeHack()
  *	Source
  */
 
-void pie_SetDefaultStates(void)//Sets all states
+void pie_SetDefaultStates()//Sets all states
 {
 	PIELIGHT black;
 
@@ -109,19 +106,12 @@ void pie_EnableFog(bool val)
 	}
 }
 
-bool pie_GetFogEnabled(void)
+bool pie_GetFogEnabled()
 {
 	return rendStates.fogEnabled;
 }
 
-//***************************************************************************
-//
-// pie_SetFogStatus(bool val)
-//
-// Toggle fog on and off for rendering objects inside or outside the 3D world
-//
-//***************************************************************************
-bool pie_GetFogStatus(void)
+bool pie_GetFogStatus()
 {
 	return rendStates.fog;
 }
@@ -131,7 +121,7 @@ void pie_SetFogColour(PIELIGHT colour)
 	rendStates.fogColour = colour;
 }
 
-PIELIGHT pie_GetFogColour(void)
+PIELIGHT pie_GetFogColour()
 {
 	return rendStates.fogColour;
 }
@@ -145,7 +135,7 @@ static char *readShaderBuf(const char *name)
 
 	fp = PHYSFS_openRead(name);
 	debug(LOG_3D, "Reading...[directory: %s] %s", PHYSFS_getRealDir(name), name);
-	ASSERT_OR_RETURN(0, fp != NULL, "Could not open %s", name);
+	ASSERT_OR_RETURN(nullptr, fp != nullptr, "Could not open %s", name);
 	filesize = PHYSFS_fileLength(fp);
 	buffer = (char *)malloc(filesize + 1);
 	if (buffer)
@@ -192,25 +182,21 @@ static void printProgramInfoLog(code_part part, GLuint program)
 	}
 }
 
-static void getLocs(SHADER_PROGRAM *program)
+static void getLocs(pie_internal::SHADER_PROGRAM *program)
 {
-	GLint locTex0, locTex1, locTex2, locTex3;
-
 	glUseProgram(program->program);
-	locTex0 = glGetUniformLocation(program->program, "Texture0");
-	locTex1 = glGetUniformLocation(program->program, "Texture1");
-	locTex2 = glGetUniformLocation(program->program, "Texture2");
-	locTex3 = glGetUniformLocation(program->program, "Texture3");
-	program->locTeam = glGetUniformLocation(program->program, "teamcolour");
-	program->locStretch = glGetUniformLocation(program->program, "stretch");
-	program->locTCMask = glGetUniformLocation(program->program, "tcmask");
-	program->locNormalMap = glGetUniformLocation(program->program, "normalmap");
-	program->locSpecularMap = glGetUniformLocation(program->program, "specularmap");
-	program->locFog = glGetUniformLocation(program->program, "fogEnabled");
-	program->locEcm = glGetUniformLocation(program->program, "ecmEffect");
-	program->locTime = glGetUniformLocation(program->program, "graphicsCycle");
 
-	// These never change
+	// Attributes
+	program->locVertex = glGetAttribLocation(program->program, "vertex");
+	program->locNormal = glGetAttribLocation(program->program, "vertexNormal");
+	program->locTexCoord = glGetAttribLocation(program->program, "vertexTexCoord");
+	program->locColor = glGetAttribLocation(program->program, "vertexColor");
+
+	// Uniforms, these never change.
+	GLint locTex0 = glGetUniformLocation(program->program, "Texture");
+	GLint locTex1 = glGetUniformLocation(program->program, "TextureTcmask");
+	GLint locTex2 = glGetUniformLocation(program->program, "TextureNormal");
+	GLint locTex3 = glGetUniformLocation(program->program, "TextureSpecular");
 	glUniform1i(locTex0, 0);
 	glUniform1i(locTex1, 1);
 	glUniform1i(locTex2, 2);
@@ -219,25 +205,27 @@ static void getLocs(SHADER_PROGRAM *program)
 
 void pie_FreeShaders()
 {
-	while (shaderProgram.size() > SHADER_MAX)
+	while (pie_internal::shaderProgram.size() > SHADER_MAX)
 	{
-		SHADER_PROGRAM program = shaderProgram.takeLast();
-		glDeleteShader(program.program);
+		glDeleteShader(pie_internal::shaderProgram.back().program);
+		pie_internal::shaderProgram.pop_back();
 	}
 }
 
 // Read/compile/link shaders
-GLuint pie_LoadShader(const char *programName, const char *vertexPath, const char *fragmentPath)
+SHADER_MODE pie_LoadShader(const char *programName, const char *vertexPath, const char *fragmentPath,
+	const std::vector<std::string> &uniformNames)
 {
-	SHADER_PROGRAM program;
+	pie_internal::SHADER_PROGRAM program;
 	GLint status;
 	bool success = true; // Assume overall success
 	char *buffer[2];
 
-	memset(&program, 0, sizeof(program));
-
 	program.program = glCreateProgram();
-	ASSERT_OR_RETURN(false, program.program, "Could not create shader program!");
+	glBindAttribLocation(program.program, 0, "vertex");
+	glBindAttribLocation(program.program, 1, "vertexTexCoord");
+	glBindAttribLocation(program.program, 2, "vertexColor");
+	ASSERT_OR_RETURN(SHADER_NONE, program.program, "Could not create shader program!");
 
 	*buffer = (char *)"";
 
@@ -249,7 +237,7 @@ GLuint pie_LoadShader(const char *programName, const char *vertexPath, const cha
 		{
 			GLuint shader = glCreateShader(GL_VERTEX_SHADER);
 
-			glShaderSource(shader, 2, (const char **)buffer, NULL);
+			glShaderSource(shader, 2, (const char **)buffer, nullptr);
 			glCompileShader(shader);
 
 			// Check for compilation errors
@@ -281,7 +269,7 @@ GLuint pie_LoadShader(const char *programName, const char *vertexPath, const cha
 		{
 			GLuint shader = glCreateShader(GL_FRAGMENT_SHADER);
 
-			glShaderSource(shader, 2, (const char **)buffer, NULL);
+			glShaderSource(shader, 2, (const char **)buffer, nullptr);
 			glCompileShader(shader);
 
 			// Check for compilation errors
@@ -326,42 +314,135 @@ GLuint pie_LoadShader(const char *programName, const char *vertexPath, const cha
 			glObjectLabel(GL_PROGRAM, program.program, -1, programName);
 		}
 	}
+	GLuint p = program.program;
+	std::transform(uniformNames.begin(), uniformNames.end(),
+		std::back_inserter(program.locations),
+		[p](const std::string name) { return glGetUniformLocation(p, name.data()); });
 
 	getLocs(&program);
 	glUseProgram(0);
 
-	shaderProgram.append(program);
+	pie_internal::shaderProgram.push_back(program);
 
-	return shaderProgram.size() - 1;
+	return SHADER_MODE(pie_internal::shaderProgram.size() - 1);
 }
+
+static float fogBegin;
+static float fogEnd;
 
 // Run from screen.c on init. Do not change the order of loading here! First ones are enumerated.
 bool pie_LoadShaders()
 {
-	SHADER_PROGRAM program;
+	pie_internal::SHADER_PROGRAM program;
 	int result;
 
 	// Load some basic shaders
 	memset(&program, 0, sizeof(program));
-	shaderProgram.append(program);
+	pie_internal::shaderProgram.push_back(program);
+	int shaderEnum = 0;
 
 	// TCMask shader for map-placed models with advanced lighting
 	debug(LOG_3D, "Loading shader: SHADER_COMPONENT");
-	result = pie_LoadShader("Component program", "shaders/tcmask.vert", "shaders/tcmask.frag");
-	ASSERT_OR_RETURN(false, result, "Failed to load component shader");
+	result = pie_LoadShader("Component program", "shaders/tcmask.vert", "shaders/tcmask.frag",
+		{ "colour", "teamcolour", "stretch", "tcmask", "fogEnabled", "normalmap", "specularmap", "ecmEffect", "alphaTest", "graphicsCycle",
+		"ModelViewMatrix", "ModelViewProjectionMatrix", "NormalMatrix", "lightPosition", "sceneColor", "ambient", "diffuse", "specular",
+		"fogEnd", "fogStart", "fogColor" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_COMPONENT, "Failed to load component shader");
 
 	// TCMask shader for buttons with flat lighting
 	debug(LOG_3D, "Loading shader: SHADER_BUTTON");
-	result = pie_LoadShader("Button program", "shaders/button.vert", "shaders/button.frag");
-	ASSERT_OR_RETURN(false, result, "Failed to load button shader");
+	result = pie_LoadShader("Button program", "shaders/button.vert", "shaders/button.frag",
+		{ "colour", "teamcolour", "stretch", "tcmask", "fogEnabled", "normalmap", "specularmap", "ecmEffect", "alphaTest", "graphicsCycle",
+		"ModelViewMatrix", "ModelViewProjectionMatrix", "NormalMatrix", "lightPosition", "sceneColor", "ambient", "diffuse", "specular",
+		"fogEnd", "fogStart", "fogColor" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_BUTTON, "Failed to load button shader");
 
-	currentShaderMode = SHADER_NONE;
+	// Plain shader for no lighting
+	debug(LOG_3D, "Loading shader: SHADER_NOLIGHT");
+	result = pie_LoadShader("Plain program", "shaders/nolight.vert", "shaders/nolight.frag",
+		{ "colour", "teamcolour", "stretch", "tcmask", "fogEnabled", "normalmap", "specularmap", "ecmEffect", "alphaTest", "graphicsCycle",
+		"ModelViewMatrix", "ModelViewProjectionMatrix", "NormalMatrix", "lightPosition", "sceneColor", "ambient", "diffuse", "specular",
+		"fogEnd", "fogStart", "fogColor" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_NOLIGHT, "Failed to load no-lighting shader");
+
+	debug(LOG_3D, "Loading shader: SHADER_TERRAIN");
+	result = pie_LoadShader("terrain program", "shaders/terrain_water.vert", "shaders/terrain.frag",
+		{ "ModelViewProjectionMatrix", "paramx1", "paramy1", "paramx2", "paramy2", "tex", "lightmap_tex", "textureMatrix1", "textureMatrix2",
+		"fogEnabled", "fogEnd", "fogStart", "fogColor" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_TERRAIN, "Failed to load terrain shader");
+
+	debug(LOG_3D, "Loading shader: SHADER_TERRAIN_DEPTH");
+	result = pie_LoadShader("terrain_depth program", "shaders/terrain_water.vert", "shaders/terraindepth.frag",
+	{ "ModelViewProjectionMatrix", "paramx2", "paramy2", "lightmap_tex", "textureMatrix1", "textureMatrix2" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_TERRAIN_DEPTH, "Failed to load terrain_depth shader");
+
+	debug(LOG_3D, "Loading shader: SHADER_DECALS");
+	result = pie_LoadShader("decals program", "shaders/decals.vert", "shaders/decals.frag",
+		{ "ModelViewProjectionMatrix", "paramxlight", "paramylight", "tex", "lightmap_tex", "lightTextureMatrix",
+		"fogEnabled", "fogEnd", "fogStart", "fogColor" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_DECALS, "Failed to load decals shader");
+
+	debug(LOG_3D, "Loading shader: SHADER_WATER");
+	result = pie_LoadShader("water program", "shaders/terrain_water.vert", "shaders/water.frag",
+		{ "ModelViewProjectionMatrix", "paramx1", "paramy1", "paramx2", "paramy2", "tex1", "tex2", "textureMatrix1", "textureMatrix2",
+		"fogEnabled", "fogEnd", "fogStart" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_WATER, "Failed to load water shader");
+
+	// Rectangular shader
+	debug(LOG_3D, "Loading shader: SHADER_RECT");
+	result = pie_LoadShader("Rect program", "shaders/rect.vert", "shaders/rect.frag",
+		{ "transformationMatrix", "color" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_RECT, "Failed to load rect shader");
+
+	// Textured rectangular shader
+	debug(LOG_3D, "Loading shader: SHADER_TEXRECT");
+	result = pie_LoadShader("Textured rect program", "shaders/rect.vert", "shaders/texturedrect.frag",
+		{ "transformationMatrix", "tuv_offset", "tuv_scale", "color", "texture" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_TEXRECT, "Failed to load textured rect shader");
+
+	debug(LOG_3D, "Loading shader: SHADER_GFX_COLOUR");
+	result = pie_LoadShader("gfx_color program", "shaders/gfx.vert", "shaders/gfx.frag",
+		{ "posMatrix" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_GFX_COLOUR, "Failed to load textured gfx shader");
+
+	debug(LOG_3D, "Loading shader: SHADER_GFX_TEXT");
+	result = pie_LoadShader("gfx_text program", "shaders/gfx.vert", "shaders/texturedrect.frag",
+		{ "posMatrix", "color", "texture" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_GFX_TEXT, "Failed to load textured gfx shader");
+
+	debug(LOG_3D, "Loading shader: SHADER_GENERIC_COLOR");
+	result = pie_LoadShader("generic color program", "shaders/generic.vert", "shaders/rect.frag", { "ModelViewProjectionMatrix", "color" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_GENERIC_COLOR, "Failed to load generic color shader");
+
+	debug(LOG_3D, "Loading shader: SHADER_LINE");
+	result = pie_LoadShader("line program", "shaders/line.vert", "shaders/rect.frag", { "from", "to", "color", "ModelViewProjectionMatrix" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_LINE, "Failed to load line shader");
+
+	// Text shader
+	debug(LOG_3D, "Loading shader: SHADER_TEXT");
+	result = pie_LoadShader("Text program", "shaders/rect.vert", "shaders/text.frag",
+		{ "transformationMatrix", "tuv_offset", "tuv_scale", "color", "texture" });
+	ASSERT_OR_RETURN(false, result && ++shaderEnum == SHADER_TEXT, "Failed to load text shader");
+
+	pie_internal::currentShaderMode = SHADER_NONE;
+
+	GLbyte rect[] {
+		0, 1, 0, 1,
+		0, 0, 0, 1,
+		1, 1, 0, 1,
+		1, 0, 0, 1
+	};
+	glGenBuffers(1, &pie_internal::rectBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, pie_internal::rectBuffer);
+	glBufferData(GL_ARRAY_BUFFER, 16 * sizeof(GLbyte), rect, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
 	return true;
 }
 
-void pie_DeactivateShader(void)
+void pie_DeactivateShader()
 {
-	currentShaderMode = SHADER_NONE;
+	pie_internal::currentShaderMode = SHADER_NONE;
 	glUseProgram(0);
 }
 
@@ -390,46 +471,67 @@ float pie_GetShaderStretchDepth()
 	return shaderStretch;
 }
 
-void pie_ActivateShader(int shaderMode, const iIMDShape *shape, PIELIGHT teamcolour, PIELIGHT colour)
+pie_internal::SHADER_PROGRAM &pie_ActivateShaderDeprecated(SHADER_MODE shaderMode, const iIMDShape *shape, PIELIGHT teamcolour, PIELIGHT colour, const glm::mat4 &ModelView, const glm::mat4 &Proj,
+	const glm::vec4 &sunPos, const glm::vec4 &sceneColor, const glm::vec4 &ambient, const glm::vec4 &diffuse, const glm::vec4 &specular)
 {
 	int maskpage = shape->tcmaskpage;
 	int normalpage = shape->normalpage;
 	int specularpage = shape->specularpage;
-	GLfloat colour4f[4];
-	SHADER_PROGRAM program = shaderProgram[shaderMode];
+	pie_internal::SHADER_PROGRAM &program = pie_internal::shaderProgram[shaderMode];
 
-	if (shaderMode != currentShaderMode)
+	if (shaderMode != pie_internal::currentShaderMode)
 	{
 		glUseProgram(program.program);
 
 		// These do not change during our drawing pass
-		glUniform1i(program.locFog, rendStates.fog);
-		glUniform1f(program.locTime, timeState);
+		glUniform1i(program.locations[4], rendStates.fog);
+		glUniform1f(program.locations[9], timeState);
 
-		currentShaderMode = shaderMode;
+		pie_internal::currentShaderMode = shaderMode;
 	}
-
-	glColor4ubv(colour.vector);
+	glUniform4fv(program.locations[0], 1, &pal_PIELIGHTtoVec4(colour)[0]);
 	pie_SetTexturePage(shape->texpage);
 
-	pal_PIELIGHTtoRGBA4f(&colour4f[0], teamcolour);
-	glUniform4fv(program.locTeam, 1, &colour4f[0]);
-	glUniform1i(program.locTCMask, maskpage != iV_TEX_INVALID);
-	if (program.locStretch >= 0)
+	glUniform4fv(program.locations[1], 1, &pal_PIELIGHTtoVec4(teamcolour)[0]);
+	glUniform1i(program.locations[3], maskpage != iV_TEX_INVALID);
+
+	glUniform1i(program.locations[8], 0);
+
+	glUniformMatrix4fv(program.locations[10], 1, GL_FALSE, glm::value_ptr(ModelView));
+	glUniformMatrix4fv(program.locations[11], 1, GL_FALSE, glm::value_ptr(Proj * ModelView));
+	glUniformMatrix4fv(program.locations[12], 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(ModelView))));
+	glUniform4fv(program.locations[13], 1, &sunPos[0]);
+	glUniform4fv(program.locations[14], 1, &sceneColor[0]);
+	glUniform4fv(program.locations[15], 1, &ambient[0]);
+	glUniform4fv(program.locations[16], 1, &diffuse[0]);
+	glUniform4fv(program.locations[17], 1, &specular[0]);
+
+	glUniform1f(program.locations[18], fogBegin);
+	glUniform1f(program.locations[19], fogEnd);
+
+	float color[4] = {
+		rendStates.fogColour.vector[0] / 255.f,
+		rendStates.fogColour.vector[1] / 255.f,
+		rendStates.fogColour.vector[2] / 255.f,
+		rendStates.fogColour.vector[3] / 255.f
+	};
+	glUniform4fv(program.locations[20], 1, color);
+
+	if (program.locations[2] >= 0)
 	{
-		glUniform1f(program.locStretch, shaderStretch);
+		glUniform1f(program.locations[2], shaderStretch);
 	}
-	if (program.locNormalMap >= 0)
+	if (program.locations[5] >= 0)
 	{
-		glUniform1i(program.locNormalMap, normalpage != iV_TEX_INVALID);
+		glUniform1i(program.locations[5], normalpage != iV_TEX_INVALID);
 	}
-	if (program.locSpecularMap >= 0)
+	if (program.locations[6] >= 0)
 	{
-		glUniform1i(program.locSpecularMap, specularpage != iV_TEX_INVALID);
+		glUniform1i(program.locations[6], specularpage != iV_TEX_INVALID);
 	}
-	if (program.locEcm >= 0)
+	if (program.locations[7] >= 0)
 	{
-		glUniform1i(program.locEcm, ecmState);
+		glUniform1i(program.locations[7], ecmState);
 	}
 
 	if (maskpage != iV_TEX_INVALID)
@@ -449,9 +551,7 @@ void pie_ActivateShader(int shaderMode, const iIMDShape *shape, PIELIGHT teamcol
 	}
 	glActiveTexture(GL_TEXTURE0);
 
-#ifdef _DEBUG
-	glErrors();
-#endif
+	return program;
 }
 
 void pie_SetDepthBufferStatus(DEPTH_MODE depthMode)
@@ -494,53 +594,20 @@ void pie_SetDepthOffset(float offset)
 /// Set the OpenGL fog start and end
 void pie_UpdateFogDistance(float begin, float end)
 {
-	glFogf(GL_FOG_START, begin);
-	glFogf(GL_FOG_END, end);
+	rendStates.fogBegin = begin;
+	rendStates.fogEnd = end;
 }
 
-//
-// pie_SetFogStatus(bool val)
-//
-// Toggle fog on and off for rendering objects inside or outside the 3D world
-//
 void pie_SetFogStatus(bool val)
 {
-	float fog_colour[4];
-
 	if (rendStates.fogEnabled)
 	{
 		//fog enabled so toggle if required
-		if (rendStates.fog != val)
-		{
-			rendStates.fog = val;
-			if (rendStates.fog)
-			{
-				PIELIGHT fog = pie_GetFogColour();
-
-				fog_colour[0] = fog.byte.r / 255.0f;
-				fog_colour[1] = fog.byte.g / 255.0f;
-				fog_colour[2] = fog.byte.b / 255.0f;
-				fog_colour[3] = fog.byte.a / 255.0f;
-
-				glFogi(GL_FOG_MODE, GL_LINEAR);
-				glFogfv(GL_FOG_COLOR, fog_colour);
-				glFogf(GL_FOG_DENSITY, 0.35f);
-				glHint(GL_FOG_HINT, GL_DONT_CARE);
-				glEnable(GL_FOG);
-			}
-			else
-			{
-				glDisable(GL_FOG);
-			}
-		}
+		rendStates.fog = val;
 	}
 	else
 	{
-		//fog disabled so turn it off if not off already
-		if (rendStates.fog != false)
-		{
-			rendStates.fog = false;
-		}
+		rendStates.fog = false;
 	}
 }
 
@@ -556,17 +623,11 @@ void pie_SetTexturePage(SDWORD num)
 		switch (num)
 		{
 		case TEXPAGE_NONE:
-			glDisable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, 0);
 			break;
 		case TEXPAGE_EXTERN:
-			// GLC will set the texture, we just need to enable texturing
-			glEnable(GL_TEXTURE_2D);
 			break;
 		default:
-			if (rendStates.texPage == TEXPAGE_NONE)
-			{
-				glEnable(GL_TEXTURE_2D);
-			}
 			glBindTexture(GL_TEXTURE_2D, pie_Texture(num));
 		}
 		rendStates.texPage = num;
@@ -604,12 +665,22 @@ void pie_SetRendMode(REND_MODE rendMode)
 			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 			break;
 
+		case REND_TEXT:
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA /* Should be GL_ONE_MINUS_SRC1_COLOR, if supported. Also, gl_FragData[1] then needs to be set in text.frag. */);
+			break;
+
 		default:
 			ASSERT(false, "Bad render state");
 			break;
 		}
 	}
 	return;
+}
+
+RENDER_STATE getCurrentRenderState()
+{
+	return rendStates;
 }
 
 bool _glerrors(const char *function, const char *file, int line)
@@ -623,4 +694,11 @@ bool _glerrors(const char *function, const char *file, int line)
 		err = glGetError();
 	}
 	return ret;
+}
+
+int pie_GetMaxAntialiasing()
+{
+	GLint maxSamples = 0;
+	glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
+	return maxSamples;
 }

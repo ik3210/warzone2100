@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,11 +30,11 @@
 extern bool OrderUp;
 
 bool intAddOrder(BASE_OBJECT *psObj);			// create and open order form
-void intRunOrder(void);
+void intRunOrder();
 void intProcessOrder(UDWORD id);
-void intRemoveOrder(void);
-void intRemoveOrderNoAnim(void);
-bool intRefreshOrder(void);
+void intRemoveOrder();
+void intRemoveOrderNoAnim();
+bool intRefreshOrder();
 
 //new function added to bring up the RMB order form for Factories as well as droids
 void intAddFactoryOrder(STRUCTURE *psStructure);

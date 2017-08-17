@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -122,7 +122,7 @@ static inline char *PHYSFS_fgets(char *s, int size, PHYSFS_file *stream)
 
 	if (size <= 0 || !stream || !s || PHYSFS_eof(stream))
 	{
-		return NULL;
+		return nullptr;
 	}
 	do
 	{
@@ -146,7 +146,7 @@ static inline char *PHYSFS_fgets(char *s, int size, PHYSFS_file *stream)
 	}
 
 	// Complete failure
-	return NULL;
+	return nullptr;
 }
 
 #endif // _physfs_ext_h

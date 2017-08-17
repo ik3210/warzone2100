@@ -22,6 +22,12 @@
 /* NLS can be disabled through the configure --disable-nls option.  */
 #if ENABLE_NLS
 
+// Note: libintl_dcgettext symbol is not properly exported with MSVC build
+// We use dcgettext symbol instead which is exported.
+#ifdef WZ_CC_MSVC
+#define dcgettext dcgettext_dummy
+#endif
+
 /* Get declarations of GNU message catalog functions.  */
 # include <libintl.h>
 
@@ -123,6 +129,15 @@
 #define dcnpgettext(Domainname, Msgctxt, Msgid, MsgidPlural, N, Category) \
 	npgettext_aux (Domainname, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, MsgidPlural, N, Category)
 
+#ifdef WZ_CC_MSVC
+#if ENABLE_NLS
+#undef dcgettext
+
+extern "C" char *dcgettext(const char *__domainname, const char *__msgid,
+	int __category)
+	_INTL_MAY_RETURN_STRING_ARG(2);
+#endif
+#endif
 #ifdef __GNUC__
 __inline
 #else
@@ -213,7 +228,7 @@ dcpgettext_expr(const char *domain,
 	    (msgctxt_len + msgid_len <= sizeof(buf)
 	     ? buf
 	     : (char *) malloc(msgctxt_len + msgid_len));
-	if (msg_ctxt_id != NULL)
+	if (msg_ctxt_id != nullptr)
 #endif
 	{
 		memcpy(msg_ctxt_id, msgctxt, msgctxt_len - 1);
@@ -224,7 +239,7 @@ dcpgettext_expr(const char *domain,
 		if (msg_ctxt_id != buf)
 		{
 			free(msg_ctxt_id);
-			msg_ctxt_id = NULL;
+			msg_ctxt_id = nullptr;
 		}
 #endif
 		if (translation != msg_ctxt_id)
@@ -264,7 +279,7 @@ dcnpgettext_expr(const char *domain,
 	    (msgctxt_len + msgid_len <= sizeof(buf)
 	     ? buf
 	     : (char *) malloc(msgctxt_len + msgid_len));
-	if (msg_ctxt_id != NULL)
+	if (msg_ctxt_id != nullptr)
 #endif
 	{
 		memcpy(msg_ctxt_id, msgctxt, msgctxt_len - 1);

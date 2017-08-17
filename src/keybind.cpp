@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -20,18 +20,16 @@
 #include <string.h>
 
 #include "lib/framework/frame.h"
-#include "lib/framework/strres.h"
 #include "lib/framework/stdio_ext.h"
-#include "lib/framework/utf.h"
 #include "lib/framework/wzapp.h"
 #include "lib/framework/rational.h"
 #include "objects.h"
+#include "levels.h"
 #include "basedef.h"
 #include "map.h"
 #include "warcam.h"
 #include "warzoneconfig.h"
 #include "console.h"
-#include "objects.h"
 #include "display.h"
 #include "mapdisplay.h"
 #include "display3d.h"
@@ -44,7 +42,6 @@
 #include "power.h"
 #include "hci.h"
 #include "oprint.h"
-#include "wrappers.h"
 #include "ingameop.h"
 #include "effects.h"
 #include "component.h"
@@ -60,15 +57,8 @@
 #include "multimenu.h"
 #include "atmos.h"
 #include "advvis.h"
-#include "difficulty.h"
 
 #include "intorder.h"
-#include "lib/widget/widget.h"
-#include "lib/widget/widgint.h"
-#include "lib/widget/bar.h"
-#include "lib/widget/form.h"
-#include "lib/widget/label.h"
-#include "lib/widget/button.h"
 #include "lib/widget/listwidget.h"
 #include "order.h"
 #include "lib/ivis_opengl/piestate.h"
@@ -79,12 +69,10 @@
 #include "keymap.h"
 #include "loop.h"
 #include "lib/script/script.h"
-#include "scripttabs.h"
 #include "scriptextern.h"
 #include "mission.h"
 #include "mapgrid.h"
 #include "order.h"
-#include "drive.h"
 #include "selection.h"
 #include "difficulty.h"
 #include "scriptcb.h"		/* for console callback */
@@ -98,7 +86,7 @@
 /*
 	KeyBind.c
 	Holds all the functions that can be mapped to a key.
-	All functions at the moment must be 'void func(void)'.
+	All functions at the moment must be 'void func()'.
 	Alex McLean, Pumpkin Studios, EIDOS Interactive.
 */
 
@@ -112,7 +100,7 @@ bool		bAllowOtherKeyPresses = true;
 char	sTextToSend[MAX_CONSOLE_STRING_LENGTH];
 char	beaconMsg[MAX_PLAYERS][MAX_CONSOLE_STRING_LENGTH];		//beacon msg for each player
 
-static STRUCTURE	*psOldRE = NULL;
+static STRUCTURE	*psOldRE = nullptr;
 static char	sCurrentConsoleText[MAX_CONSOLE_STRING_LENGTH];			//remember what user types in console for beacon msg
 
 /* Support functions to minimise code size */
@@ -123,7 +111,7 @@ static void kfsf_SetSelectedDroidsState(SECONDARY_ORDER sec, SECONDARY_STATE Sta
  *  \return false if this is a skirmish or single player game, true if it is a
  *          multiplayer game.
  */
-bool runningMultiplayer(void)
+bool runningMultiplayer()
 {
 	if (!bMultiPlayer || !NetPlay.bComms)
 	{
@@ -133,13 +121,13 @@ bool runningMultiplayer(void)
 	return true;
 }
 
-static void noMPCheatMsg(void)
+static void noMPCheatMsg()
 {
 	addConsoleMessage(_("Sorry, that cheat is disabled in multiplayer games."), DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
 }
 
 // --------------------------------------------------------------------------
-void kf_AutoGame(void)
+void kf_AutoGame()
 {
 #ifndef DEBUG
 	// Bail out if we're running a _true_ multiplayer game (to prevent MP cheating)
@@ -166,19 +154,19 @@ void kf_AutoGame(void)
 	CONPRINTF(ConsoleString, (ConsoleString, "autogame request has been sent to all players. AI script *must* support this command!"));
 }
 
-void	kf_ToggleMissionTimer(void)
+void	kf_ToggleMissionTimer()
 {
 	addConsoleMessage(_("Warning! This cheat is buggy.  We recommend to NOT use it."), DEFAULT_JUSTIFY,  SYSTEM_MESSAGE);
 	setMissionCheatTime(!mission.cheatTime);
 }
 
-void	kf_ToggleShowGateways(void)
+void	kf_ToggleShowGateways()
 {
 	addConsoleMessage("Gateways toggled.", DEFAULT_JUSTIFY,  SYSTEM_MESSAGE);
 	showGateways = !showGateways;
 }
 
-void	kf_ToggleShowPath(void)
+void	kf_ToggleShowPath()
 {
 	addConsoleMessage("Path display toggled.", DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
 	showPath = !showPath;
@@ -190,19 +178,19 @@ void kf_PerformanceSample()
 }
 
 // --------------------------------------------------------------------------
-void	kf_ToggleRadarJump(void)
+void	kf_ToggleRadarJump()
 {
 	setRadarJump(!getRadarJumpStatus());
 }
 
 // --------------------------------------------------------------------------
 
-void kf_ForceDesync(void)
+void kf_ForceDesync()
 {
 	syncDebug("Oh no!!! I went out of sync!!!");
 }
 
-void	kf_PowerInfo(void)
+void	kf_PowerInfo()
 {
 	int i;
 
@@ -212,7 +200,7 @@ void	kf_PowerInfo(void)
 	}
 }
 
-void kf_DamageMe(void)
+void kf_DamageMe()
 {
 #ifndef DEBUG
 	// Bail out if we're running a _true_ multiplayer game (to prevent MP cheating)
@@ -256,7 +244,7 @@ void kf_DamageMe(void)
 	}
 }
 
-void	kf_TraceObject(void)
+void	kf_TraceObject()
 {
 	DROID		*psCDroid, *psNDroid;
 	STRUCTURE	*psCStruct, *psNStruct;
@@ -286,7 +274,7 @@ void	kf_TraceObject(void)
 }
 
 //===================================================
-void kf_ToggleSensorDisplay(void)
+void kf_ToggleSensorDisplay()
 {
 
 #ifndef DEBUG
@@ -311,14 +299,13 @@ void kf_ToggleSensorDisplay(void)
 }
 //===================================================
 /* Halves all the heights of the map tiles */
-void	kf_HalveHeights(void)
+void	kf_HalveHeights()
 {
-	UDWORD	i, j;
 	MAPTILE	*psTile;
 
-	for (i = 0; i < mapWidth; i++)
+	for (int i = 0; i < mapWidth; ++i)
 	{
-		for (j = 0; j < mapHeight; j++)
+		for (int j = 0; j < mapHeight; ++j)
 		{
 			psTile = mapTile(i, j);
 			psTile->height /= 2;
@@ -327,7 +314,7 @@ void	kf_HalveHeights(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_FaceNorth(void)
+void	kf_FaceNorth()
 {
 	player.r.y = 0;
 	if (getWarCamStatus())
@@ -336,7 +323,7 @@ void	kf_FaceNorth(void)
 	}
 }
 // --------------------------------------------------------------------------
-void	kf_FaceSouth(void)
+void	kf_FaceSouth()
 {
 	player.r.y = DEG(180);
 	if (getWarCamStatus())
@@ -345,7 +332,7 @@ void	kf_FaceSouth(void)
 	}
 }
 // --------------------------------------------------------------------------
-void	kf_FaceEast(void)
+void	kf_FaceEast()
 {
 	player.r.y = DEG(90);
 	if (getWarCamStatus())
@@ -354,7 +341,7 @@ void	kf_FaceEast(void)
 	}
 }
 // --------------------------------------------------------------------------
-void	kf_FaceWest(void)
+void	kf_FaceWest()
 {
 	player.r.y = DEG(270);
 	if (getWarCamStatus())
@@ -365,7 +352,7 @@ void	kf_FaceWest(void)
 // --------------------------------------------------------------------------
 
 /* Writes out debug info about all the selected droids */
-void	kf_DebugDroidInfo(void)
+void	kf_DebugDroidInfo()
 {
 	DROID	*psDroid;
 
@@ -378,10 +365,9 @@ void	kf_DebugDroidInfo(void)
 	}
 }
 
-void	kf_CloneSelected(void)
+void kf_CloneSelected(int limit)
 {
-	DROID_TEMPLATE	*sTemplate = NULL;
-	const int	limit = 10;	// make 10 clones
+	DROID_TEMPLATE	*sTemplate = nullptr;
 	const char *msg;
 #ifndef DEBUG
 	// Bail out if we're running a _true_ multiplayer game (to prevent MP cheating)
@@ -407,29 +393,30 @@ void	kf_CloneSelected(void)
 
 			if (!sTemplate)
 			{
-				debug(LOG_ERROR, "Cloning vat has been destoryed. We can't find the template for this droid: %s, id:%u, type:%d!", psDroid->aName, psDroid->id, psDroid->droidType);
+				debug(LOG_ERROR, "Cloning vat has been destroyed. We can't find the template for this droid: %s, id:%u, type:%d!", psDroid->aName, psDroid->id, psDroid->droidType);
 				return;
 			}
 
 			// create a new droid army
 			for (int i = 0; i < limit; i++)
 			{
-				DROID *psNewDroid = buildDroid(sTemplate, psDroid->pos.x + (i * 12), psDroid->pos.y + (i * 14), psDroid->player, false, NULL);
+				Vector2i pos = psDroid->pos.xy + iSinCosR(40503 * i, iSqrt(50 * 50 * i));  // 40503 = 65536/φ
+				DROID *psNewDroid = buildDroid(sTemplate, pos.x, pos.y, psDroid->player, false, nullptr);
 				if (psNewDroid)
 				{
 					addDroid(psNewDroid, apsDroidLists);
 					psScrCBNewDroid = psNewDroid;
-					psScrCBNewDroidFact = NULL;
+					psScrCBNewDroidFact = nullptr;
 					eventFireCallbackTrigger((TRIGGER_TYPE)CALL_NEWDROID);	// notify scripts so it will get assigned jobs
-					psScrCBNewDroid = NULL;
-					triggerEventDroidBuilt(psNewDroid, NULL);
+					psScrCBNewDroid = nullptr;
+					triggerEventDroidBuilt(psNewDroid, nullptr);
 				}
-				else
+				else if (!bMultiMessages)
 				{
 					debug(LOG_ERROR, "Cloning has failed for template:%s id:%d", getID(sTemplate), sTemplate->multiPlayerID);
 				}
 			}
-			sasprintf((char **)&msg, _("Player %u is cheating a new droid army of: %s."), selectedPlayer, psDroid->aName);
+			sasprintf((char **)&msg, _("Player %u is cheating a new droid army of: %d × %s."), selectedPlayer, limit, psDroid->aName);
 			sendTextMessage(msg, true);
 			Cheated = true;
 			audio_PlayTrack(ID_SOUND_NEXUS_LAUGH1);
@@ -438,16 +425,37 @@ void	kf_CloneSelected(void)
 		debug(LOG_INFO, "Nothing was selected?");
 	}
 }
+
+void kf_TeachSelected()
+{
+#ifndef DEBUG
+	// Bail out if we're running a _true_ multiplayer game (to prevent MP cheating)
+	if (runningMultiplayer())
+	{
+		noMPCheatMsg();
+		return;
+	}
+#endif
+
+	for (DROID *psDroid = apsDroidLists[selectedPlayer]; psDroid; psDroid = psDroid->psNext)
+	{
+		if (psDroid->selected)
+		{
+			psDroid->experience += 4 * 65536;
+		}
+	}
+}
+
 // --------------------------------------------------------------------------
 //
 ///* Prints out the date and time of the build of the game */
-void	kf_BuildInfo(void)
+void	kf_BuildInfo()
 {
 	CONPRINTF(ConsoleString, (ConsoleString, "Built at %s on %s", __TIME__, __DATE__));
 }
 
 // --------------------------------------------------------------------------
-void	kf_ToggleConsoleDrop(void)
+void	kf_ToggleConsoleDrop()
 {
 	if (!bInTutorial)
 	{
@@ -456,7 +464,7 @@ void	kf_ToggleConsoleDrop(void)
 	}
 }
 
-void kf_ToggleTeamChat(void)
+void kf_ToggleTeamChat()
 {
 	if (!bInTutorial)
 	{
@@ -465,7 +473,7 @@ void kf_ToggleTeamChat(void)
 	}
 }
 // --------------------------------------------------------------------------
-void	kf_SetKillerLevel(void)
+void	kf_SetKillerLevel()
 {
 	const char *cmsg;
 
@@ -482,7 +490,7 @@ void	kf_SetKillerLevel(void)
 	sendTextMessage(cmsg, true);
 }
 // --------------------------------------------------------------------------
-void	kf_SetEasyLevel(void)
+void	kf_SetEasyLevel()
 {
 	// Bail out if we're running a _true_ multiplayer game (to prevent MP cheating)
 	if (runningMultiplayer())
@@ -496,7 +504,7 @@ void	kf_SetEasyLevel(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_UpThePower(void)
+void	kf_UpThePower()
 {
 	const char *cmsg;
 
@@ -513,7 +521,7 @@ void	kf_UpThePower(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_MaxPower(void)
+void	kf_MaxPower()
 {
 	const char *cmsg;
 
@@ -530,7 +538,7 @@ void	kf_MaxPower(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetNormalLevel(void)
+void	kf_SetNormalLevel()
 {
 	// Bail out if we're running a _true_ multiplayer game (to prevent MP cheating)
 	if (runningMultiplayer())
@@ -543,7 +551,7 @@ void	kf_SetNormalLevel(void)
 	addConsoleMessage(_("Back to normality!"), LEFT_JUSTIFY, SYSTEM_MESSAGE);
 }
 // --------------------------------------------------------------------------
-void	kf_SetHardLevel(void)
+void	kf_SetHardLevel()
 {
 	// Bail out if we're running a _true_ multiplayer game (to prevent MP cheating)
 	if (runningMultiplayer())
@@ -556,7 +564,7 @@ void	kf_SetHardLevel(void)
 	addConsoleMessage(_("Getting tricky!"), LEFT_JUSTIFY, SYSTEM_MESSAGE);
 }
 // --------------------------------------------------------------------------
-void	kf_SetToughUnitsLevel(void)
+void	kf_SetToughUnitsLevel()
 {
 	const char *cmsg;
 
@@ -573,7 +581,7 @@ void	kf_SetToughUnitsLevel(void)
 	sendTextMessage(cmsg, true);
 }
 // --------------------------------------------------------------------------
-void kf_ToggleFPS(void) //This shows *just FPS* and is always visable (when active) -Q.
+void kf_ToggleFPS() //This shows *just FPS* and is always visable (when active) -Q.
 {
 	// Toggle the boolean value of showFPS
 	showFPS = !showFPS;
@@ -587,7 +595,7 @@ void kf_ToggleFPS(void) //This shows *just FPS* and is always visable (when acti
 		CONPRINTF(ConsoleString, (ConsoleString, _("FPS display is disabled.")));
 	}
 }
-void kf_ToggleSamples(void) //Displays number of sound sample in the sound queues & lists.
+void kf_ToggleSamples() //Displays number of sound sample in the sound queues & lists.
 {
 	// Toggle the boolean value of showSAMPLES
 	showSAMPLES = !showSAMPLES;
@@ -595,7 +603,7 @@ void kf_ToggleSamples(void) //Displays number of sound sample in the sound queue
 	CONPRINTF(ConsoleString, (ConsoleString, "Sound Samples displayed is %s", showSAMPLES ? "Enabled" : "Disabled"));
 }
 
-void kf_ToggleOrders(void)	// Displays orders & action of currently selected unit.
+void kf_ToggleOrders()	// Displays orders & action of currently selected unit.
 {
 	// Toggle the boolean value of showORDERS
 	showORDERS = !showORDERS;
@@ -603,10 +611,10 @@ void kf_ToggleOrders(void)	// Displays orders & action of currently selected uni
 }
 
 /* Writes out the frame rate */
-void	kf_FrameRate(void)
+void	kf_FrameRate()
 {
-	CONPRINTF(ConsoleString, (ConsoleString, "FPS %d; PIEs %d; polys %d; States %d",
-	                          frameRate(), loopPieCount, loopPolyCount, loopStateChanges));
+	CONPRINTF(ConsoleString, (ConsoleString, "FPS %d; PIEs %d; polys %d",
+	                          frameRate(), loopPieCount, loopPolyCount));
 	if (runningMultiplayer())
 	{
 		CONPRINTF(ConsoleString, (ConsoleString, "NETWORK:  Bytes: s-%d r-%d  Uncompressed Bytes: s-%d r-%d  Packets: s-%d r-%d",
@@ -624,7 +632,7 @@ void	kf_FrameRate(void)
 // --------------------------------------------------------------------------
 
 // display the total number of objects in the world
-void kf_ShowNumObjects(void)
+void kf_ShowNumObjects()
 {
 	int droids, structures, features;
 	const char *cmsg;
@@ -645,7 +653,7 @@ void kf_ShowNumObjects(void)
 // --------------------------------------------------------------------------
 
 /* Toggles radar on off */
-void	kf_ToggleRadar(void)
+void	kf_ToggleRadar()
 {
 	radarOnScreen = !radarOnScreen;
 }
@@ -653,7 +661,7 @@ void	kf_ToggleRadar(void)
 // --------------------------------------------------------------------------
 
 /* Toggles infinite power on/off */
-void	kf_TogglePower(void)
+void	kf_TogglePower()
 {
 	const char *cmsg;
 
@@ -680,7 +688,7 @@ void	kf_TogglePower(void)
 // --------------------------------------------------------------------------
 
 /* Recalculates the lighting values for a tile */
-void	kf_RecalcLighting(void)
+void	kf_RecalcLighting()
 {
 	initLighting(0, 0, mapWidth, mapHeight);
 	addConsoleMessage("Lighting values for all tiles recalculated", DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
@@ -689,7 +697,7 @@ void	kf_RecalcLighting(void)
 // --------------------------------------------------------------------------
 
 /* Sends the screen buffer to disk */
-void	kf_ScreenDump(void)
+void	kf_ScreenDump()
 {
 	screenDumpToDisk(ScreenDumpPath, getLevelName());
 }
@@ -697,7 +705,7 @@ void	kf_ScreenDump(void)
 // --------------------------------------------------------------------------
 
 /* Make all functions available */
-void	kf_AllAvailable(void)
+void	kf_AllAvailable()
 {
 	const char *cmsg;
 
@@ -719,7 +727,7 @@ void	kf_AllAvailable(void)
 // --------------------------------------------------------------------------
 
 /* Flips the cut of a tile */
-void	kf_TriFlip(void)
+void	kf_TriFlip()
 {
 	MAPTILE	*psTile;
 	psTile = mapTile(mouseTileX, mouseTileY);
@@ -730,7 +738,7 @@ void	kf_TriFlip(void)
 // --------------------------------------------------------------------------
 
 /* Debug info about a map tile */
-void	kf_TileInfo(void)
+void	kf_TileInfo()
 {
 	MAPTILE	*psTile = mapTile(mouseTileX, mouseTileY);
 
@@ -740,58 +748,8 @@ void	kf_TileInfo(void)
 	addConsoleMessage("Tile info dumped into log", DEFAULT_JUSTIFY, SYSTEM_MESSAGE);
 }
 
-// --------------------------------------------------------------------------
-void	kf_ToggleBackgroundFog(void)
-{
-	static bool bEnabled  = true;//start in nicks mode
-
-	if (bEnabled)//true, so go to false
-	{
-		bEnabled = false;
-		fogStatus &= FOG_FLAGS - FOG_BACKGROUND; //clear lowest bit of 3
-		if (fogStatus == 0)
-		{
-			pie_SetFogStatus(false);
-			pie_EnableFog(false);
-		}
-	}
-	else
-	{
-		bEnabled = true;
-		if (fogStatus == 0)
-		{
-			pie_EnableFog(true);
-		}
-		fogStatus |= FOG_BACKGROUND;//set lowest bit of 3
-	}
-}
-
-extern void	kf_ToggleDistanceFog(void)
-{
-	static bool bEnabled  = true;//start in nicks mode
-
-	if (bEnabled)//true, so go to false
-	{
-		bEnabled = false;
-		fogStatus &= FOG_FLAGS - FOG_DISTANCE; //clear middle bit of 3
-		if (fogStatus == 0)
-		{
-			pie_SetFogStatus(false);
-			pie_EnableFog(false);
-		}
-	}
-	else
-	{
-		bEnabled = true;
-		if (fogStatus == 0)
-		{
-			pie_EnableFog(true);
-		}
-		fogStatus |= FOG_DISTANCE;//set lowest bit of 3
-	}
-}
 /* Toggles fog on/off */
-void	kf_ToggleFog(void)
+void	kf_ToggleFog()
 {
 	static bool fogEnabled = false;
 	const char *cmsg;
@@ -825,13 +783,8 @@ void	kf_ToggleFog(void)
 // --------------------------------------------------------------------------
 
 /* Toggle camera on/off */
-void	kf_ToggleCamera(void)
+void	kf_ToggleCamera()
 {
-	if (getWarCamStatus() == false)
-	{
-		shakeStop();	// Ensure screen shake stopped before starting camera mode.
-		setDrivingStatus(false);
-	}
 	camToggleStatus();
 }
 
@@ -842,7 +795,7 @@ void kf_RevealMapAtPos()
 
 // --------------------------------------------------------------------------
 
-void kf_MapCheck(void)
+void kf_MapCheck()
 {
 	DROID		*psDroid;
 	STRUCTURE	*psStruct;
@@ -865,7 +818,7 @@ void kf_MapCheck(void)
 }
 
 /* Raises the tile under the mouse */
-void	kf_RaiseTile(void)
+void	kf_RaiseTile()
 {
 	if (runningMultiplayer())
 	{
@@ -878,7 +831,7 @@ void	kf_RaiseTile(void)
 // --------------------------------------------------------------------------
 
 /* Lowers the tile under the mouse */
-void	kf_LowerTile(void)
+void	kf_LowerTile()
 {
 	if (runningMultiplayer())
 	{
@@ -891,14 +844,14 @@ void	kf_LowerTile(void)
 // --------------------------------------------------------------------------
 
 /* Quick game exit */
-void	kf_SystemClose(void)
+void	kf_SystemClose()
 {
 
 }
 
 // --------------------------------------------------------------------------
 /* Zooms out from display */
-void	kf_ZoomOut(void)
+void	kf_ZoomOut()
 {
 	if (getDebugMappingStatus())
 	{
@@ -911,7 +864,7 @@ void	kf_ZoomOut(void)
 	UpdateFogDistance(getViewDistance());
 }
 
-void kf_ZoomOutStep(void)
+void kf_ZoomOutStep()
 {
 	if (getDebugMappingStatus())
 	{
@@ -925,7 +878,7 @@ void kf_ZoomOutStep(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_RadarZoomIn(void)
+void	kf_RadarZoomIn()
 {
 	uint8_t RadarZoomLevel = GetRadarZoom();
 
@@ -937,7 +890,7 @@ void	kf_RadarZoomIn(void)
 	}
 }
 // --------------------------------------------------------------------------
-void	kf_RadarZoomOut(void)
+void	kf_RadarZoomOut()
 {
 	uint8_t RadarZoomLevel = GetRadarZoom();
 
@@ -951,7 +904,7 @@ void	kf_RadarZoomOut(void)
 // --------------------------------------------------------------------------
 // --------------------------------------------------------------------------
 /* Zooms in the map */
-void	kf_ZoomIn(void)
+void	kf_ZoomIn()
 {
 	if (getDebugMappingStatus())
 	{
@@ -964,7 +917,7 @@ void	kf_ZoomIn(void)
 	UpdateFogDistance(getViewDistance());
 }
 
-void kf_ZoomInStep(void)
+void kf_ZoomInStep()
 {
 	if (getDebugMappingStatus())
 	{
@@ -978,7 +931,7 @@ void kf_ZoomInStep(void)
 }
 
 // --------------------------------------------------------------------------
-void kf_MaxScrollLimits(void)
+void kf_MaxScrollLimits()
 {
 	scrollMinX = scrollMinY = 0;
 	scrollMaxX = mapWidth;
@@ -1024,7 +977,7 @@ void	kf_ExpandScreen( void )
 */
 // --------------------------------------------------------------------------
 /* Spins the world round left */
-void	kf_RotateLeft(void)
+void	kf_RotateLeft()
 {
 	float rotAmount = realTimeAdjustedIncrement(MAP_SPIN_RATE);
 
@@ -1033,7 +986,7 @@ void	kf_RotateLeft(void)
 
 // --------------------------------------------------------------------------
 /* Spins the world right */
-void	kf_RotateRight(void)
+void	kf_RotateRight()
 {
 	float rotAmount = realTimeAdjustedIncrement(MAP_SPIN_RATE);
 
@@ -1046,7 +999,7 @@ void	kf_RotateRight(void)
 
 // --------------------------------------------------------------------------
 /* Pitches camera back */
-void	kf_PitchBack(void)
+void	kf_PitchBack()
 {
 	float pitchAmount = realTimeAdjustedIncrement(MAP_PITCH_RATE);
 
@@ -1061,7 +1014,7 @@ void	kf_PitchBack(void)
 
 // --------------------------------------------------------------------------
 /* Pitches camera foward */
-void	kf_PitchForward(void)
+void	kf_PitchForward()
 {
 	float pitchAmount = realTimeAdjustedIncrement(MAP_PITCH_RATE);
 
@@ -1075,7 +1028,7 @@ void	kf_PitchForward(void)
 
 // --------------------------------------------------------------------------
 /* Resets pitch to default */
-void	kf_ResetPitch(void)
+void	kf_ResetPitch()
 {
 	player.r.x = DEG(360 - 20);
 	setViewDistance(START_DISTANCE);
@@ -1083,14 +1036,14 @@ void	kf_ResetPitch(void)
 
 // --------------------------------------------------------------------------
 /* Dumps all the keyboard mappings to the console display */
-void	kf_ShowMappings(void)
+void	kf_ShowMappings()
 {
 	keyShowMappings();
 }
 
 // --------------------------------------------------------------------------
 /*If this is performed twice then it changes the productionPlayer*/
-void	kf_SelectPlayer(void)
+void	kf_SelectPlayer()
 {
 	UDWORD	playerNumber, prevPlayer;
 
@@ -1134,7 +1087,7 @@ void	kf_SelectGrouping(UDWORD	groupNumber)
 	bool	Selected;
 
 	bAlreadySelected = false;
-	for (psDroid = apsDroidLists[selectedPlayer]; psDroid != NULL; psDroid = psDroid->psNext)
+	for (psDroid = apsDroidLists[selectedPlayer]; psDroid != nullptr; psDroid = psDroid->psNext)
 	{
 		/* Wipe out the ones in the wrong group */
 		if (psDroid->selected && psDroid->group != groupNumber)
@@ -1159,8 +1112,6 @@ void	kf_SelectGrouping(UDWORD	groupNumber)
 		Selected = activateGroup(selectedPlayer, groupNumber);
 	}
 
-	// Tell the driving system that the selection may have changed.
-	driveSelectionChanged();
 	/* play group audio but only if they wern't already selected - AM */
 	if (Selected && !bAlreadySelected)
 	{
@@ -1196,7 +1147,7 @@ DEFINE_NUMED_KF(8)
 DEFINE_NUMED_KF(9)
 
 // --------------------------------------------------------------------------
-void	kf_SelectMoveGrouping(void)
+void	kf_SelectMoveGrouping()
 {
 	UDWORD	groupNumber;
 
@@ -1206,12 +1157,12 @@ void	kf_SelectMoveGrouping(void)
 	activateGroupAndMove(selectedPlayer, groupNumber);
 }
 // --------------------------------------------------------------------------
-void	kf_ToggleDroidInfo(void)
+void	kf_ToggleDroidInfo()
 {
 	camToggleInfo();
 }
 
-void	kf_addInGameOptions(void)
+void	kf_addInGameOptions()
 {
 	setWidgetsStatus(true);
 	if (!isInGamePopupUp)	// they can *only* quit when popup is up.
@@ -1222,7 +1173,7 @@ void	kf_addInGameOptions(void)
 
 // --------------------------------------------------------------------------
 /* Tell the scripts to start a mission*/
-void	kf_AddMissionOffWorld(void)
+void	kf_AddMissionOffWorld()
 {
 #ifndef DEBUG
 	// Bail out if we're running a _true_ multiplayer game
@@ -1238,7 +1189,7 @@ void	kf_AddMissionOffWorld(void)
 
 // --------------------------------------------------------------------------
 /* Tell the scripts to end a mission*/
-void	kf_EndMissionOffWorld(void)
+void	kf_EndMissionOffWorld()
 {
 	const char *cmsg;
 
@@ -1259,7 +1210,7 @@ void	kf_EndMissionOffWorld(void)
 
 // --------------------------------------------------------------------------
 // Display multiplayer guff.
-void	kf_addMultiMenu(void)
+void	kf_addMultiMenu()
 {
 	if (bMultiPlayer)
 	{
@@ -1270,17 +1221,17 @@ void	kf_addMultiMenu(void)
 // --------------------------------------------------------------------------
 // start/stop capturing audio for multiplayer
 
-void kf_multiAudioStart(void)
+void kf_multiAudioStart()
 {
 }
 
-void kf_multiAudioStop(void)
+void kf_multiAudioStop()
 {
 }
 
 // --------------------------------------------------------------------------
 
-void	kf_JumpToMapMarker(void)
+void	kf_JumpToMapMarker()
 {
 
 	KEY_CODE	entry;
@@ -1301,19 +1252,19 @@ void	kf_JumpToMapMarker(void)
 
 // --------------------------------------------------------------------------
 /* Toggles the power bar display on and off*/
-void	kf_TogglePowerBar(void)
+void	kf_TogglePowerBar()
 {
 	togglePowerBar();
 }
 // --------------------------------------------------------------------------
 /* Toggles whether we process debug key mappings */
-void	kf_ToggleDebugMappings(void)
+void	kf_ToggleDebugMappings()
 {
 	sendProcessDebugMappings(!getWantedDebugMappingStatus(selectedPlayer));
 }
 // --------------------------------------------------------------------------
 
-void	kf_ToggleGodMode(void)
+void	kf_ToggleGodMode()
 {
 	const char *cmsg;
 	static bool pastReveal = true;
@@ -1330,7 +1281,6 @@ void	kf_ToggleGodMode(void)
 	if (godMode)
 	{
 		FEATURE	*psFeat = apsFeatureLists[0];
-		int player;
 
 		godMode = false;
 		setRevealStatus(pastReveal);
@@ -1342,7 +1292,7 @@ void	kf_ToggleGodMode(void)
 		}
 
 		// and the structures
-		for (player = 0; player < MAX_PLAYERS; ++player)
+		for (unsigned player = 0; player < MAX_PLAYERS; ++player)
 		{
 			if (player != selectedPlayer)
 			{
@@ -1372,7 +1322,7 @@ void	kf_ToggleGodMode(void)
 }
 // --------------------------------------------------------------------------
 /* Aligns the view to north - some people can't handle the world spinning */
-void	kf_SeekNorth(void)
+void	kf_SeekNorth()
 {
 	player.r.y = 0;
 	if (getWarCamStatus())
@@ -1382,7 +1332,7 @@ void	kf_SeekNorth(void)
 	CONPRINTF(ConsoleString, (ConsoleString, _("View Aligned to North")));
 }
 
-void kf_toggleTrapCursor(void)
+void kf_toggleTrapCursor()
 {
 	const char *msg;
 	bool trap = !war_GetTrapCursor();
@@ -1394,7 +1344,7 @@ void kf_toggleTrapCursor(void)
 
 
 // --------------------------------------------------------------------------
-void	kf_TogglePauseMode(void)
+void	kf_TogglePauseMode()
 {
 	// Bail out if we're running a _true_ multiplayer game (which cannot be paused)
 	if (runningMultiplayer())
@@ -1443,7 +1393,7 @@ void	kf_TogglePauseMode(void)
 
 // --------------------------------------------------------------------------
 // finish all the research for the selected player
-void	kf_FinishAllResearch(void)
+void	kf_FinishAllResearch()
 {
 	UDWORD	j;
 	const char *cmsg;
@@ -1469,7 +1419,7 @@ void	kf_FinishAllResearch(void)
 			else
 			{
 				MakeResearchCompleted(&asPlayerResList[selectedPlayer][j]);
-				researchResult(j, selectedPlayer, false, NULL, false);
+				researchResult(j, selectedPlayer, false, nullptr, false);
 			}
 		}
 	}
@@ -1478,7 +1428,7 @@ void	kf_FinishAllResearch(void)
 	sendTextMessage(cmsg, true);
 }
 
-void kf_Reload(void)
+void kf_Reload()
 {
 	STRUCTURE	*psCurr;
 
@@ -1505,7 +1455,7 @@ void kf_Reload(void)
 
 // --------------------------------------------------------------------------
 // finish all the research for the selected player
-void	kf_FinishResearch(void)
+void	kf_FinishResearch()
 {
 	STRUCTURE	*psCurr;
 	const char *cmsg;
@@ -1523,7 +1473,7 @@ void	kf_FinishResearch(void)
 	{
 		if (psCurr->pStructureType->type == REF_RESEARCH)
 		{
-			BASE_STATS	*pSubject = NULL;
+			BASE_STATS	*pSubject = nullptr;
 
 			// find out what we are researching here
 			pSubject = ((RESEARCH_FACILITY *)psCurr->pFunctionality)->psSubject;
@@ -1555,7 +1505,7 @@ void	kf_FinishResearch(void)
 //}
 
 // --------------------------------------------------------------------------
-void	kf_ToggleEnergyBars(void)
+void	kf_ToggleEnergyBars()
 {
 	switch (toggleEnergyBars())
 	{
@@ -1574,25 +1524,23 @@ void	kf_ToggleEnergyBars(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_ChooseOptions(void)
+void	kf_ChooseOptions()
 {
 	const char *cmsg;
 
 	sasprintf((char **)&cmsg, _("(Player %u) is using cheat :%s"),
 	          selectedPlayer, _("Debug menu is Open"));
 	sendTextMessage(cmsg, true);
-	intResetScreen(true);
-	setWidgetsStatus(true);
-	intAddOptions();
+	jsShowDebug();
 }
 
 // --------------------------------------------------------------------------
-void	kf_ToggleProximitys(void)
+void	kf_ToggleProximitys()
 {
 	setProximityDraw(!doWeDrawProximitys());
 }
 // --------------------------------------------------------------------------
-void	kf_JumpToResourceExtractor(void)
+void	kf_JumpToResourceExtractor()
 {
 	int xJump, yJump;
 
@@ -1621,39 +1569,39 @@ void	kf_JumpToResourceExtractor(void)
 
 }
 // --------------------------------------------------------------------------
-void	kf_JumpToRepairUnits(void)
+void	kf_JumpToRepairUnits()
 {
 	selNextSpecifiedUnit(DROID_REPAIR);
 }
 // --------------------------------------------------------------------------
 // --------------------------------------------------------------------------
-void	kf_JumpToConstructorUnits(void)
+void	kf_JumpToConstructorUnits()
 {
 	selNextSpecifiedUnit(DROID_CONSTRUCT);
 }
 // --------------------------------------------------------------------------
 // --------------------------------------------------------------------------
-void	kf_JumpToSensorUnits(void)
+void	kf_JumpToSensorUnits()
 {
 	selNextSpecifiedUnit(DROID_SENSOR);
 }
 // --------------------------------------------------------------------------
 // --------------------------------------------------------------------------
-void	kf_JumpToCommandUnits(void)
+void	kf_JumpToCommandUnits()
 {
 	selNextSpecifiedUnit(DROID_COMMAND);
 }
 // --------------------------------------------------------------------------
 
 // --------------------------------------------------------------------------
-void	kf_JumpToUnassignedUnits(void)
+void	kf_JumpToUnassignedUnits()
 {
 	selNextUnassignedUnit();
 }
 // --------------------------------------------------------------------------
 
 
-void	kf_ToggleOverlays(void)
+void	kf_ToggleOverlays()
 {
 	if (getWidgetsStatus() && !isChatUp() && !gamePaused())
 	{
@@ -1666,7 +1614,7 @@ void	kf_ToggleOverlays(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_ChooseCommand(void)
+void	kf_ChooseCommand()
 {
 	if (intCheckReticuleButEnabled(IDRET_COMMAND))
 	{
@@ -1675,7 +1623,7 @@ void	kf_ChooseCommand(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_ChooseManufacture(void)
+void	kf_ChooseManufacture()
 {
 	if (intCheckReticuleButEnabled(IDRET_MANUFACTURE))
 	{
@@ -1684,7 +1632,7 @@ void	kf_ChooseManufacture(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_ChooseResearch(void)
+void	kf_ChooseResearch()
 {
 	if (intCheckReticuleButEnabled(IDRET_RESEARCH))
 	{
@@ -1693,7 +1641,7 @@ void	kf_ChooseResearch(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_ChooseBuild(void)
+void	kf_ChooseBuild()
 {
 	if (intCheckReticuleButEnabled(IDRET_BUILD))
 	{
@@ -1702,7 +1650,7 @@ void	kf_ChooseBuild(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_ChooseDesign(void)
+void	kf_ChooseDesign()
 {
 	if (intCheckReticuleButEnabled(IDRET_DESIGN))
 	{
@@ -1711,7 +1659,7 @@ void	kf_ChooseDesign(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_ChooseIntelligence(void)
+void	kf_ChooseIntelligence()
 {
 	if (intCheckReticuleButEnabled(IDRET_INTEL_MAP))
 	{
@@ -1721,42 +1669,13 @@ void	kf_ChooseIntelligence(void)
 
 // --------------------------------------------------------------------------
 
-void	kf_ChooseCancel(void)
+void	kf_ChooseCancel()
 {
 	setKeyButtonMapping(IDRET_CANCEL);
 }
 
 // --------------------------------------------------------------------------
-void	kf_ToggleDrivingMode(void)
-{
-	addConsoleMessage("Toggle driver mode", LEFT_JUSTIFY, SYSTEM_MESSAGE); // what does this do? - per
-
-	/* No point unless we're tracking */
-	if (getWarCamStatus())
-	{
-		if (getDrivingStatus())
-		{
-			StopDriverMode();
-			addConsoleMessage("DriverMode off", LEFT_JUSTIFY, SYSTEM_MESSAGE);
-		}
-		else
-		{
-			// removed the MP check for this, so you can now play with in in MP games.
-			if (!driveModeActive())
-			{
-				StartDriverMode(NULL);
-				addConsoleMessage("DriverMode on", LEFT_JUSTIFY, SYSTEM_MESSAGE);
-			}
-		}
-	}
-	else
-	{
-		addConsoleMessage("DriverMode disabled. Must be in tracking mode. Hit space bar with a unit selected.", LEFT_JUSTIFY, SYSTEM_MESSAGE);
-	}
-}
-
-// --------------------------------------------------------------------------
-void	kf_MovePause(void)
+void	kf_MovePause()
 {
 	if (!bMultiPlayer)	// can't do it in multiplay
 	{
@@ -1790,7 +1709,7 @@ void	kf_MovePause(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_MoveToLastMessagePos(void)
+void	kf_MoveToLastMessagePos()
 {
 	int iX, iY, iZ;
 
@@ -1806,7 +1725,7 @@ void	kf_MoveToLastMessagePos(void)
 
 // --------------------------------------------------------------------------
 /* Makes it snow if it's not snowing and stops it if it is */
-void	kf_ToggleWeather(void)
+void	kf_ToggleWeather()
 {
 	if (atmosGetWeatherType() == WT_NONE)
 	{
@@ -1828,7 +1747,7 @@ void	kf_ToggleWeather(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectNextFactory(void)
+void	kf_SelectNextFactory()
 {
 	STRUCTURE	*psCurr;
 
@@ -1853,7 +1772,7 @@ void	kf_SelectNextFactory(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectNextResearch(void)
+void	kf_SelectNextResearch()
 {
 	selNextSpecifiedBuilding(REF_RESEARCH);
 	if (intCheckReticuleButEnabled(IDRET_RESEARCH))
@@ -1864,14 +1783,14 @@ void	kf_SelectNextResearch(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectNextPowerStation(void)
+void	kf_SelectNextPowerStation()
 {
 	selNextSpecifiedBuilding(REF_POWER_GEN);
 	triggerEventSelected();
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectNextCyborgFactory(void)
+void	kf_SelectNextCyborgFactory()
 {
 	STRUCTURE	*psCurr;
 
@@ -1898,7 +1817,7 @@ void	kf_SelectNextCyborgFactory(void)
 // --------------------------------------------------------------------------
 
 
-void	kf_KillEnemy(void)
+void	kf_KillEnemy()
 {
 	UDWORD		player;
 	DROID		*psCDroid, *psNDroid;
@@ -1943,7 +1862,7 @@ void	kf_KillEnemy(void)
 }
 
 // kill all the selected objects
-void kf_KillSelected(void)
+void kf_KillSelected()
 {
 	DROID		*psCDroid, *psNDroid;
 	STRUCTURE	*psCStruct, *psNStruct;
@@ -2001,7 +1920,7 @@ void kf_KillSelected(void)
 #if 0  // There's no gridDisplayCoverage anymore.
 // --------------------------------------------------------------------------
 // display the grid info for all the selected objects
-void kf_ShowGridInfo(void)
+void kf_ShowGridInfo()
 {
 	DROID		*psCDroid, *psNDroid;
 	STRUCTURE	*psCStruct, *psNStruct;
@@ -2026,9 +1945,9 @@ void kf_ShowGridInfo(void)
 #endif
 // --------------------------------------------------------------------------
 // Chat message. NOTE THIS FUNCTION CAN DISABLE ALL OTHER KEYPRESSES
-void kf_SendTeamMessage(void)
+void kf_SendTeamMessage()
 {
-	if (bAllowOtherKeyPresses)		// just starting.
+	if (bAllowOtherKeyPresses && !gamePaused())  // just starting.
 	{
 		bAllowOtherKeyPresses = false;
 		sstrcpy(sTextToSend, "");
@@ -2043,9 +1962,9 @@ void kf_SendTeamMessage(void)
 }
 
 // Chat message. NOTE THIS FUNCTION CAN DISABLE ALL OTHER KEYPRESSES
-void kf_SendGlobalMessage(void)
+void kf_SendGlobalMessage()
 {
-	if (bAllowOtherKeyPresses)		// just starting.
+	if (bAllowOtherKeyPresses && !gamePaused())  // just starting.
 	{
 		bAllowOtherKeyPresses = false;
 		sstrcpy(sTextToSend, "");
@@ -2127,7 +2046,7 @@ void kf_SendGlobalMessage(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_ToggleConsole(void)
+void	kf_ToggleConsole()
 {
 	if (getConsoleDisplayStatus())
 	{
@@ -2140,21 +2059,21 @@ void	kf_ToggleConsole(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectAllOnScreenUnits(void)
+void	kf_SelectAllOnScreenUnits()
 {
 
 	selDroidSelection(selectedPlayer, DS_ALL_UNITS, DST_UNUSED, true);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectAllUnits(void)
+void	kf_SelectAllUnits()
 {
 
 	selDroidSelection(selectedPlayer, DS_ALL_UNITS, DST_UNUSED, false);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectAllVTOLs(void)
+void	kf_SelectAllVTOLs()
 {
 	selDroidSelection(selectedPlayer, DS_BY_TYPE, DST_VTOL, false);
 }
@@ -2165,25 +2084,25 @@ void kf_SelectAllArmedVTOLs()
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectAllHovers(void)
+void	kf_SelectAllHovers()
 {
 	selDroidSelection(selectedPlayer, DS_BY_TYPE, DST_HOVER, false);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectAllWheeled(void)
+void	kf_SelectAllWheeled()
 {
 	selDroidSelection(selectedPlayer, DS_BY_TYPE, DST_WHEELED, false);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectAllTracked(void)
+void	kf_SelectAllTracked()
 {
 	selDroidSelection(selectedPlayer, DS_BY_TYPE, DST_TRACKED, false);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectAllHalfTracked(void)
+void	kf_SelectAllHalfTracked()
 {
 	selDroidSelection(selectedPlayer, DS_BY_TYPE, DST_HALF_TRACKED, false);
 }
@@ -2231,13 +2150,13 @@ void kf_SelectAllTrucks()
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectAllDamaged(void)
+void	kf_SelectAllDamaged()
 {
 	selDroidSelection(selectedPlayer, DS_BY_TYPE, DST_ALL_DAMAGED, false);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SelectAllCombatUnits(void)
+void	kf_SelectAllCombatUnits()
 {
 	selDroidSelection(selectedPlayer, DS_BY_TYPE, DST_ALL_COMBAT, false);
 }
@@ -2257,43 +2176,43 @@ void kf_SelectAllCombatCyborgs()
 // --------------------------------------------------------------------------
 // this is worst case (size of apsDroidLists[selectedPlayer] squared).
 // --------------------------------------------------------------------------
-void	kf_SelectAllSameType(void)
+void	kf_SelectAllSameType()
 {
 	selDroidSelection(selectedPlayer, DS_BY_TYPE, DST_ALL_SAME, false);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidRetreatMedium(void)
+void	kf_SetDroidRetreatMedium()
 {
 	kfsf_SetSelectedDroidsState(DSO_REPAIR_LEVEL, DSS_REPLEV_LOW);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidRetreatHeavy(void)
+void	kf_SetDroidRetreatHeavy()
 {
 	kfsf_SetSelectedDroidsState(DSO_REPAIR_LEVEL, DSS_REPLEV_HIGH);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidRetreatNever(void)
+void	kf_SetDroidRetreatNever()
 {
 	kfsf_SetSelectedDroidsState(DSO_REPAIR_LEVEL, DSS_REPLEV_NEVER);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidAttackAtWill(void)
+void	kf_SetDroidAttackAtWill()
 {
 	kfsf_SetSelectedDroidsState(DSO_ATTACK_LEVEL, DSS_ALEV_ALWAYS);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidAttackReturn(void)
+void	kf_SetDroidAttackReturn()
 {
 	kfsf_SetSelectedDroidsState(DSO_ATTACK_LEVEL, DSS_ALEV_ATTACKED);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidAttackCease(void)
+void	kf_SetDroidAttackCease()
 {
 	kfsf_SetSelectedDroidsState(DSO_ATTACK_LEVEL, DSS_ALEV_NEVER);
 }
@@ -2323,37 +2242,37 @@ void	kf_SetDroidOrderStop()
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidMovePatrol(void)
+void	kf_SetDroidMovePatrol()
 {
 	kfsf_SetSelectedDroidsState(DSO_PATROL, DSS_PATROL_SET);	// ASK
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidReturnToBase(void)
+void	kf_SetDroidReturnToBase()
 {
 	kfsf_SetSelectedDroidsState(DSO_RETURN_TO_LOC, DSS_RTL_BASE);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidGoToTransport(void)
+void	kf_SetDroidGoToTransport()
 {
 	kfsf_SetSelectedDroidsState(DSO_RETURN_TO_LOC, DSS_RTL_TRANSPORT);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidGoForRepair(void)
+void	kf_SetDroidGoForRepair()
 {
 	kfsf_SetSelectedDroidsState(DSO_RETURN_TO_LOC, DSS_RTL_REPAIR);
 }
 
 // --------------------------------------------------------------------------
-void	kf_SetDroidRecycle(void)
+void	kf_SetDroidRecycle()
 {
 	kfsf_SetSelectedDroidsState(DSO_RECYCLE, DSS_RECYCLE_SET);
 }
 
 // --------------------------------------------------------------------------
-void	kf_ToggleVisibility(void)
+void	kf_ToggleVisibility()
 {
 	if (getRevealStatus())
 	{
@@ -2388,7 +2307,7 @@ static void kfsf_SetSelectedDroidsState(SECONDARY_ORDER sec, SECONDARY_STATE sta
 }
 
 // --------------------------------------------------------------------------
-void	kf_TriggerRayCast(void)
+void	kf_TriggerRayCast()
 {
 	DROID	*psDroid;
 	bool	found;
@@ -2413,14 +2332,14 @@ void	kf_TriggerRayCast(void)
 }
 
 // --------------------------------------------------------------------------
-void	kf_ScatterDroids(void)
+void	kf_ScatterDroids()
 {
 	// to be written!
 	addConsoleMessage("Scatter droids - not written yet!", LEFT_JUSTIFY, SYSTEM_MESSAGE);
 }
 
 // --------------------------------------------------------------------------
-void	kf_CentreOnBase(void)
+void	kf_CentreOnBase()
 {
 	STRUCTURE	*psStruct;
 	bool		bGotHQ;
@@ -2460,19 +2379,19 @@ void	kf_CentreOnBase(void)
 }
 
 // --------------------------------------------------------------------------
-void kf_ToggleFormationSpeedLimiting(void)
+void kf_ToggleFormationSpeedLimiting()
 {
 	addConsoleMessage(_("Formation speed limiting has been removed from the game due to bugs."), LEFT_JUSTIFY, SYSTEM_MESSAGE);
 }
 
 // --------------------------------------------------------------------------
-void	kf_RightOrderMenu(void)
+void	kf_RightOrderMenu()
 {
-	DROID	*psDroid, *psGotOne = NULL;
+	DROID	*psDroid, *psGotOne = nullptr;
 	bool	bFound;
 
 	// if menu open, then close it!
-	if (widgGetFromID(psWScreen, IDORDER_FORM) != NULL)
+	if (widgGetFromID(psWScreen, IDORDER_FORM) != nullptr)
 	{
 		intRemoveOrder();	// close the screen.
 		return;
@@ -2495,7 +2414,7 @@ void	kf_RightOrderMenu(void)
 }
 
 // --------------------------------------------------------------------------
-void kf_TriggerShockWave(void)
+void kf_TriggerShockWave()
 {
 	Vector3i pos;
 
@@ -2503,10 +2422,10 @@ void kf_TriggerShockWave(void)
 	pos.z = mouseTileY * TILE_UNITS + TILE_UNITS / 2;
 	pos.y = map_Height(pos.x, pos.z) + SHOCK_WAVE_HEIGHT;
 
-	addEffect(&pos, EFFECT_EXPLOSION, EXPLOSION_TYPE_SHOCKWAVE, false, NULL, 0);
+	addEffect(&pos, EFFECT_EXPLOSION, EXPLOSION_TYPE_SHOCKWAVE, false, nullptr, 0);
 }
 // --------------------------------------------------------------------------
-void	kf_ToggleMouseInvert(void)
+void	kf_ToggleMouseInvert()
 {
 	if (getInvertMouseStatus())
 	{
@@ -2519,22 +2438,9 @@ void	kf_ToggleMouseInvert(void)
 		CONPRINTF(ConsoleString, (ConsoleString, _("Vertical rotation direction: Flipped")));
 	}
 }
+
 // --------------------------------------------------------------------------
-void	kf_ToggleShakeStatus(void)
-{
-	if (getShakeStatus())
-	{
-		setShakeStatus(false);
-		CONPRINTF(ConsoleString, (ConsoleString, _("Screen shake when things die: Off")));
-	}
-	else
-	{
-		setShakeStatus(true);
-		CONPRINTF(ConsoleString, (ConsoleString, _("Screen shake when things die: On")));
-	}
-}
-// --------------------------------------------------------------------------
-void	kf_ToggleShadows(void)
+void	kf_ToggleShadows()
 {
 	if (getDrawShadows())
 	{
@@ -2629,7 +2535,7 @@ static void tryChangeSpeed(Rational newMod, Rational oldMod)
 	gameTimeSetMod(newMod);
 }
 
-void kf_SpeedUp(void)
+void kf_SpeedUp()
 {
 	// get the current modifier
 	Rational mod = gameTimeGetMod();
@@ -2643,7 +2549,7 @@ void kf_SpeedUp(void)
 	tryChangeSpeed(*newMod, mod);
 }
 
-void kf_SlowDown(void)
+void kf_SlowDown()
 {
 	// get the current modifier
 	Rational mod = gameTimeGetMod();
@@ -2658,7 +2564,7 @@ void kf_SlowDown(void)
 	tryChangeSpeed(*newMod, mod);
 }
 
-void kf_NormalSpeed(void)
+void kf_NormalSpeed()
 {
 	// Bail out if we're running a _true_ multiplayer game or are playing a tutorial
 	if (runningMultiplayer() || bInTutorial)
@@ -2676,7 +2582,7 @@ void kf_NormalSpeed(void)
 
 // --------------------------------------------------------------------------
 
-void kf_ToggleRadarAllyEnemy(void)
+void kf_ToggleRadarAllyEnemy()
 {
 	bEnemyAllyRadarColor = !bEnemyAllyRadarColor;
 
@@ -2691,7 +2597,7 @@ void kf_ToggleRadarAllyEnemy(void)
 	resizeRadar();
 }
 
-void kf_ToggleRadarTerrain(void)
+void kf_ToggleRadarTerrain()
 {
 	radarDrawMode = (RADAR_DRAW_MODE)(radarDrawMode + 1);
 	if (radarDrawMode >= NUM_RADAR_MODES)
@@ -2719,7 +2625,7 @@ void kf_ToggleRadarTerrain(void)
 }
 
 //Add a beacon (blip)
-void	kf_AddHelpBlip(void)
+void	kf_AddHelpBlip()
 {
 	int		worldX, worldY;
 	UDWORD	i;
@@ -2786,9 +2692,9 @@ void kf_NoAssert()
 // rotuine to decrement the tab-scroll 'buttons'
 void kf_BuildPrevPage()
 {
-	ASSERT_OR_RETURN(, psWScreen != NULL, " Invalid screen pointer!");
+	ASSERT_OR_RETURN(, psWScreen != nullptr, " Invalid screen pointer!");
 	ListTabWidget *psTForm = (ListTabWidget *)widgGetFromID(psWScreen, IDSTAT_TABFORM);
-	if (psTForm == NULL)
+	if (psTForm == nullptr)
 	{
 		return;
 	}
@@ -2805,9 +2711,9 @@ void kf_BuildPrevPage()
 // rotuine to advance the tab-scroll 'buttons'
 void kf_BuildNextPage()
 {
-	ASSERT_OR_RETURN(, psWScreen != NULL, " Invalid screen pointer!");
+	ASSERT_OR_RETURN(, psWScreen != nullptr, " Invalid screen pointer!");
 	ListTabWidget *psTForm = (ListTabWidget *)widgGetFromID(psWScreen, IDSTAT_TABFORM);
-	if (psTForm == NULL)
+	if (psTForm == nullptr)
 	{
 		return;
 	}

@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,6 +28,9 @@
 #include "lib/netplay/netplay.h"
 
 #include "multiplay.h"
+#include "group.h"
+#include "droid.h"
+#include "order.h"
 #include <QtCore/QMap>
 
 // Group system variables: grpGlobalManager enables to remove all the groups to Shutdown the system
@@ -35,7 +38,7 @@ static QMap<int, DROID_GROUP *> grpGlobalManager;
 static bool grpInitialized = false;
 
 // initialise the group system
-bool grpInitialise(void)
+bool grpInitialise()
 {
 	grpGlobalManager.clear();
 	grpInitialized = true;
@@ -43,7 +46,7 @@ bool grpInitialise(void)
 }
 
 // shutdown the group system
-void grpShutDown(void)
+void grpShutDown()
 {
 	/* Since we are not very diligent removing groups after we have
 	 * created them; we need this hack to remove them on level end. */
@@ -62,8 +65,8 @@ DROID_GROUP::DROID_GROUP()
 {
 	type = GT_NORMAL;
 	refCount = 0;
-	psList = NULL;
-	psCommander = NULL;
+	psList = nullptr;
+	psCommander = nullptr;
 	memset(&sRunData, 0, sizeof(sRunData));
 }
 
@@ -89,7 +92,7 @@ DROID_GROUP *grpCreate(int id)
 
 DROID_GROUP *grpFind(int id)
 {
-	DROID_GROUP *psGroup = grpGlobalManager.value(id, NULL);
+	DROID_GROUP *psGroup = grpGlobalManager.value(id, nullptr);
 	if (!psGroup)
 	{
 		psGroup = grpCreate(id);
@@ -104,7 +107,7 @@ void DROID_GROUP::add(DROID *psDroid)
 
 	refCount += 1;
 	// if psDroid == NULL just increase the refcount don't add anything to the list
-	if (psDroid != NULL)
+	if (psDroid != nullptr)
 	{
 		if (psList && psDroid->player != psList->player)
 		{
@@ -112,7 +115,7 @@ void DROID_GROUP::add(DROID *psDroid)
 			return;
 		}
 
-		if (psDroid->psGroup != NULL)
+		if (psDroid->psGroup != nullptr)
 		{
 			psDroid->psGroup->remove(psDroid);
 		}
@@ -121,14 +124,14 @@ void DROID_GROUP::add(DROID *psDroid)
 		if (isTransporter(psDroid))
 		{
 			ASSERT_OR_RETURN(, (type == GT_NORMAL), "grpJoin: Cannot have two transporters in a group");
-			ASSERT_OR_RETURN(, psList == NULL, "Adding transporter to non-empty list.");
+			ASSERT_OR_RETURN(, psList == nullptr, "Adding transporter to non-empty list.");
 			type = GT_TRANSPORTER;
 			psDroid->psGrpNext = psList;
 			psList = psDroid;
 		}
 		else if ((psDroid->droidType == DROID_COMMAND) && (type != GT_TRANSPORTER))
 		{
-			ASSERT_OR_RETURN(, (type == GT_NORMAL) && (psCommander == NULL), "grpJoin: Cannot have two command droids in a group");
+			ASSERT_OR_RETURN(, (type == GT_NORMAL) && (psCommander == nullptr), "grpJoin: Cannot have two command droids in a group");
 			type = GT_COMMAND;
 			psCommander = psDroid;
 		}
@@ -140,7 +143,7 @@ void DROID_GROUP::add(DROID *psDroid)
 
 		if (type == GT_COMMAND)
 		{
-			syncDebug("Droid %d joining command group %d", psDroid->id, psCommander != NULL ? psCommander->id : 0);
+			syncDebug("Droid %d joining command group %d", psDroid->id, psCommander != nullptr ? psCommander->id : 0);
 		}
 	}
 }
@@ -152,26 +155,26 @@ void DROID_GROUP::remove(DROID *psDroid)
 
 	ASSERT_OR_RETURN(, grpInitialized, "Group code not initialized yet");
 
-	if (psDroid != NULL && psDroid->psGroup != this)
+	if (psDroid != nullptr && psDroid->psGroup != this)
 	{
 		ASSERT(false, "grpLeave: droid group does not match");
 		return;
 	}
 
 	// SyncDebug
-	if (psDroid != NULL && type == GT_COMMAND)
+	if (psDroid != nullptr && type == GT_COMMAND)
 	{
-		syncDebug("Droid %d leaving command group %d", psDroid->id, psCommander != NULL ? psCommander->id : 0);
+		syncDebug("Droid %d leaving command group %d", psDroid->id, psCommander != nullptr ? psCommander->id : 0);
 	}
 
 	refCount -= 1;
 	// if psDroid == NULL just decrease the refcount don't remove anything from the list
-	if (psDroid != NULL)
+	if (psDroid != nullptr)
 	{
 		// update group list of droids and droids' psGrpNext
 		if (psDroid->droidType != DROID_COMMAND || type != GT_COMMAND)
 		{
-			psPrev = NULL;
+			psPrev = nullptr;
 			for (psCurr = psList; psCurr; psCurr = psCurr->psGrpNext)
 			{
 				if (psCurr == psDroid)
@@ -180,8 +183,8 @@ void DROID_GROUP::remove(DROID *psDroid)
 				}
 				psPrev = psCurr;
 			}
-			ASSERT(psCurr != NULL, "grpLeave: droid not found");
-			if (psCurr != NULL)
+			ASSERT(psCurr != nullptr, "grpLeave: droid not found");
+			if (psCurr != nullptr)
 			{
 				if (psPrev)
 				{
@@ -194,14 +197,14 @@ void DROID_GROUP::remove(DROID *psDroid)
 			}
 		}
 
-		psDroid->psGroup = NULL;
-		psDroid->psGrpNext = NULL;
+		psDroid->psGroup = nullptr;
+		psDroid->psGrpNext = nullptr;
 
 		// update group's type
 		if ((psDroid->droidType == DROID_COMMAND) && (type == GT_COMMAND))
 		{
 			type = GT_NORMAL;
-			psCommander = NULL;
+			psCommander = nullptr;
 		}
 		else if (isTransporter(psDroid) && (type == GT_TRANSPORTER))
 		{
@@ -269,7 +272,7 @@ void DROID_GROUP::orderGroup(DROID_ORDER order, UDWORD x, UDWORD y)
 	ASSERT(grpInitialized, "Group code not initialized yet");
 	ASSERT_OR_RETURN(, validOrderForLoc(order), "orderGroup: Bad order");
 
-	for (psCurr = psList; psCurr != NULL; psCurr = psCurr->psGrpNext)
+	for (psCurr = psList; psCurr != nullptr; psCurr = psCurr->psGrpNext)
 	{
 		orderDroidLoc(psCurr, order, x, y, bMultiMessages ? ModeQueue : ModeImmediate);
 	}
@@ -282,7 +285,7 @@ void DROID_GROUP::orderGroup(DROID_ORDER order, BASE_OBJECT *psObj)
 
 	ASSERT_OR_RETURN(, validOrderForObj(order), "orderGroup: Bad order");
 
-	for (psCurr = psList; psCurr != NULL; psCurr = psCurr->psGrpNext)
+	for (psCurr = psList; psCurr != nullptr; psCurr = psCurr->psGrpNext)
 	{
 		orderDroidObj(psCurr, order, (BASE_OBJECT *)psObj, bMultiMessages ? ModeQueue : ModeImmediate);
 	}

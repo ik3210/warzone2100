@@ -1,7 +1,7 @@
-/*
+	/*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -21,8 +21,11 @@
 #ifndef _INCLUDED_TEXTDRAW_
 #define _INCLUDED_TEXTDRAW_
 
-#include "ivisdef.h"
-#include "piepalette.h"
+#include <string>
+
+#include "lib/framework/vector.h"
+#include "lib/framework/opengl.h"
+#include "pietypes.h"
 
 enum iV_fonts
 {
@@ -30,26 +33,52 @@ enum iV_fonts
 	font_large,
 	font_medium,
 	font_small,
+	font_bar,
 	font_scaled,
 	font_count
 };
 
-extern void iV_TextInit(void);
-extern void iV_TextShutdown(void);
-extern void iV_font(const char *fontName, const char *fontFace, const char *fontFaceBold);
+class WzText
+{
+public:
+	WzText() {}
+	WzText(const std::string &text, iV_fonts fontID);
+	void setText(const std::string &text, iV_fonts fontID);
+	~WzText();
+	int width() { return dimensions.x; }
+	int height() { return dimensions.y; }
+	void render(Vector2i position, PIELIGHT colour, float rotation = 0.0f);
+	void render(int x, int y, PIELIGHT colour, float rotation = 0.0f) { render(Vector2i{x,y}, colour, rotation); }
+	int aboveBase() { return mAboveBase; }
+	int belowBase() { return mBelowBase; }
+	int lineSize() { return mLineSize; }
 
-extern void iV_SetFont(enum iV_fonts FontID);
-extern int iV_GetTextAboveBase(void);
-extern int iV_GetTextBelowBase(void);
-extern int iV_GetTextLineSize(void);
-extern unsigned int iV_GetTextWidth(const char *String);
-extern unsigned int iV_GetCountedTextWidth(const char *string, size_t string_length);
-extern unsigned int iV_GetCharWidth(uint32_t charCode);
+private:
+	iV_fonts mFontID = font_count;
+	std::string mText;
+	GLuint texture = 0;
+	int mAboveBase = 0;
+	int mBelowBase = 0;
+	int mLineSize = 0;
+	Vector2i offsets;
+	Vector2i dimensions;
+};
 
-extern unsigned int iV_GetTextHeight(const char *string);
-extern void iV_SetTextColour(PIELIGHT colour);
+void iV_TextInit();
+void iV_TextShutdown();
+void iV_font(const char *fontName, const char *fontFace, const char *fontFaceBold);
 
-// Valid values for "Justify" argument of iV_DrawFormattedText().
+int iV_GetTextAboveBase(iV_fonts fontID);
+int iV_GetTextBelowBase(iV_fonts fontID);
+int iV_GetTextLineSize(iV_fonts fontID);
+unsigned int iV_GetTextWidth(const char *String, iV_fonts fontID);
+unsigned int iV_GetCountedTextWidth(const char *string, size_t string_length, iV_fonts fontID);
+unsigned int iV_GetCharWidth(uint32_t charCode, iV_fonts fontID);
+
+unsigned int iV_GetTextHeight(const char *string, iV_fonts fontID);
+void iV_SetTextColour(PIELIGHT colour);
+
+/// Valid values for "Justify" argument of iV_DrawFormattedText().
 enum
 {
 	FTEXT_LEFTJUSTIFY,			// Left justify.
@@ -57,19 +86,13 @@ enum
 	FTEXT_RIGHTJUSTIFY,			// Right justify.
 };
 
-extern int iV_DrawFormattedText(const char *String, UDWORD x, UDWORD y, UDWORD Width, UDWORD Justify);
+int iV_DrawFormattedText(const char *String, UDWORD x, UDWORD y, UDWORD Width, UDWORD Justify, iV_fonts fontID);
+void iV_DrawTextRotated(const char *string, float x, float y, float rotation, iV_fonts fontID);
 
-extern void iV_SetTextSize(float size);
-
-extern void iV_DrawTextRotated(const char *string, float x, float y, float rotation);
-
-/** Draws text with a printf syntax to the screen.
- */
-static inline void iV_DrawText(const char *string, float x, float y)
+/// Draws text with a printf syntax to the screen.
+static inline void iV_DrawText(const char *string, float x, float y, iV_fonts fontID)
 {
-	iV_DrawTextRotated(string, x, y, 0.f);
+	iV_DrawTextRotated(string, x, y, 0.f, fontID);
 }
-
-extern void iV_DrawTextF(float x, float y, const char *format, ...) WZ_DECL_FORMAT(printf, 3, 4);
 
 #endif // _INCLUDED_TEXTDRAW_

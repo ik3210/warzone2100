@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 2004  Giel van Schijndel
-	Copyright (C) 2007-2015  Warzone 2100 Project
+	Copyright (C) 2007-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 
 #include "lib/framework/types.h"
 
-extern const char *version_getVersionString(void);
-extern const char *version_getFormattedVersionString(void);
+const char *version_getVersionString();
+const char *version_getFormattedVersionString();
 
 #endif // __INCLUDED_VERSION_H__

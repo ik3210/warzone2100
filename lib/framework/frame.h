@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -49,6 +49,13 @@
 #include "i18n.h"
 #include "trig.h"
 #include "cursors.h"
+
+#if __clang__
+// workaround LLVM bug https://bugs.llvm.org//show_bug.cgi?id=21629
+#pragma clang diagnostic ignored "-Wmissing-braces"
+// workaround bad implementations in our code
+#pragma clang diagnostic ignored "-Wcast-align"
+#endif
 
 #define REALCONCAT(x, y) x ## y
 #define CONCAT(x, y) REALCONCAT(x, y)

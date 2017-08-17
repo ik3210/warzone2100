@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -52,7 +52,6 @@
 #include <algorithm>
 #include <memory>
 
-#include "lib/framework/crc.h"
 #include "lib/netplay/netplay.h"
 
 /// A coordinate.
@@ -155,7 +154,7 @@ struct PathNonblockingArea
 // Data structures used for pathfinding, can contain cached results.
 struct PathfindContext
 {
-	PathfindContext() : myGameTime(0), iteration(0), blockingMap(NULL) {}
+	PathfindContext() : myGameTime(0), iteration(0), blockingMap(nullptr) {}
 	bool isBlocked(int x, int y) const
 	{
 		if (dstIgnore.isNonblocking(x, y))
@@ -254,13 +253,13 @@ static inline PathNode fpathTakeNode(std::vector<PathNode> &nodes)
 
 /** Estimate the distance to the target point
  */
-static inline unsigned WZ_DECL_CONST fpathEstimate(PathCoord s, PathCoord f)
+static inline unsigned WZ_DECL_PURE fpathEstimate(PathCoord s, PathCoord f)
 {
 	// Cost of moving horizontal/vertical = 70*2, cost of moving diagonal = 99*2, 99/70 = 1.41428571... ≈ √2 = 1.41421356...
 	unsigned xDelta = abs(s.x - f.x), yDelta = abs(s.y - f.y);
 	return std::min(xDelta, yDelta) * (198 - 140) + std::max(xDelta, yDelta) * 140;
 }
-static inline unsigned WZ_DECL_CONST fpathGoodEstimate(PathCoord s, PathCoord f)
+static inline unsigned WZ_DECL_PURE fpathGoodEstimate(PathCoord s, PathCoord f)
 {
 	// Cost of moving horizontal/vertical = 70*2, cost of moving diagonal = 99*2, 99/70 = 1.41428571... ≈ √2 = 1.41421356...
 	return iHypot((s.x - f.x) * 140, (s.y - f.y) * 140);
@@ -341,9 +340,9 @@ static inline void fpathNewNode(PathfindContext &context, PathCoord dest, PathCo
 /// Recalculates estimates to new tileF tile.
 static void fpathAStarReestimate(PathfindContext &context, PathCoord tileF)
 {
-	for (std::vector<PathNode>::iterator node = context.nodes.begin(); node != context.nodes.end(); ++node)
+	for (auto &node : context.nodes)
 	{
-		node->est = node->dist + fpathGoodEstimate(node->p, tileF);
+		node.est = node.dist + fpathGoodEstimate(node.p, tileF);
 	}
 
 	// Changing the estimates breaks the heap ordering. Fix the heap ordering.

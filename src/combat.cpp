@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
  */
 
 #include "lib/framework/frame.h"
+#include "lib/framework/fixedpoint.h"
 #include "lib/netplay/netplay.h"
 
 #include "action.h"
@@ -36,7 +37,8 @@
 #include "projectile.h"
 #include "random.h"
 #include "qtscript.h"
-
+#include "order.h"
+#include "objmem.h"
 
 /* Fire a weapon at something */
 bool combFire(WEAPON *psWeap, BASE_OBJECT *psAttacker, BASE_OBJECT *psTarget, int weapon_slot)
@@ -48,7 +50,7 @@ bool combFire(WEAPON *psWeap, BASE_OBJECT *psAttacker, BASE_OBJECT *psTarget, in
 
 	CHECK_OBJECT(psAttacker);
 	CHECK_OBJECT(psTarget);
-	ASSERT(psWeap != NULL, "Invalid weapon pointer");
+	ASSERT(psWeap != nullptr, "Invalid weapon pointer");
 
 	/* Don't shoot if the weapon_slot of a vtol is empty */
 	if (psAttacker->type == OBJ_DROID && isVtolDroid(((DROID *)psAttacker))
@@ -125,7 +127,7 @@ bool combFire(WEAPON *psWeap, BASE_OBJECT *psAttacker, BASE_OBJECT *psTarget, in
 	// if the turret doesn't turn, check if the attacker is in alignment with the target
 	if (psAttacker->type == OBJ_DROID && !psStats->rotate)
 	{
-		uint16_t targetDir = iAtan2(removeZ(deltaPos));
+		uint16_t targetDir = iAtan2(deltaPos.xy);
 		int dirDiff = abs(angleDelta(targetDir - psAttacker->rot.direction));
 		if (dirDiff > FIXED_TURRET_DIR)
 		{
@@ -134,7 +136,7 @@ bool combFire(WEAPON *psWeap, BASE_OBJECT *psAttacker, BASE_OBJECT *psTarget, in
 	}
 
 	/* Now see if the target is in range  - also check not too near */
-	int dist = iHypot(removeZ(deltaPos));
+	int dist = iHypot(deltaPos.xy);
 	longRange = proj_GetLongRange(psStats, psAttacker->player);
 
 	int min_angle = 0;
@@ -254,7 +256,7 @@ bool combFire(WEAPON *psWeap, BASE_OBJECT *psAttacker, BASE_OBJECT *psTarget, in
 		predict += Vector3i(iSinCosR(psDroid->sMove.moveDir, psDroid->sMove.speed * flightTime / GAME_TICKS_PER_SEC), 0);
 		if (!isFlying(psDroid))
 		{
-			predict.z = map_Height(removeZ(predict));  // Predict that the object will be on the ground.
+			predict.z = map_Height(predict.xy);  // Predict that the object will be on the ground.
 		}
 	}
 
@@ -278,7 +280,7 @@ bool combFire(WEAPON *psWeap, BASE_OBJECT *psAttacker, BASE_OBJECT *psTarget, in
 		Vector3i miss = Vector3i(iSinCosR(gameRand(DEG(360)), missDist), 0);
 		predict += miss;
 
-		psTarget = NULL;  // Missed the target, so don't expect to hit it.
+		psTarget = nullptr;  // Missed the target, so don't expect to hit it.
 
 		objTrace(psAttacker->id, "combFire: Missed shot by (%4d,%4d)", miss.x, miss.y);
 		syncDebug("miss=(%d,%d,%d)", predict.x, predict.y, predict.z);
@@ -300,9 +302,9 @@ void counterBatteryFire(BASE_OBJECT *psAttacker, BASE_OBJECT *psTarget)
 	projectile is sent - we may have to cater for these at some point*/
 	// also ignore cases where you attack your own player
 	// Also ignore cases where there are already 1000 missiles heading towards the attacker.
-	if (psTarget == NULL
-	    || (psAttacker != NULL && psAttacker->player == psTarget->player)
-	    || (psAttacker != NULL && aiObjectIsProbablyDoomed(psAttacker, false)))
+	if (psTarget == nullptr
+	    || (psAttacker != nullptr && psAttacker->player == psTarget->player)
+	    || (psAttacker != nullptr && aiObjectIsProbablyDoomed(psAttacker, false)))
 	{
 		return;
 	}
@@ -469,7 +471,7 @@ unsigned int objGuessFutureDamage(WEAPON_STATS *psStats, unsigned int player, BA
 	unsigned int damage;
 	int actualDamage, armour, level = 1;
 
-	if (psTarget == NULL)
+	if (psTarget == nullptr)
 	{
 		return 0;    // Hard to destroy the ground. The armour on the mud is very strong and blocks all damage.
 	}

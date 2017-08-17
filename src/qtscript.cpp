@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -43,11 +43,16 @@
 #include "lib/framework/wzconfig.h"
 #include "lib/framework/file.h"
 #include "lib/gamelib/gtime.h"
+#include "lib/netplay/netplay.h"
 #include "multiplay.h"
+#include "levels.h"
 #include "map.h"
 #include "difficulty.h"
 #include "console.h"
-#include "lib/netplay/netplay.h"
+#include "clparse.h"
+
+#include <set>
+#include <utility>
 
 #include "qtscriptdebug.h"
 #include "qtscriptfuncs.h"
@@ -78,9 +83,9 @@ struct timerNode
 	int player;
 	int calls;
 	timerType type;
-	timerNode() : engine(NULL), baseobjtype(OBJ_NUM_TYPES) {}
+	timerNode() : engine(nullptr), baseobjtype(OBJ_NUM_TYPES) {}
 	timerNode(QScriptEngine *caller, QString val, int plr, int frame)
-		: function(val), engine(caller), baseobj(-1), baseobjtype(OBJ_NUM_TYPES), frameTime(frame + gameTime), ms(frame), player(plr), calls(0), type(TIMER_REPEAT) {}
+		: function(std::move(val)), engine(caller), baseobj(-1), baseobjtype(OBJ_NUM_TYPES), frameTime(frame + gameTime), ms(frame), player(plr), calls(0), type(TIMER_REPEAT) {}
 	bool operator== (const timerNode &t)
 	{
 		return function == t.function && player == t.player;
@@ -115,7 +120,7 @@ struct researchEvent
 static QQueue<struct researchEvent> eventQueue;
 
 /// Remember what names are used internally in the scripting engine, we don't want to save these to the savegame
-static QHash<QString, int> internalNamespace;
+static std::set<QString> internalNamespace;
 
 typedef struct monitor_bin
 {
@@ -129,6 +134,7 @@ typedef struct monitor_bin
 } MONITOR_BIN;
 typedef QHash<QString, MONITOR_BIN> MONITOR;
 static QHash<QScriptEngine *, MONITOR *> monitors;
+static QHash<QScriptEngine *, QStringList> eventNamespaces; // separate event namespaces for libraries
 
 static MODELMAP models;
 static QStandardItemModel *triggerModel;
@@ -138,10 +144,27 @@ static void updateGlobalModels();
 
 // ----------------------------------------------------------
 
-// Call a function by name
-static QScriptValue callFunction(QScriptEngine *engine, const QString &function, const QScriptValueList &args, bool required = false)
+void doNotSaveGlobal(const QString &global)
 {
-	code_part level = required ? LOG_ERROR : LOG_SCRIPT;
+	internalNamespace.insert(global);
+}
+
+// Call a function by name
+static QScriptValue callFunction(QScriptEngine *engine, const QString &function, const QScriptValueList &args, bool event = true)
+{
+	if (event)
+	{
+		// recurse into variants, if any
+		for (const QString &s : eventNamespaces[engine])
+		{
+			const QScriptValue &value = engine->globalObject().property(s + function);
+			if (value.isValid() && value.isFunction())
+			{
+				callFunction(engine, s + function, args, event);
+			}
+		}
+	}
+	code_part level = event ? LOG_SCRIPT : LOG_ERROR;
 	QScriptValue value = engine->globalObject().property(function);
 	if (!value.isValid() || !value.isFunction())
 	{
@@ -341,6 +364,18 @@ void scriptRemoveObject(BASE_OBJECT *psObj)
 	groupRemoveObject(psObj);
 }
 
+//-- \subsection{namespace(prefix)}
+//-- Registers a new event namespace. All events can now have this prefix. This is useful for
+//-- code libraries, to implement event that do not conflict with events in main code. This
+//-- function should be called from global; do not (for hopefully obvious reasons) put it
+//-- inside an event.
+static QScriptValue js_namespace(QScriptContext *context, QScriptEngine *engine)
+{
+	QString prefix(context->argument(0).toString());
+	eventNamespaces[engine].append(prefix);
+	return QScriptValue(true);
+}
+
 //-- \subsection{include(file)}
 //-- Includes another source code file at this point. You should generally only specify the filename,
 //-- not try to specify its path, here.
@@ -359,7 +394,7 @@ static QScriptValue js_include(QScriptContext *context, QScriptEngine *engine)
 		path = "scripts/" + basename.filePath(); // use this path instead (in user write dir)
 	}
 	UDWORD size;
-	char *bytes = NULL;
+	char *bytes = nullptr;
 	if (!loadFile(path.toUtf8().constData(), &bytes, &size))
 	{
 		debug(LOG_ERROR, "Failed to read include file \"%s\" (path=%s, name=%s)",
@@ -418,10 +453,9 @@ bool shutdownScripts()
 	jsDebugShutdown();
 	globalDialog = false;
 	models.clear();
-	triggerModel = NULL;
-	for (int i = 0; i < scripts.size(); ++i)
+	triggerModel = nullptr;
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		MONITOR *monitor = monitors.value(engine);
 		QString scriptName = engine->globalObject().property("scriptName").toString();
 		int me = engine->globalObject().property("me").toInt32();
@@ -429,7 +463,7 @@ bool shutdownScripts()
 		dumpScriptLog(scriptName, me, "    calls | avg (usec) | worst (usec) | worst call at | >=limit | >=limit/2 | function\n");
 		for (MONITOR::const_iterator iter = monitor->constBegin(); iter != monitor->constEnd(); ++iter)
 		{
-			QString function = iter.key();
+			const QString& function = iter.key();
 			MONITOR_BIN m = iter.value();
 			QString info = QString("%1 | %2 | %3 | %4 | %5 | %6 | %7\n")
 			               .arg(m.calls, 9).arg(m.time / m.calls, 10).arg(m.worst, 12)
@@ -456,21 +490,18 @@ bool updateScripts()
 	// Call delayed triggers here
 	if (selectionChanged)
 	{
-		for (int i = 0; i < scripts.size(); ++i)
+		for (auto *engine : scripts)
 		{
-			QScriptEngine *engine = scripts.at(i);
 			QScriptValueList args;
-			args += js_enumSelected(NULL, engine);
+			args += js_enumSelected(nullptr, engine);
 			callFunction(engine, "eventSelectionChanged", args);
 		}
 		selectionChanged = false;
 	}
 
 	// Update gameTime
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
-
 		engine->globalObject().setProperty("gameTime", gameTime, QScriptValue::ReadOnly | QScriptValue::Undeletable);
 	}
 	// Weed out dead timers
@@ -526,21 +557,21 @@ bool updateScripts()
 	return true;
 }
 
-QScriptEngine *loadPlayerScript(QString path, int player, int difficulty)
+QScriptEngine *loadPlayerScript(const QString& path, int player, int difficulty)
 {
-	ASSERT_OR_RETURN(NULL, player < MAX_PLAYERS, "Player index %d out of bounds", player);
+	ASSERT_OR_RETURN(nullptr, player < MAX_PLAYERS, "Player index %d out of bounds", player);
 	QScriptEngine *engine = new QScriptEngine();
 	UDWORD size;
-	char *bytes = NULL;
+	char *bytes = nullptr;
 	if (!loadFile(path.toUtf8().constData(), &bytes, &size))
 	{
 		debug(LOG_ERROR, "Failed to read script file \"%s\"", path.toUtf8().constData());
-		return NULL;
+		return nullptr;
 	}
 	QString source = QString::fromUtf8(bytes, size);
 	free(bytes);
 	QScriptSyntaxCheckResult syntax = QScriptEngine::checkSyntax(source);
-	ASSERT_OR_RETURN(NULL, syntax.state() == QScriptSyntaxCheckResult::Valid, "Syntax error in %s line %d: %s",
+	ASSERT_OR_RETURN(nullptr, syntax.state() == QScriptSyntaxCheckResult::Valid, "Syntax error in %s line %d: %s",
 	                 path.toUtf8().constData(), syntax.errorLineNumber(), syntax.errorMessage().toUtf8().constData());
 	// Special functions
 	engine->globalObject().setProperty("setTimer", engine->newFunction(js_setTimer));
@@ -548,6 +579,7 @@ QScriptEngine *loadPlayerScript(QString path, int player, int difficulty)
 	engine->globalObject().setProperty("removeTimer", engine->newFunction(js_removeTimer));
 	engine->globalObject().setProperty("profile", engine->newFunction(js_profile));
 	engine->globalObject().setProperty("include", engine->newFunction(js_include));
+	engine->globalObject().setProperty("namespace", engine->newFunction(js_namespace));
 
 	// Special global variables
 	//== \item[version] Current version of the game, set in \emph{major.minor} format.
@@ -613,7 +645,7 @@ QScriptEngine *loadPlayerScript(QString path, int player, int difficulty)
 	while (it.hasNext())
 	{
 		it.next();
-		internalNamespace.insert(it.name(), 1);
+		internalNamespace.insert(it.name());
 	}
 
 	// We need to always save the 'me' special variable.
@@ -629,7 +661,7 @@ QScriptEngine *loadPlayerScript(QString path, int player, int difficulty)
 	engine->globalObject().setProperty("scriptPath", basename.path(), QScriptValue::ReadOnly | QScriptValue::Undeletable);
 
 	QScriptValue result = engine->evaluate(source, path);
-	ASSERT_OR_RETURN(NULL, !engine->hasUncaughtException(), "Uncaught exception at line %d, file %s: %s",
+	ASSERT_OR_RETURN(nullptr, !engine->hasUncaughtException(), "Uncaught exception at line %d, file %s: %s",
 	                 engine->uncaughtExceptionLineNumber(), path.toUtf8().constData(), result.toString().toUtf8().constData());
 
 	// Register script
@@ -644,7 +676,7 @@ QScriptEngine *loadPlayerScript(QString path, int player, int difficulty)
 
 bool loadGlobalScript(QString path)
 {
-	return loadPlayerScript(path, selectedPlayer, 0);
+	return loadPlayerScript(std::move(path), selectedPlayer, 0);
 }
 
 bool saveScriptStates(const char *filename)
@@ -659,7 +691,7 @@ bool saveScriptStates(const char *filename)
 		while (it.hasNext())
 		{
 			it.next();
-			if (!internalNamespace.contains(it.name()) && !it.value().isFunction()
+			if (internalNamespace.count(it.name()) == 0 && !it.value().isFunction()
 			    && !it.value().equals(engine->globalObject()))
 			{
 				ini.setValue(it.name(), it.value().toVariant());
@@ -693,11 +725,10 @@ bool saveScriptStates(const char *filename)
 	return true;
 }
 
-static QScriptEngine *findEngineForPlayer(int match, QString scriptName)
+static QScriptEngine *findEngineForPlayer(int match, const QString& scriptName)
 {
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		int player = engine->globalObject().property("me").toInt32();
 		QString matchName = engine->globalObject().property("scriptName").toString();
 		if (match == player && (matchName.compare(scriptName, Qt::CaseInsensitive) == 0 || scriptName.isEmpty()))
@@ -707,7 +738,7 @@ static QScriptEngine *findEngineForPlayer(int match, QString scriptName)
 	}
 	ASSERT(false, "Script context for player %d and script name %s not found",
 	       match, scriptName.toUtf8().constData());
-	return NULL;
+	return nullptr;
 }
 
 bool loadScriptStates(const char *filename)
@@ -769,7 +800,7 @@ static QStandardItemList addModelItem(QScriptValueIterator &it)
 {
 	QStandardItemList l;
 	QStandardItem *key = new QStandardItem(it.name());
-	QStandardItem *value = NULL;
+	QStandardItem *value = nullptr;
 
 	if (it.value().isObject() || it.value().isArray())
 	{
@@ -792,9 +823,8 @@ static QStandardItemList addModelItem(QScriptValueIterator &it)
 
 static void updateGlobalModels()
 {
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		QScriptValueIterator it(engine->globalObject());
 		QStandardItemModel *m = models.value(engine);
 		m->setRowCount(0);
@@ -802,7 +832,7 @@ static void updateGlobalModels()
 		while (it.hasNext())
 		{
 			it.next();
-			if ((!internalNamespace.contains(it.name()) && !it.value().isFunction()
+			if ((internalNamespace.count(it.name()) == 0 && !it.value().isFunction()
 			     && !it.value().equals(engine->globalObject()))
 			    || it.name() == "Upgrades" || it.name() == "Stats")
 			{
@@ -813,9 +843,8 @@ static void updateGlobalModels()
 	}
 	QStandardItemModel *m = triggerModel;
 	m->setRowCount(0);
-	for (int i = 0; i < timers.size(); ++i)
+	for (const auto &node : timers)
 	{
-		timerNode node = timers.at(i);
 		int nextRow = m->rowCount();
 		m->setRowCount(nextRow);
 		m->setItem(nextRow, 0, new QStandardItem(node.function));
@@ -885,7 +914,7 @@ void jsAutogame()
 	QString srcPath(PHYSFS_getWriteDir());
 	srcPath += PHYSFS_getDirSeparator();
 	srcPath += "scripts";
-	QString path = QFileDialog::getOpenFileName(NULL, "Choose AI script to load", srcPath, "Javascript files (*.js)");
+	QString path = QFileDialog::getOpenFileName(nullptr, "Choose AI script to load", srcPath, "Javascript files (*.js)");
 	QFileInfo basename(path);
 	if (path.isEmpty())
 	{
@@ -898,9 +927,8 @@ void jsAutogame()
 void jsShowDebug()
 {
 	// Add globals
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		QStandardItemModel *m = new QStandardItemModel(0, 2);
 		m->setHeaderData(0, Qt::Horizontal, QString("Name"));
 		m->setHeaderData(1, Qt::Horizontal, QString("Value"));
@@ -926,7 +954,7 @@ void jsShowDebug()
 
 /// For generic, parameter-less triggers
 //__ \subsection{eventGameInit()}
-//__ An event that is run once as the game is initialized. Not all game may have been
+//__ An event that is run once as the game is initialized. Not all game state may have been
 //__ properly initialized by this time, so use this only to initialize script state.
 //__ \subsection{eventStartLevel()}
 //__ An event that is run once the game has started and all game data has been loaded.
@@ -954,9 +982,8 @@ bool triggerEvent(SCRIPT_TRIGGER_TYPE trigger, BASE_OBJECT *psObj)
 {
 	// HACK: TRIGGER_VIDEO_QUIT is called before scripts for initial campaign video
 	ASSERT(scriptsReady || trigger == TRIGGER_VIDEO_QUIT, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		QScriptValueList args;
 
 		if (psObj)
@@ -1016,6 +1043,13 @@ bool triggerEvent(SCRIPT_TRIGGER_TYPE trigger, BASE_OBJECT *psObj)
 			break;
 		}
 	}
+
+	if ((trigger == TRIGGER_START_LEVEL || trigger == TRIGGER_GAME_LOADED) && !saveandquit_enabled().empty())
+	{
+		saveGame(saveandquit_enabled().c_str(), GTYPE_SAVE_START);
+		exit(0);
+	}
+
 	return true;
 }
 
@@ -1024,9 +1058,8 @@ bool triggerEvent(SCRIPT_TRIGGER_TYPE trigger, BASE_OBJECT *psObj)
 bool triggerEventPlayerLeft(int id)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		QScriptValueList args;
 		args += id;
 		callFunction(engine, "eventPlayerLeft", args);
@@ -1039,9 +1072,8 @@ bool triggerEventPlayerLeft(int id)
 bool triggerEventCheatMode(bool entered)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		QScriptValueList args;
 		args += entered;
 		callFunction(engine, "eventCheatMode", args);
@@ -1053,9 +1085,8 @@ bool triggerEventCheatMode(bool entered)
 bool triggerEventDroidIdle(DROID *psDroid)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		int player = engine->globalObject().property("me").toInt32();
 		if (player == psDroid->player)
 		{
@@ -1074,9 +1105,8 @@ bool triggerEventDroidIdle(DROID *psDroid)
 bool triggerEventDroidBuilt(DROID *psDroid, STRUCTURE *psFactory)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		int player = engine->globalObject().property("me").toInt32();
 		bool receiveAll = engine->globalObject().property("isReceivingAllEvents").toBool();
 		if (player == psDroid->player || receiveAll)
@@ -1100,9 +1130,8 @@ bool triggerEventDroidBuilt(DROID *psDroid, STRUCTURE *psFactory)
 bool triggerEventStructBuilt(STRUCTURE *psStruct, DROID *psDroid)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		int player = engine->globalObject().property("me").toInt32();
 		bool receiveAll = engine->globalObject().property("isReceivingAllEvents").toBool();
 		if (player == psStruct->player || receiveAll)
@@ -1126,9 +1155,8 @@ bool triggerEventStructBuilt(STRUCTURE *psStruct, DROID *psDroid)
 bool triggerEventStructureReady(STRUCTURE *psStruct)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		int player = engine->globalObject().property("me").toInt32();
 		bool receiveAll = engine->globalObject().property("isReceivingAllEvents").toBool();
 		if (player == psStruct->player || receiveAll)
@@ -1158,9 +1186,8 @@ bool triggerEventAttacked(BASE_OBJECT *psVictim, BASE_OBJECT *psAttacker, int la
 	{
 		return false;
 	}
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		int player = engine->globalObject().property("me").toInt32();
 		bool receiveAll = engine->globalObject().property("isReceivingAllEvents").toBool();
 		if (player == psVictim->player || receiveAll)
@@ -1188,9 +1215,8 @@ bool triggerEventResearched(RESEARCH *psResearch, STRUCTURE *psStruct, int playe
 		eventQueue.enqueue(researchEvent(psResearch, psStruct, player));
 		return true;
 	}
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		int me = engine->globalObject().property("me").toInt32();
 		bool receiveAll = engine->globalObject().property("isReceivingAllEvents").toBool();
 		if (me == player || receiveAll)
@@ -1235,9 +1261,8 @@ bool triggerEventDestroyed(BASE_OBJECT *psVictim)
 bool triggerEventPickup(FEATURE *psFeat, DROID *psDroid)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		QScriptValueList args;
 		args += convFeature(psFeat, engine);
 		args += convDroid(psDroid, engine);
@@ -1335,9 +1360,8 @@ bool triggerEventChat(int from, int to, const char *message)
 //__ Message may be undefined.
 bool triggerEventBeacon(int from, int to, const char *message, int x, int y)
 {
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		int me = engine->globalObject().property("me").toInt32();
 		bool receiveAll = engine->globalObject().property("isReceivingAllEvents").toBool();
 		if (me == to || receiveAll)
@@ -1363,9 +1387,8 @@ bool triggerEventBeacon(int from, int to, const char *message, int x, int y)
 bool triggerEventBeaconRemoved(int from, int to)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		int me = engine->globalObject().property("me").toInt32();
 		bool receiveAll = engine->globalObject().property("isReceivingAllEvents").toBool();
 		if (me == to || receiveAll)
@@ -1419,12 +1442,11 @@ bool triggerEventDroidMoved(DROID *psDroid, int oldx, int oldy)
 //__ An event that is run whenever a droid enters an area label. The area is then
 //__ deactived. Call resetArea() to reactivate it. The name of the event is
 //__ eventArea + the name of the label.
-bool triggerEventArea(QString label, DROID *psDroid)
+bool triggerEventArea(const QString& label, DROID *psDroid)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		QScriptValueList args;
 		args += convDroid(psDroid, engine);
 		QString funcname = QString("eventArea" + label);
@@ -1441,9 +1463,8 @@ bool triggerEventArea(QString label, DROID *psDroid)
 bool triggerEventDesignCreated(DROID_TEMPLATE *psTemplate)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		QScriptValueList args;
 		args += convTemplate(psTemplate, engine);
 		callFunction(engine, "eventDesignCreated", args);
@@ -1458,9 +1479,8 @@ bool triggerEventDesignCreated(DROID_TEMPLATE *psTemplate)
 bool triggerEventSyncRequest(int from, int req_id, int x, int y, BASE_OBJECT *psObj, BASE_OBJECT *psObj2)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
 		QScriptValueList args;
 		args += QScriptValue(from);
 		args += QScriptValue(req_id);
@@ -1485,10 +1505,9 @@ bool triggerEventSyncRequest(int from, int req_id, int x, int y, BASE_OBJECT *ps
 bool triggerEventKeyPressed(int meta, int key)
 {
 	ASSERT(scriptsReady, "Scripts not initialized yet");
-	for (int i = 0; i < scripts.size(); ++i)
+	for (auto *engine : scripts)
 	{
-		QScriptEngine *engine = scripts.at(i);
-                QScriptValueList args;
+		QScriptValueList args;
 		args += QScriptValue(meta);
 		args += QScriptValue(key);
 		callFunction(engine, "eventKeyPressed", args);

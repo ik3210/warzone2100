@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -31,7 +31,6 @@
 
 #include "lib/framework/frame.h"
 #include "lib/framework/input.h"
-#include "lib/framework/strres.h"
 #include "lib/netplay/netplay.h"
 #include "lib/gamelib/gtime.h"
 #include "keymap.h"
@@ -41,26 +40,17 @@
 #include "display3d.h"
 #include "keymap.h"
 #include "keyedit.h"
-#include "lib/script/script.h"
 
 static UDWORD asciiKeyCodeToTable(KEY_CODE code);
+static KEY_CODE getQwertyKey();
 
 // ----------------------------------------------------------------------------------
-KEY_MAPPING	*keyGetMappingFromFunction(void	*function)
+KEY_MAPPING *keyGetMappingFromFunction(void (*function)())
 {
-	KEY_MAPPING	*psMapping, *psReturn;
-
-	for (psMapping = keyMappings, psReturn = NULL;
-	     psMapping && !psReturn;
-	     psMapping = psMapping->psNext)
-	{
-		if ((void *)psMapping->function == function)
-		{
-			psReturn = psMapping;
-		}
-	}
-
-	return (psReturn);
+	auto mapping = std::find_if(keyMappings.begin(), keyMappings.end(), [function](KEY_MAPPING const &mapping) {
+		return mapping.function == function;
+	});
+	return mapping != keyMappings.end()? &*mapping : nullptr;
 }
 // ----------------------------------------------------------------------------------
 /* Some stuff allowing the user to add key mappings themselves */
@@ -81,193 +71,188 @@ static bool bWantDebugMappings[MAX_PLAYERS] = {false};
 
 // ----------------------------------------------------------------------------------
 /* The linked list of present key mappings */
-KEY_MAPPING	*keyMappings;
-
-/* Holds number of active mappings */
-UDWORD	numActiveMappings;
+std::list<KEY_MAPPING> keyMappings;
 
 /* Last meta and sub key that were recorded */
 static KEY_CODE	lastMetaKey, lastSubKey;
-static bool	bKeyProcessing = true;
-
-static void kf_NOOP(void) {}
 
 // ----------------------------------------------------------------------------------
 // Adding a mapped function ? add a save pointer! Thank AlexL.
-// don't bugger around with the order either. new ones go at the end! DEBUG in debug section..
 
-//typedef void (*_keymapsave)(void);
-_keymapsave keyMapSaveTable[] =
+static KeyMapSaveEntry const keyMapSaveTable[] =
 {
-	kf_ChooseManufacture,
-	kf_ChooseResearch,
-	kf_ChooseBuild,
-	kf_ChooseDesign,
-	kf_ChooseIntelligence,
-	kf_ChooseCommand,
-	kf_ToggleRadar,
-	kf_ToggleConsole,
-	kf_ToggleEnergyBars,
-	kf_ToggleTeamChat,
-	kf_ScreenDump ,
-	kf_MoveToLastMessagePos,
-	kf_AssignGrouping_1,
-	kf_AssignGrouping_2,
-	kf_AssignGrouping_3,
-	kf_AssignGrouping_4,
-	kf_AssignGrouping_5,
-	kf_AssignGrouping_6,
-	kf_AssignGrouping_7,
-	kf_AssignGrouping_8,
-	kf_AssignGrouping_9,
-	kf_SelectGrouping_1,
-	kf_SelectGrouping_2,
-	kf_SelectGrouping_3,
-	kf_SelectGrouping_4,
-	kf_SelectGrouping_5,
-	kf_SelectGrouping_6,
-	kf_SelectGrouping_7,
-	kf_SelectGrouping_8,
-	kf_SelectGrouping_9,
-	kf_addMultiMenu,
-	kf_multiAudioStart,
-	kf_multiAudioStop,
-	kf_SeekNorth,
-	kf_ToggleCamera,
-	kf_addInGameOptions,
-	kf_RadarZoomOut,
-	kf_RadarZoomIn,
-	kf_ZoomOut,
-	kf_ZoomIn,
-	kf_PitchForward,
-	kf_RotateLeft,
-	kf_ResetPitch,
-	kf_RotateRight,
-	kf_PitchBack,
-	kf_RightOrderMenu,
-	kf_JumpToResourceExtractor,
-	kf_JumpToRepairUnits,
-	kf_JumpToConstructorUnits,
-	kf_JumpToSensorUnits,
-	kf_JumpToCommandUnits,
-	kf_ToggleOverlays,
-	kf_CentreOnBase,
-	kf_SetDroidAttackCease ,
-	kf_JumpToUnassignedUnits ,
-	kf_SetDroidAttackReturn ,
-	kf_SetDroidAttackAtWill ,
-	kf_SetDroidReturnToBase ,
-	kf_NOOP,
-	kf_ToggleFormationSpeedLimiting,
-	kf_NOOP,
-	kf_NOOP,
-	kf_SetDroidMovePatrol ,
-	kf_SetDroidGoForRepair ,
-	kf_SetDroidOrderHold,
-	kf_SendGlobalMessage,
-	kf_SendTeamMessage,
-	kf_ScatterDroids,
-	kf_SetDroidRetreatMedium,
-	kf_SetDroidRetreatHeavy,
-	kf_SetDroidRetreatNever,
-	kf_SelectAllCombatUnits,
-	kf_SelectAllDamaged,
-	kf_SelectAllHalfTracked,
-	kf_SelectAllHovers,
-	kf_SetDroidRecycle,
-	kf_SelectAllOnScreenUnits,
-	kf_SelectAllTracked,
-	kf_SelectAllUnits,
-	kf_SelectAllVTOLs,
-	kf_SelectAllWheeled,
-	kf_FrameRate,
-	kf_SelectAllSameType,
-	kf_SelectNextFactory,
-	kf_SelectNextResearch,
-	kf_SelectNextPowerStation,
-	kf_SelectNextCyborgFactory,
-	kf_ToggleConsoleDrop,
-	kf_SelectCommander_1,
-	kf_SelectCommander_2,
-	kf_SelectCommander_3,
-	kf_SelectCommander_4,
-	kf_SelectCommander_5,
-	kf_SelectCommander_6,
-	kf_SelectCommander_7,
-	kf_SelectCommander_8,
-	kf_SelectCommander_9,
-	kf_FaceNorth,
-	kf_FaceSouth,
-	kf_FaceWest,
-	kf_FaceEast,
-	kf_SpeedUp,
-	kf_SlowDown,
-	kf_NormalSpeed,
-	kf_ToggleRadarJump,
-	kf_MovePause,
-	kf_NOOP,
-	kf_NOOP,
-	kf_NOOP,
-	kf_ToggleRadarTerrain,          //radar terrain on/off
-	kf_ToggleRadarAllyEnemy,        //enemy/ally radar color toggle
-	kf_ToggleSensorDisplay,		//  Was commented out below. moved also!.  Re-enabled --Q 5/10/05
-	kf_AddHelpBlip,				//Add a beacon
-	kf_AllAvailable,
-	kf_ToggleDebugMappings,
-	kf_NOOP,
-	kf_TogglePauseMode,
-	kf_MaxScrollLimits,
-	kf_DebugDroidInfo,
-	kf_RecalcLighting,
-	kf_ToggleFog,
-	kf_ChooseOptions,
-	kf_TogglePower,
-	kf_ToggleWeather,
-	kf_SelectPlayer,
-	kf_AssignGrouping_0,
-	kf_SelectGrouping_0,
-	kf_SelectCommander_0,
-	kf_TraceObject,
-	kf_NOOP, // unused
-	kf_AddMissionOffWorld,
-	kf_KillSelected,
-	kf_ShowMappings,
-	kf_NOOP, // unused
-	kf_ToggleVisibility,
-	kf_FinishResearch,
-	kf_LowerTile,
-	kf_NOOP, // unused
-	kf_ToggleGodMode,
-	kf_EndMissionOffWorld,
-	kf_SystemClose,
-	kf_ToggleShadows,
-	kf_RaiseTile,
-	kf_NOOP, // unused
-	kf_TriFlip,
-	kf_NOOP, // unused
-	kf_NOOP, // unused
-	kf_RevealMapAtPos,
-	kf_ToggleDrivingMode,
-	kf_ToggleShowGateways,
-	kf_ToggleShowPath,
-	kf_PerformanceSample,
-	kf_SetDroidGoToTransport,
-	kf_NOOP,
-	kf_toggleTrapCursor,
-	kf_SelectAllCyborgs,
-	kf_SelectAllCombatCyborgs,
-	kf_SelectAllEngineers,
-	kf_SelectAllLandCombatUnits,
-	kf_SelectAllMechanics,
-	kf_SelectAllTransporters,
-	kf_SelectAllRepairTanks,
-	kf_SelectAllSensorUnits,
-	kf_SelectAllTrucks,
-	kf_SetDroidOrderStop,
-	kf_SelectAllArmedVTOLs,
-	NULL		// last function!
+	{kf_ChooseManufacture, "ChooseManufacture"},
+	{kf_ChooseResearch, "ChooseResearch"},
+	{kf_ChooseBuild, "ChooseBuild"},
+	{kf_ChooseDesign, "ChooseDesign"},
+	{kf_ChooseIntelligence, "ChooseIntelligence"},
+	{kf_ChooseCommand, "ChooseCommand"},
+	{kf_ToggleRadar, "ToggleRadar"},
+	{kf_ToggleConsole, "ToggleConsole"},
+	{kf_ToggleEnergyBars, "ToggleEnergyBars"},
+	{kf_ToggleTeamChat, "ToggleTeamChat"},
+	{kf_ScreenDump, "ScreenDump"} ,
+	{kf_MoveToLastMessagePos, "MoveToLastMessagePos"},
+	{kf_AssignGrouping_1, "AssignGrouping_1"},
+	{kf_AssignGrouping_2, "AssignGrouping_2"},
+	{kf_AssignGrouping_3, "AssignGrouping_3"},
+	{kf_AssignGrouping_4, "AssignGrouping_4"},
+	{kf_AssignGrouping_5, "AssignGrouping_5"},
+	{kf_AssignGrouping_6, "AssignGrouping_6"},
+	{kf_AssignGrouping_7, "AssignGrouping_7"},
+	{kf_AssignGrouping_8, "AssignGrouping_8"},
+	{kf_AssignGrouping_9, "AssignGrouping_9"},
+	{kf_SelectGrouping_1, "SelectGrouping_1"},
+	{kf_SelectGrouping_2, "SelectGrouping_2"},
+	{kf_SelectGrouping_3, "SelectGrouping_3"},
+	{kf_SelectGrouping_4, "SelectGrouping_4"},
+	{kf_SelectGrouping_5, "SelectGrouping_5"},
+	{kf_SelectGrouping_6, "SelectGrouping_6"},
+	{kf_SelectGrouping_7, "SelectGrouping_7"},
+	{kf_SelectGrouping_8, "SelectGrouping_8"},
+	{kf_SelectGrouping_9, "SelectGrouping_9"},
+	{kf_addMultiMenu, "addMultiMenu"},
+	{kf_multiAudioStart, "multiAudioStart"},
+	{kf_multiAudioStop, "multiAudioStop"},
+	{kf_SeekNorth, "SeekNorth"},
+	{kf_ToggleCamera, "ToggleCamera"},
+	{kf_addInGameOptions, "addInGameOptions"},
+	{kf_RadarZoomOut, "RadarZoomOut"},
+	{kf_RadarZoomIn, "RadarZoomIn"},
+	{kf_ZoomOut, "ZoomOut"},
+	{kf_ZoomIn, "ZoomIn"},
+	{kf_PitchForward, "PitchForward"},
+	{kf_RotateLeft, "RotateLeft"},
+	{kf_ResetPitch, "ResetPitch"},
+	{kf_RotateRight, "RotateRight"},
+	{kf_PitchBack, "PitchBack"},
+	{kf_RightOrderMenu, "RightOrderMenu"},
+	{kf_JumpToResourceExtractor, "JumpToResourceExtractor"},
+	{kf_JumpToRepairUnits, "JumpToRepairUnits"},
+	{kf_JumpToConstructorUnits, "JumpToConstructorUnits"},
+	{kf_JumpToSensorUnits, "JumpToSensorUnits"},
+	{kf_JumpToCommandUnits, "JumpToCommandUnits"},
+	{kf_ToggleOverlays, "ToggleOverlays"},
+	{kf_CentreOnBase, "CentreOnBase"},
+	{kf_SetDroidAttackCease, "SetDroidAttackCease"} ,
+	{kf_JumpToUnassignedUnits, "JumpToUnassignedUnits"} ,
+	{kf_SetDroidAttackReturn, "SetDroidAttackReturn"} ,
+	{kf_SetDroidAttackAtWill, "SetDroidAttackAtWill"} ,
+	{kf_SetDroidReturnToBase, "SetDroidReturnToBase"} ,
+	{kf_ToggleFormationSpeedLimiting, "ToggleFormationSpeedLimiting"},
+	{kf_SetDroidMovePatrol, "SetDroidMovePatrol"} ,
+	{kf_SetDroidGoForRepair, "SetDroidGoForRepair"} ,
+	{kf_SetDroidOrderHold, "SetDroidOrderHold"},
+	{kf_SendGlobalMessage, "SendGlobalMessage"},
+	{kf_SendTeamMessage, "SendTeamMessage"},
+	{kf_ScatterDroids, "ScatterDroids"},
+	{kf_SetDroidRetreatMedium, "SetDroidRetreatMedium"},
+	{kf_SetDroidRetreatHeavy, "SetDroidRetreatHeavy"},
+	{kf_SetDroidRetreatNever, "SetDroidRetreatNever"},
+	{kf_SelectAllCombatUnits, "SelectAllCombatUnits"},
+	{kf_SelectAllDamaged, "SelectAllDamaged"},
+	{kf_SelectAllHalfTracked, "SelectAllHalfTracked"},
+	{kf_SelectAllHovers, "SelectAllHovers"},
+	{kf_SetDroidRecycle, "SetDroidRecycle"},
+	{kf_SelectAllOnScreenUnits, "SelectAllOnScreenUnits"},
+	{kf_SelectAllTracked, "SelectAllTracked"},
+	{kf_SelectAllUnits, "SelectAllUnits"},
+	{kf_SelectAllVTOLs, "SelectAllVTOLs"},
+	{kf_SelectAllWheeled, "SelectAllWheeled"},
+	{kf_FrameRate, "FrameRate"},
+	{kf_SelectAllSameType, "SelectAllSameType"},
+	{kf_SelectNextFactory, "SelectNextFactory"},
+	{kf_SelectNextResearch, "SelectNextResearch"},
+	{kf_SelectNextPowerStation, "SelectNextPowerStation"},
+	{kf_SelectNextCyborgFactory, "SelectNextCyborgFactory"},
+	{kf_ToggleConsoleDrop, "ToggleConsoleDrop"},
+	{kf_SelectCommander_1, "SelectCommander_1"},
+	{kf_SelectCommander_2, "SelectCommander_2"},
+	{kf_SelectCommander_3, "SelectCommander_3"},
+	{kf_SelectCommander_4, "SelectCommander_4"},
+	{kf_SelectCommander_5, "SelectCommander_5"},
+	{kf_SelectCommander_6, "SelectCommander_6"},
+	{kf_SelectCommander_7, "SelectCommander_7"},
+	{kf_SelectCommander_8, "SelectCommander_8"},
+	{kf_SelectCommander_9, "SelectCommander_9"},
+	{kf_FaceNorth, "FaceNorth"},
+	{kf_FaceSouth, "FaceSouth"},
+	{kf_FaceWest, "FaceWest"},
+	{kf_FaceEast, "FaceEast"},
+	{kf_SpeedUp, "SpeedUp"},
+	{kf_SlowDown, "SlowDown"},
+	{kf_NormalSpeed, "NormalSpeed"},
+	{kf_ToggleRadarJump, "ToggleRadarJump"},
+	{kf_MovePause, "MovePause"},
+	{kf_ToggleRadarTerrain, "ToggleRadarTerrain"},          //radar terrain on/off
+	{kf_ToggleRadarAllyEnemy, "ToggleRadarAllyEnemy"},      //enemy/ally radar color toggle
+	{kf_ToggleSensorDisplay, "ToggleSensorDisplay"},        //  Was commented out below. moved also!.  Re-enabled --Q 5/10/05
+	{kf_AddHelpBlip, "AddHelpBlip"},                        //Add a beacon
+	{kf_AllAvailable, "AllAvailable"},
+	{kf_ToggleDebugMappings, "ToggleDebugMappings"},
+	{kf_TogglePauseMode, "TogglePauseMode"},
+	{kf_MaxScrollLimits, "MaxScrollLimits"},
+	{kf_DebugDroidInfo, "DebugDroidInfo"},
+	{kf_RecalcLighting, "RecalcLighting"},
+	{kf_ToggleFog, "ToggleFog"},
+	{kf_ChooseOptions, "ChooseOptions"},
+	{kf_TogglePower, "TogglePower"},
+	{kf_ToggleWeather, "ToggleWeather"},
+	{kf_SelectPlayer, "SelectPlayer"},
+	{kf_AssignGrouping_0, "AssignGrouping_0"},
+	{kf_SelectGrouping_0, "SelectGrouping_0"},
+	{kf_SelectCommander_0, "SelectCommander_0"},
+	{kf_TraceObject, "TraceObject"},
+	{kf_AddMissionOffWorld, "AddMissionOffWorld"},
+	{kf_KillSelected, "KillSelected"},
+	{kf_ShowMappings, "ShowMappings"},
+	{kf_ToggleVisibility, "ToggleVisibility"},
+	{kf_FinishResearch, "FinishResearch"},
+	{kf_LowerTile, "LowerTile"},
+	{kf_ToggleGodMode, "ToggleGodMode"},
+	{kf_EndMissionOffWorld, "EndMissionOffWorld"},
+	{kf_SystemClose, "SystemClose"},
+	{kf_ToggleShadows, "ToggleShadows"},
+	{kf_RaiseTile, "RaiseTile"},
+	{kf_TriFlip, "TriFlip"},
+	{kf_RevealMapAtPos, "RevealMapAtPos"},
+	{kf_ToggleShowGateways, "ToggleShowGateways"},
+	{kf_ToggleShowPath, "ToggleShowPath"},
+	{kf_PerformanceSample, "PerformanceSample"},
+	{kf_SetDroidGoToTransport, "SetDroidGoToTransport"},
+	{kf_toggleTrapCursor, "toggleTrapCursor"},
+	{kf_SelectAllCyborgs, "SelectAllCyborgs"},
+	{kf_SelectAllCombatCyborgs, "SelectAllCombatCyborgs"},
+	{kf_SelectAllEngineers, "SelectAllEngineers"},
+	{kf_SelectAllLandCombatUnits, "SelectAllLandCombatUnits"},
+	{kf_SelectAllMechanics, "SelectAllMechanics"},
+	{kf_SelectAllTransporters, "SelectAllTransporters"},
+	{kf_SelectAllRepairTanks, "SelectAllRepairTanks"},
+	{kf_SelectAllSensorUnits, "SelectAllSensorUnits"},
+	{kf_SelectAllTrucks, "SelectAllTrucks"},
+	{kf_SetDroidOrderStop, "SetDroidOrderStop"},
+	{kf_SelectAllArmedVTOLs, "SelectAllArmedVTOLs"},
 };
 
+KeyMapSaveEntry const *keymapEntryByFunction(void (*function)())
+{
+	for (auto &entry : keyMapSaveTable) {
+		if (entry.function == function) {
+			return &entry;
+		}
+	}
+	return nullptr;
+}
+
+KeyMapSaveEntry const *keymapEntryByName(std::string const &name)
+{
+	for (auto &entry : keyMapSaveTable) {
+		if (entry.name == name) {
+			return &entry;
+		}
+	}
+	return nullptr;
+}
 
 // ----------------------------------------------------------------------------------
 /*
@@ -275,21 +260,18 @@ _keymapsave keyMapSaveTable[] =
 	these will be read in from a .cfg file customisable by the player from
 	an in-game menu
 */
-void	keyInitMappings(bool bForceDefaults)
+void keyInitMappings(bool bForceDefaults)
 {
-	UDWORD	i;
-	keyMappings = NULL;
-	numActiveMappings = 0;
-	bKeyProcessing = true;
+	keyMappings.clear();
 	for (unsigned n = 0; n < MAX_PLAYERS; ++n)
 	{
 		processDebugMappings(n, false);
 	}
 
 
-	for (i = 0; i < NUM_QWERTY_KEYS; i++)
+	for (unsigned i = 0; i < NUM_QWERTY_KEYS; i++)
 	{
-		qwertyKeyMappings[i].psMapping = NULL;
+		qwertyKeyMappings[i].psMapping = nullptr;
 	}
 
 	// load the mappings.
@@ -476,35 +458,20 @@ void	keyInitMappings(bool bForceDefaults)
 	keyAddMapping(KEYMAP__DEBUG, KEY_LCTRL,  KEY_X, KEYMAP_PRESSED, kf_FinishResearch,    N_("Complete current research"));
 	keyAddMapping(KEYMAP__DEBUG, KEY_LSHIFT, KEY_W, KEYMAP_PRESSED, kf_RevealMapAtPos,    N_("Reveal map at mouse position"));
 	keyAddMapping(KEYMAP__DEBUG, KEY_LCTRL,  KEY_L, KEYMAP_PRESSED, kf_TraceObject,       N_("Trace a game object"));
-	keyAddMapping(KEYMAP__DEBUG, KEY_LSHIFT, KEY_D, KEYMAP_PRESSED, kf_ToggleDrivingMode, N_("Toggle Driving Mode"));
 	saveKeyMap();	// save out the default key mappings.
 }
 
 // ----------------------------------------------------------------------------------
 /* Adds a new mapping to the list */
 //bool	keyAddMapping(KEY_CODE metaCode, KEY_CODE subCode, KEY_ACTION action,void *function, char *name)
-KEY_MAPPING *keyAddMapping(KEY_STATUS status, KEY_CODE metaCode, KEY_CODE subCode, KEY_ACTION action,
-                           void (*pKeyMapFunc)(void), const char *name)
+KEY_MAPPING *keyAddMapping(KEY_STATUS status, KEY_CODE metaCode, KEY_CODE subCode, KEY_ACTION action, void (*pKeyMapFunc)(), const char *name)
 {
-	KEY_MAPPING	*newMapping;
-
 	/* Get some memory for our binding */
-	newMapping = (KEY_MAPPING *)malloc(sizeof(KEY_MAPPING));
-	if (newMapping == NULL)
-	{
-		debug(LOG_FATAL, "keyAddMapping: Out of memory!");
-		abort();
-		return NULL;
-	}
+	keyMappings.emplace_back();
+	KEY_MAPPING *newMapping = &keyMappings.back();
 
 	/* Copy over the name */
-	newMapping->pName = strdup(name);
-	if (newMapping->pName == NULL)
-	{
-		debug(LOG_FATAL, "keyAddMapping: Out of memory!");
-		abort();
-		return NULL;
-	}
+	newMapping->name = name;
 
 	/* Fill up our entries, first the ones that activate it */
 	newMapping->metaKeyCode	= metaCode;
@@ -540,123 +507,46 @@ KEY_MAPPING *keyAddMapping(KEY_STATUS status, KEY_CODE metaCode, KEY_CODE subCod
 		newMapping->altMetaKeyCode = KEY_RMETA;
 	}
 
-	/* Set it to be active */
-	newMapping->active = true;
-	/* Add it to the start of the list */
-	newMapping->psNext = keyMappings;
-	keyMappings = newMapping;
-	numActiveMappings++;
-
-	return (newMapping);
-}
-
-// ----------------------------------------------------------------------------------
-/* Removes a mapping from the list specified by the key codes */
-bool	keyRemoveMapping(KEY_CODE metaCode, KEY_CODE subCode)
-{
-	KEY_MAPPING	*mapping;
-
-	mapping = keyFindMapping(metaCode, subCode);
-	return (keyRemoveMappingPt(mapping));
+	return newMapping;
 }
 
 // ----------------------------------------------------------------------------------
 /* Returns a pointer to a mapping if it exists - NULL otherwise */
 KEY_MAPPING *keyFindMapping(KEY_CODE metaCode, KEY_CODE subCode)
 {
-	KEY_MAPPING	*psCurr;
-
-	/* See if we can find it */
-	for (psCurr = keyMappings; psCurr != NULL; psCurr = psCurr->psNext)
-	{
-		if (psCurr->metaKeyCode == metaCode && psCurr->subKeyCode == subCode)
-		{
-			return (psCurr);
-		}
-	}
-	return (NULL);
+	auto mapping = std::find_if(keyMappings.begin(), keyMappings.end(), [metaCode, subCode](KEY_MAPPING const &mapping) {
+		return mapping.metaKeyCode == metaCode && mapping.subKeyCode == subCode;
+	});
+	return mapping != keyMappings.end()? &*mapping : nullptr;
 }
 
 // ----------------------------------------------------------------------------------
 /* clears the mappings list and frees the memory */
-void	keyClearMappings(void)
+void keyClearMappings()
 {
-	while (keyMappings)
-	{
-		keyRemoveMappingPt(keyMappings);
-	}
+	keyMappings.clear();
 }
 
 
 // ----------------------------------------------------------------------------------
 /* Removes a mapping specified by a pointer */
-bool	keyRemoveMappingPt(KEY_MAPPING *psToRemove)
+static bool keyRemoveMappingPt(KEY_MAPPING *psToRemove)
 {
-	KEY_MAPPING	*psPrev, *psCurr;
-
-	if (psToRemove == NULL)
+	auto mapping = std::find_if(keyMappings.begin(), keyMappings.end(), [psToRemove](KEY_MAPPING const &mapping) {
+		return &mapping == psToRemove;
+	});
+	if (mapping != keyMappings.end())
 	{
-		return (false);
+		keyMappings.erase(mapping);
+		return true;
 	}
-
-	if (psToRemove == keyMappings && keyMappings->psNext == NULL)
-	{
-		if (keyMappings->pName)
-		{
-			free(keyMappings->pName);    // ffs
-		}
-		free(keyMappings);
-		keyMappings = NULL;
-		numActiveMappings = 0;
-		return (true);
-	}
-
-	/* See if we can find it */
-	for (psPrev = NULL, psCurr = keyMappings;
-	     psCurr != NULL && psCurr != psToRemove;
-	     psPrev = psCurr, psCurr = psCurr->psNext)
-	{
-		/*NOP*/
-	}
-
-	/* If it was found... */
-	if (psCurr == psToRemove)
-	{
-		/* See if it was the first element */
-		if (psPrev)
-		{
-			/* It wasn't */
-			psPrev->psNext = psCurr->psNext;
-		}
-		else
-		{
-			/* It was */
-			keyMappings = psCurr->psNext;
-		}
-		/* Free up the memory, first for the string  */
-		if (psCurr->pName)
-		{
-			free(psCurr->pName);    // only free it if it was allocated in the first place (ffs)
-		}
-		/* and then for the mapping itself */
-		free(psCurr);
-		numActiveMappings--;
-		return (true);
-	}
-	return (false);
-}
-
-// ----------------------------------------------------------------------------------
-/* Just returns how many are active */
-UDWORD	getNumMappings(void)
-{
-	return (numActiveMappings);
+	return false;
 }
 
 
 // ----------------------------------------------------------------------------------
 /* Allows _new_ mappings to be made at runtime */
-static bool checkQwertyKeys(void)
+static bool checkQwertyKeys()
 {
 	KEY_CODE qKey;
 	UDWORD tableEntry;
@@ -696,11 +586,8 @@ static bool checkQwertyKeys(void)
 /* Manages update of all the active function mappings */
 void	keyProcessMappings(bool bExclude)
 {
-	KEY_MAPPING	*keyToProcess;
-	bool		bMetaKeyDown;
-
 	/* Bomb out if there are none */
-	if (!keyMappings || !numActiveMappings || !bKeyProcessing)
+	if (keyMappings.empty())
 	{
 		return;
 	}
@@ -709,27 +596,14 @@ void	keyProcessMappings(bool bExclude)
 	(void) checkQwertyKeys();
 
 	/* Check for the meta keys */
-	if (keyDown(KEY_LCTRL) || keyDown(KEY_RCTRL) || keyDown(KEY_LALT)
+	bool bMetaKeyDown = keyDown(KEY_LCTRL) || keyDown(KEY_RCTRL) || keyDown(KEY_LALT)
 	    || keyDown(KEY_RALT) || keyDown(KEY_LSHIFT) || keyDown(KEY_RSHIFT)
-	    || keyDown(KEY_LMETA) || keyDown(KEY_RMETA))
-	{
-		bMetaKeyDown = true;
-	}
-	else
-	{
-		bMetaKeyDown = false;
-	}
+	    || keyDown(KEY_LMETA) || keyDown(KEY_RMETA);
 
 	/* Run through all our mappings */
-	for (keyToProcess = keyMappings; keyToProcess != NULL; keyToProcess = keyToProcess->psNext)
+	for (auto keyToProcess = keyMappings.begin(); keyToProcess != keyMappings.end(); ++keyToProcess)
 	{
-		/* We haven't acted upon it */
-		if (!keyToProcess->active)
-		{
-			/* Get out if it's inactive */
-			break;
-		}
-		/* Skip innappropriate ones when necessary */
+		/* Skip inappropriate ones when necessary */
 		if (bExclude && keyToProcess->status != KEYMAP_ALWAYS_PROCESS)
 		{
 			break;
@@ -740,7 +614,7 @@ void	keyProcessMappings(bool bExclude)
 			continue;
 		}
 
-		if (keyToProcess->function == NULL)
+		if (keyToProcess->function == nullptr)
 		{
 			continue;
 		}
@@ -888,102 +762,61 @@ static void keyShowMapping(KEY_MAPPING *psMapping)
 	keyScanToString(psMapping->subKeyCode, (char *)&asciiSub, 20);
 	if (onlySub)
 	{
-		CONPRINTF(ConsoleString, (ConsoleString, "%s - %s", asciiSub, _(psMapping->pName)));
+		CONPRINTF(ConsoleString, (ConsoleString, "%s - %s", asciiSub, _(psMapping->name.c_str())));
 	}
 	else
 	{
-		CONPRINTF(ConsoleString, (ConsoleString, "%s and %s - %s", asciiMeta, asciiSub, _(psMapping->pName)));
+		CONPRINTF(ConsoleString, (ConsoleString, "%s and %s - %s", asciiMeta, asciiSub, _(psMapping->name.c_str())));
 	}
 	debug(LOG_INPUT, "Received %s from Console", ConsoleString);
 }
 
 // ----------------------------------------------------------------------------------
 // this function isn't really module static - should be removed - debug only
-void keyShowMappings(void)
+void keyShowMappings()
 {
-	KEY_MAPPING *psMapping;
-
-	for (psMapping = keyMappings; psMapping; psMapping = psMapping->psNext)
+	for (auto &mapping : keyMappings)
 	{
-		keyShowMapping(psMapping);
+		keyShowMapping(&mapping);
 	}
 }
 
 // ----------------------------------------------------------------------------------
 /* Returns the key code of the last sub key pressed - allows called functions to have a simple stack */
-KEY_CODE	getLastSubKey(void)
+KEY_CODE getLastSubKey()
 {
-	return (lastSubKey);
+	return lastSubKey;
 }
 
 // ----------------------------------------------------------------------------------
 /* Returns the key code of the last meta key pressed - allows called functions to have a simple stack */
-KEY_CODE	getLastMetaKey(void)
+KEY_CODE getLastMetaKey()
 {
-	return (lastMetaKey);
-}
-
-// ----------------------------------------------------------------------------------
-/* Allows us to enable/disable the whole mapping system */
-void	keyEnableProcessing(bool val)
-{
-	bKeyProcessing = val;
-}
-
-// ----------------------------------------------------------------------------------
-/* Sets all mappings to be inactive */
-void	keyAllMappingsInactive(void)
-{
-	KEY_MAPPING	*psMapping;
-
-	for (psMapping = keyMappings; psMapping; psMapping = psMapping->psNext)
-	{
-		psMapping->active = false;
-	}
-}
-
-// ----------------------------------------------------------------------------------
-void	keyAllMappingsActive(void)
-{
-	KEY_MAPPING	*psMapping;
-
-	for (psMapping = keyMappings; psMapping; psMapping = psMapping->psNext)
-	{
-		psMapping->active = true;
-	}
-}
-
-// ----------------------------------------------------------------------------------
-/* Allows us to make active/inactive specific mappings */
-void	keySetMappingStatus(KEY_MAPPING *psMapping, bool state)
-{
-	psMapping->active = state;
+	return lastMetaKey;
 }
 
 
 static const KEY_CODE qwertyCodes[26] =
 {
 	//  +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+
-	KEY_Q,  KEY_W,  KEY_E,  KEY_R,  KEY_T,  KEY_Y,  KEY_U,  KEY_I,  KEY_O,  KEY_P,
+	    KEY_Q,  KEY_W,  KEY_E,  KEY_R,  KEY_T,  KEY_Y,  KEY_U,  KEY_I,  KEY_O,  KEY_P,
 	//  +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+
 	//    +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+
-	KEY_A,  KEY_S,  KEY_D,  KEY_F,  KEY_G,  KEY_H,  KEY_J,  KEY_K,  KEY_L,
+	      KEY_A,  KEY_S,  KEY_D,  KEY_F,  KEY_G,  KEY_H,  KEY_J,  KEY_K,  KEY_L,
 	//    +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+   +---+
 	//        +---+   +---+   +---+   +---+   +---+   +---+   +---+
-	KEY_Z,  KEY_X,  KEY_C,  KEY_V,  KEY_B,  KEY_N,  KEY_M
+	          KEY_Z,  KEY_X,  KEY_C,  KEY_V,  KEY_B,  KEY_N,  KEY_M
 	//        +---+   +---+   +---+   +---+   +---+   +---+   +---+
 };
 
 /* Returns the key code of the first ascii key that its finds has been PRESSED */
-KEY_CODE getQwertyKey(void)
+static KEY_CODE getQwertyKey()
 {
-	unsigned i;
-
-	for (i = 0; i < ARRAY_SIZE(qwertyCodes); ++i)
+	for (KEY_CODE code : qwertyCodes)
 	{
-		if (keyPressed(qwertyCodes[i]))
+		if (keyPressed(code))
 		{
-			return qwertyCodes[i];  // Top-, middle- or bottom-row key pressed.
+			return code;  // Top-, middle- or bottom-row key pressed.
 		}
 	}
 
@@ -1075,62 +908,19 @@ std::string getWantedDebugMappingStatuses(bool val)
 	return ret;
 }
 // ----------------------------------------------------------------------------------
-bool	keyReAssignMapping(KEY_CODE origMetaCode, KEY_CODE origSubCode,
-                           KEY_CODE newMetaCode, KEY_CODE newSubCode)
+bool keyReAssignMapping(KEY_CODE origMetaCode, KEY_CODE origSubCode, KEY_CODE newMetaCode, KEY_CODE newSubCode)
 {
-	KEY_MAPPING	*psMapping;
-	bool		bFound;
-
-	for (psMapping = keyMappings, bFound = false; psMapping && !bFound;
-	     psMapping = psMapping->psNext)
+	/* Find the original */
+	if (KEY_MAPPING *psMapping = keyFindMapping(origMetaCode, origSubCode))
 	{
-		/* Find the original */
-		if (psMapping->metaKeyCode == origMetaCode && psMapping->subKeyCode == origSubCode)
+		/* Not all can be remapped */
+		if (psMapping->status != KEYMAP_ALWAYS || psMapping->status == KEYMAP_ALWAYS_PROCESS)
 		{
-			/* Not all can be remapped */
-			if (psMapping->status != KEYMAP_ALWAYS || psMapping->status == KEYMAP_ALWAYS_PROCESS)
-			{
-				psMapping->metaKeyCode = newMetaCode;
-				psMapping->subKeyCode = newSubCode;
-				bFound = true;
-			}
+			psMapping->metaKeyCode = newMetaCode;
+			psMapping->subKeyCode = newSubCode;
+			return true;
 		}
 	}
 
-	return (bFound);
+	return false;
 }
-
-// ----------------------------------------------------------------------------------
-KEY_MAPPING	*getKeyMapFromName(char *pName)
-{
-	KEY_MAPPING	*psMapping;
-	for (psMapping = keyMappings; psMapping;	psMapping = psMapping->psNext)
-	{
-		if (strcmp(pName, psMapping->pName) == false)
-		{
-			return (psMapping);
-		}
-	}
-	return (NULL);
-}
-
-// ----------------------------------------------------------------------------------
-bool	keyReAssignMappingName(char *pName, KEY_CODE newMetaCode, KEY_CODE newSubCode)
-{
-	KEY_MAPPING	*psMapping;
-
-
-	psMapping = getKeyMapFromName(pName);
-	if (psMapping)
-	{
-		if (psMapping->status == KEYMAP_ASSIGNABLE)
-		{
-			(void)keyAddMapping(psMapping->status, newMetaCode,
-			                    newSubCode, psMapping->action, psMapping->function, psMapping->pName);
-			keyRemoveMappingPt(psMapping);
-			return (true);
-		}
-	}
-	return (false);
-}
-// ----------------------------------------------------------------------------------

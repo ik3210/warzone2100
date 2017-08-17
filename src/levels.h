@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -27,6 +27,8 @@
 #include "lib/framework/crc.h"
 #include "init.h"
 #include "game.h"
+
+#include <list>
 
 /// maximum number of data files
 #define LEVEL_MAXFILES	9
@@ -78,30 +80,30 @@ LEVEL_LIST enumerateMultiMaps(int camToUse, int numPlayers);
 bool levParse(const char *buffer, size_t size, searchPathMode datadir, bool ignoreWrf, char const *realFileName);
 
 // shutdown the level system
-extern void levShutDown(void);
+void levShutDown();
 
-extern bool levInitialise(void);
+bool levInitialise();
 
 // load up the data for a level
 bool levLoadData(char const *name, Sha256 const *hash, char *pSaveName, GAME_TYPE saveType);
 
 // find the level dataset
-LEVEL_DATASET *levFindDataSet(char const *name, Sha256 const *hash = NULL);
+LEVEL_DATASET *levFindDataSet(char const *name, Sha256 const *hash = nullptr);
 
 Sha256 levGetFileHash(LEVEL_DATASET *level);
 Sha256 levGetMapNameHash(char const *name);
 
 // free the currently loaded dataset
-extern bool levReleaseAll(void);
+bool levReleaseAll();
 
 // free the data for the current mission
-extern bool levReleaseMissionData(void);
+bool levReleaseMissionData();
 
 //get the type of level currently being loaded of GTYPE type
-extern SDWORD getLevelLoadType(void);
+SDWORD getLevelLoadType();
 
-extern char *getLevelName(void);
+char *getLevelName();
 
-extern void levTest(void);
+void levTest();
 
 #endif // __INCLUDED_SRC_LEVELS_H__

@@ -1,6 +1,6 @@
 /*
 	This file is part of Warzone 2100.
-	Copyright (C) 2013-2015  Warzone 2100 Project
+	Copyright (C) 2013-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -21,13 +21,14 @@
 #define __INCLUDED_QTSCRIPT_H__
 
 #include "lib/framework/frame.h"
-#include "basedef.h"
-#include "droiddef.h"
-#include "structuredef.h"
-#include "researchdef.h"
-#include "featuredef.h"
 
 class QScriptEngine;
+struct BASE_OBJECT;
+struct DROID;
+struct DROID_TEMPLATE;
+struct FEATURE;
+struct RESEARCH;
+struct STRUCTURE;
 
 enum SCRIPT_TRIGGER_TYPE
 {
@@ -63,7 +64,7 @@ bool updateScripts();
 
 // Load and evaluate the given script, kept in memory
 bool loadGlobalScript(QString path);
-QScriptEngine *loadPlayerScript(QString path, int player, int difficulty);
+QScriptEngine *loadPlayerScript(const QString& path, int player, int difficulty);
 
 // Set/write variables in the script's global context, run after loading script,
 // but before triggering any events.
@@ -95,7 +96,7 @@ bool jsEvaluate(QScriptEngine *engine, const QString &text);
 // Event functions
 
 /// For generic, parameter-less triggers, using an enum to avoid declaring a ton of parameter-less functions
-bool triggerEvent(SCRIPT_TRIGGER_TYPE trigger, BASE_OBJECT *psObj = NULL);
+bool triggerEvent(SCRIPT_TRIGGER_TYPE trigger, BASE_OBJECT *psObj = nullptr);
 
 // For each trigger with function parameters, a function to trigger it here
 bool triggerEventDroidBuilt(DROID *psDroid, STRUCTURE *psFactory);
@@ -114,11 +115,18 @@ bool triggerEventPickup(FEATURE *psFeat, DROID *psDroid);
 bool triggerEventCheatMode(bool entered);
 bool triggerEventGroupLoss(BASE_OBJECT *psObj, int group, int size, QScriptEngine *engine);
 bool triggerEventDroidMoved(DROID *psDroid, int oldx, int oldy);
-bool triggerEventArea(QString label, DROID *psDroid);
+bool triggerEventArea(const QString& label, DROID *psDroid);
 bool triggerEventSelected();
 bool triggerEventPlayerLeft(int id);
 bool triggerEventDesignCreated(DROID_TEMPLATE *psTemplate);
 bool triggerEventSyncRequest(int from, int req_id, int x, int y, BASE_OBJECT *psObj, BASE_OBJECT *psObj2);
 bool triggerEventKeyPressed(int meta, int key);
+
+// ----------------------------------------------
+// Debug functions
+
+void jsDebugSelected(const BASE_OBJECT *psObj);
+void jsDebugMessageUpdate();
+void jsDebugUpdate();
 
 #endif

@@ -1,34 +1,44 @@
 #version 120
-#pragma debug(on)
+//#pragma debug(on)
 
 uniform float stretch;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+uniform mat4 NormalMatrix;
+
+uniform vec4 lightPosition;
+
+attribute vec4 vertex;
+attribute vec3 vertexNormal;
+attribute vec2 vertexTexCoord;
 
 varying float vertexDistance;
 varying vec3 normal, lightDir, eyeVec;
+varying vec2 texCoord;
 
-void main(void)
+void main()
 {
-	vec3 vVertex = vec3(gl_ModelViewMatrix * gl_Vertex);
-	vec4 position = gl_Vertex;
+	vec3 vVertex = (ModelViewMatrix * vertex).xyz;
+	vec4 position = vertex;
 
 	// Pass texture coordinates to fragment shader
-	gl_TexCoord[0] = gl_TextureMatrix[0] * gl_MultiTexCoord0;
+	texCoord = vertexTexCoord;
 
 	// Lighting -- we pass these to the fragment shader
-	normal = gl_NormalMatrix * gl_Normal;
-	lightDir = vec3(gl_LightSource[0].position.xyz - vVertex);
+	normal = (NormalMatrix * vec4(vertexNormal, 0.0)).xyz;
+	lightDir = lightPosition.xyz - vVertex;
 	eyeVec = -vVertex;
-	gl_FrontColor = gl_Color;
 
 	// Implement building stretching to accomodate terrain
-	if (gl_Vertex.y <= 0.0) // use gl_Vertex here directly to help shader compiler optimization
+	if (vertex.y <= 0.0) // use vertex here directly to help shader compiler optimization
 	{
 		position.y -= stretch;
 	}
-	
+
 	// Translate every vertex according to the Model View and Projection Matrix
-	gl_Position = gl_ModelViewProjectionMatrix * position;
+	vec4 gposition = ModelViewProjectionMatrix * position;
+	gl_Position = gposition;
 
 	// Remember vertex distance
-	vertexDistance = gl_Position.z;
+	vertexDistance = gposition.z;
 }

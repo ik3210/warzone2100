@@ -1,7 +1,7 @@
 /*
 	This file is part of Warzone 2100.
 	Copyright (C) 1999-2004  Eidos Interactive
-	Copyright (C) 2005-2015  Warzone 2100 Project
+	Copyright (C) 2005-2017  Warzone 2100 Project
 
 	Warzone 2100 is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -49,9 +49,6 @@
 #include "levels.h"
 #include "scriptvals.h"
 #include "research.h"
-
-// Marks a NULL pointer for the script value save/load routines
-static const int UNALLOCATED_OBJECT = -1;
 
 static INTERP_VAL	scrFunctionResult;	//function return value to be pushed to stack
 
@@ -110,7 +107,7 @@ bool scrBaseObjGet(UDWORD index)
 		}
 		type = VAL_INT;
 		scrFunctionResult.v.ival = ((DROID *)psObj)->order.type;
-		if (scrFunctionResult.v.ival == DORDER_GUARD && ((DROID *)psObj)->order.psObj == NULL)
+		if (scrFunctionResult.v.ival == DORDER_GUARD && ((DROID *)psObj)->order.psObj == nullptr)
 		{
 			scrFunctionResult.v.ival = DORDER_NONE;
 		}
@@ -366,7 +363,7 @@ bool scrBaseObjGet(UDWORD index)
 
 
 // convert a base object to a droid if it is the right type
-bool scrObjToDroid(void)
+bool scrObjToDroid()
 {
 	BASE_OBJECT		*psObj;
 
@@ -378,7 +375,7 @@ bool scrObjToDroid(void)
 	// return NULL if not a droid
 	if (psObj->type != OBJ_DROID)
 	{
-		psObj = NULL;
+		psObj = nullptr;
 	}
 
 	scrFunctionResult.v.oval = psObj;
@@ -392,7 +389,7 @@ bool scrObjToDroid(void)
 
 
 // convert a base object to a structure if it is the right type
-bool scrObjToStructure(void)
+bool scrObjToStructure()
 {
 	BASE_OBJECT		*psObj;
 
@@ -404,7 +401,7 @@ bool scrObjToStructure(void)
 	// return NULL if not a droid
 	if (psObj->type != OBJ_STRUCTURE)
 	{
-		psObj = NULL;
+		psObj = nullptr;
 	}
 
 	scrFunctionResult.v.oval = psObj;
@@ -418,7 +415,7 @@ bool scrObjToStructure(void)
 
 
 // convert a base object to a feature if it is the right type
-bool scrObjToFeature(void)
+bool scrObjToFeature()
 {
 	BASE_OBJECT		*psObj;
 
@@ -430,7 +427,7 @@ bool scrObjToFeature(void)
 	// return NULL if not a droid
 	if (psObj->type != OBJ_FEATURE)
 	{
-		psObj = NULL;
+		psObj = nullptr;
 	}
 
 	scrFunctionResult.v.oval = psObj;
@@ -690,9 +687,9 @@ bool scrValDefSave(INTERP_VAL *psVal, WzConfig &ini)
 	case ST_INTMESSAGE:
 		// save the name
 		psIntMessage = (VIEWDATA *)psVal->v.oval;
-		if (psIntMessage != NULL)
+		if (psIntMessage != nullptr)
 		{
-			ini.setValue("data", QString(psIntMessage->pName));
+			ini.setValue("data", psIntMessage->name);
 		}
 		break;
 	case ST_BASEOBJECT:
@@ -731,7 +728,7 @@ bool scrValDefSave(INTERP_VAL *psVal, WzConfig &ini)
 		break;
 	case ST_TEXTSTRING:
 		{
-			const char *const idStr = psVal->v.sval ? strresGetIDfromString(psStringRes, psVal->v.sval) : NULL;
+			const char *const idStr = psVal->v.sval ? strresGetIDfromString(psStringRes, psVal->v.sval) : nullptr;
 			if (idStr)
 			{
 				ini.setValue("data", QString(idStr));
@@ -765,7 +762,7 @@ bool scrValDefSave(INTERP_VAL *psVal, WzConfig &ini)
 					droids.push_back(QString::number(psCDroid->id));
 				}
 				ini.setValue("members", QVariant(members));
-				if (droids.size() > 0)
+				if (!droids.empty())
 				{
 					ini.setValue("data", droids);
 				}
@@ -809,7 +806,7 @@ bool scrValDefLoad(INTERP_VAL *psVal, WzConfig &ini)
 	SDWORD			index, members;
 	UDWORD			id;
 	LEVEL_DATASET	*psLevel;
-	DROID_GROUP		*psGroup = NULL;
+	DROID_GROUP		*psGroup = nullptr;
 
 	switch ((unsigned)psVal->type)  // Unsigned cast to suppress compiler warnings due to enum abuse.
 	{
@@ -820,7 +817,7 @@ bool scrValDefLoad(INTERP_VAL *psVal, WzConfig &ini)
 		}
 		else
 		{
-			psVal->v.oval = NULL;
+			psVal->v.oval = nullptr;
 		}
 		break;
 	case ST_BASEOBJECT:
@@ -833,7 +830,7 @@ bool scrValDefLoad(INTERP_VAL *psVal, WzConfig &ini)
 		}
 		else
 		{
-			psVal->v.oval = NULL;
+			psVal->v.oval = nullptr;
 		}
 		break;
 	case ST_BASESTATS:
@@ -938,30 +935,30 @@ bool scrValDefLoad(INTERP_VAL *psVal, WzConfig &ini)
 		psVal->v.ival = index;
 		break;
 	case ST_TEMPLATE:
-		psVal->v.oval = NULL;
+		psVal->v.oval = nullptr;
 		if (ini.contains("data"))
 		{
 			// FIXME: Ugh. Find a better way to show full template info
 			psVal->v.oval = (void *)IdToTemplate(ini.value("data").toInt(), ANYPLAYER);
-			if ((DROID_TEMPLATE *)(psVal->v.oval) == NULL)
+			if ((DROID_TEMPLATE *)(psVal->v.oval) == nullptr)
 			{
 				debug(LOG_FATAL, "Could not find template %d", ini.value("data").toInt());
 			}
 		}
 		break;
 	case ST_TEXTSTRING:
-		psVal->v.sval = NULL;
+		psVal->v.sval = nullptr;
 		if (ini.contains("data"))
 		{
 			psVal->v.sval = strdup(ini.value("data").toString().toUtf8().constData());
 		}
 		break;
 	case ST_LEVEL:
-		psVal->v.sval = NULL;
+		psVal->v.sval = nullptr;
 		if (ini.contains("data"))
 		{
 			psLevel = levFindDataSet(ini.value("data").toString().toUtf8().constData());
-			if (psLevel == NULL)
+			if (psLevel == nullptr)
 			{
 				debug(LOG_FATAL, "Could not find level dataset");
 				return false;	// FIXME: Why are we saying fatal, if this isn't?
@@ -970,7 +967,7 @@ bool scrValDefLoad(INTERP_VAL *psVal, WzConfig &ini)
 		}
 		break;
 	case ST_RESEARCH:
-		psVal->v.oval = NULL;
+		psVal->v.oval = nullptr;
 		if (ini.contains("data"))
 		{
 			QString research = ini.value("data").toString();
@@ -982,10 +979,10 @@ bool scrValDefLoad(INTERP_VAL *psVal, WzConfig &ini)
 		}
 		break;
 	case ST_GROUP:
-		if (psVal->v.oval == NULL)
+		if (psVal->v.oval == nullptr)
 		{
 			DROID_GROUP *tmp = grpCreate();
-			tmp->add(NULL);
+			tmp->add(nullptr);
 			psVal->v.oval = tmp;
 		}
 		psGroup = (DROID_GROUP *)(psVal->v.oval);

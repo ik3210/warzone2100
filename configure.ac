@@ -204,7 +204,7 @@ AS_IF([test -z "$docdir"],[
 	AC_SUBST([docdir], [${datarootdir}/doc/${AC_PACKAGE_TARNAME}])
 ])
 AS_IF([test -z "$localedir"],[
-	AC_SUBST([localedir], [${datadir}/locale])
+	AC_SUBST([localedir], [${datarootdir}/locale])
 ])
 
 
@@ -212,14 +212,18 @@ AS_IF([test -z "$localedir"],[
 
 AC_ARG_WITH(icondir,
 	AS_HELP_STRING([--with-icondir=DIR],[icon files [DATADIR/icons]]),
-	[ with_icondir=${withval} ], [ with_icondir=${datadir}/icons ])
+	[ with_icondir=${withval} ], [ with_icondir=${datarootdir}/icons ])
 AC_SUBST([icondir], [${with_icondir}])
 
 AC_ARG_WITH(applicationdir,
 	AS_HELP_STRING([--with-applicationdir=DIR],[application files [DATADIR/applications]]),
-	[ with_applicationdir=${withval} ], [ with_applicationdir=${datadir}/applications ])
+	[ with_applicationdir=${withval} ], [ with_applicationdir=${datarootdir}/applications ])
 AC_SUBST([applicationdir], [${with_applicationdir}])
 
+AC_ARG_WITH(appdatadir,
+	AS_HELP_STRING([--with-appdatadir=DIR],[application files [DATADIR/metainfo]]),
+	[ with_appdatadir=${withval} ], [ with_appdatadir=${datarootdir}/metainfo ])
+AC_SUBST([appdatadir], [${with_appdatadir}])
 
 # Commandline options - enable:
 
@@ -263,13 +267,16 @@ AC_MSG_RESULT([${enable_debug}])
 # versions. The -Werror is necessary since otherwise gcc prints a warning that
 # the option is only valid for c++/objc++, but the test succeeds. The order is
 # also important, it doesn't work if -Werror comes last.
-AX_C_CHECK_FLAG([-Werror -Wno-switch], , , CFLAGS_IGNORE_WARNINGS="${CFLAGS_IGNORE_WARNINGS} -Wno-switch")
-AX_C_CHECK_FLAG([-Werror -Wno-enum-compare], , , CFLAGS_IGNORE_WARNINGS="${CFLAGS_IGNORE_WARNINGS} -Wno-enum-compare")
+AX_C_CHECK_FLAG([-Werror -Wno-switch -Wno-error=cpp], [#warning x], , CFLAGS_IGNORE_WARNINGS="${CFLAGS_IGNORE_WARNINGS} -Wno-switch")
+AX_C_CHECK_FLAG([-Werror -Wno-enum-compare -Wno-error=cpp], [#warning x], , CFLAGS_IGNORE_WARNINGS="${CFLAGS_IGNORE_WARNINGS} -Wno-enum-compare")
 # Only needed for CXX, actually.
 WZ_CPPFLAGS="${WZ_CPPFLAGS} -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
 
 # zlib
 LDFLAGS="-lz ${LDFLAGS} -fPIC"
+
+# thread support
+LDFLAGS="${LDFLAGS} -lpthread"
 
 if test "x$enable_warnings" = "xyes" ; then
 	# Only disable -Werror for the warning.
@@ -280,6 +287,7 @@ else
 fi
 
 WZ_WARNINGS_GCC="-Wall -Wextra ${WZ_Wno_}unused-parameter ${WZ_Wno_}sign-compare -Wcast-align -Wwrite-strings -Wpointer-arith ${WZ_Wno_}format-security"
+AX_C_CHECK_FLAG([-Werror -Wno-expansion-to-defined -Wno-error=cpp], [#warning x], , WZ_WARNINGS_GCC="${WZ_WARNINGS_GCC} -Wno-expansion-to-defined")
 WZ_WARNINGS_GCC_C="${WZ_WARNINGS_GCC} -Wstrict-prototypes -Wdeclaration-after-statement ${CFLAGS_IGNORE_WARNINGS}"
 WZ_WARNINGS_GCC_CXX="${WZ_Wno_}enum-compare ${WZ_WARNINGS_GCC}"
 if test "x$enable_debug" = "xyes" ; then
@@ -325,7 +333,12 @@ elif test "x$enable_debug" = "xsanitize-address" ; then
 	WZ_CFLAGS="${WZ_CFLAGS} -ggdb -Os -fno-omit-frame-pointer ${WZ_WARNINGS_GCC_C} -Werror -fsanitize=address"
 	WZ_CXXFLAGS="${WZ_CXXFLAGS} -ggdb -Os -fno-omit-frame-pointer ${WZ_WARNINGS_GCC_CXX} -Werror -fsanitize=address"
 	WZ_CPPFLAGS="${WZ_CPPFLAGS} -DDEBUG"
-	LDFLAGS="${LDFLAGS} -fsanitize=address"
+	LDFLAGS="${LDFLAGS} -fsanitize=address -lpthread"
+elif test "x$enable_debug" = "xsanitize-thread" ; then
+	WZ_CFLAGS="${WZ_CFLAGS} -ggdb -Os -fno-omit-frame-pointer ${WZ_WARNINGS_GCC_C} -Werror -fsanitize=thread"
+	WZ_CXXFLAGS="${WZ_CXXFLAGS} -ggdb -Os -fno-omit-frame-pointer ${WZ_WARNINGS_GCC_CXX} -Werror -fsanitize=thread"
+	WZ_CPPFLAGS="${WZ_CPPFLAGS} -DDEBUG"
+	LDFLAGS="${LDFLAGS} -fsanitize=thread -lpthread"
 # normal, non-debug build
 else
 	WZ_CFLAGS="${WZ_CFLAGS} -g ${WZ_WARNINGS_GCC_C}"
@@ -442,20 +455,19 @@ AC_CHECK_LIB(GLU, main,
 		[${OPENGL_LIBS} -lm]), [${OPENGL_LIBS} -lm])
 AC_SUBST([OPENGL_LIBS], [${OPENGL_LIBS}])
 
-# OpenGLC stuff
-ACX_PTHREAD
-CC="$PTHREAD_CC"
-AX_TLS
-
 PKG_CHECK_MODULES([FRIBIDI], [fribidi])
 PKG_CHECK_MODULES([FREETYPE], [freetype2])
+PKG_CHECK_MODULES([HARFBUZZ], [harfbuzz])
+WZ_CXXFLAGS="${WZ_CXXFLAGS} ${HARFBUZZ_CFLAGS} ${FREETYPE_CFLAGS}"
 AC_CHECK_LIB(freetype, FTC_Manager_New,
              AC_DEFINE([HAVE_FT_CACHE], [1],
                        [Define if FreeType supports the caching routines]))
 PKG_CHECK_MODULES([FONTCONFIG], [fontconfig])
 
-OPENGLC_LIBS="${FRIBIDI_LIBS} ${FREETYPE_LIBS} ${FONTCONFIG_LIBS} ${PTHREAD_LIBS} ${OPENGL_LIBS} ${GLEW_LIBS}"
-AC_SUBST([OPENGLC_LIBS], [${OPENGLC_LIBS}])
+FONT_CFLAGS="${FRIBIDI_CFLAGS} ${FREETYPE_CFLAGS} ${FRIBIDI_CFLAGS} ${FONTCONFIG_CFLAGS} ${HARFBUZZ_CFLAGS}"
+FONT_LIBS="${FRIBIDI_LIBS} ${FREETYPE_LIBS} ${FRIBIDI_LIBS} ${FONTCONFIG_LIBS} ${OPENGL_LIBS} ${GLEW_LIBS} ${HARFBUZZ_LIBS}"
+AC_SUBST([FONT_CFLAGS], [${FONT_CFLAGS}])
+AC_SUBST([FONT_LIBS], [${FONT_LIBS}])
 
 # When (cross-)compiling for Windows (MinGW) we need to link in BFD for the Dr.
 # MinGW derived exception handler.
@@ -471,7 +483,7 @@ WZ_CPPFLAGS="${WZ_CPPFLAGS} -DLOCALEDIR=\"\\\"\${localedir}\\\"\""
 WZ_CPPFLAGS="${WZ_CPPFLAGS} -I\$(top_srcdir)"
 
 # 3rdparty libs
-WZ_CPPFLAGS="${WZ_CPPFLAGS} -I\$(top_srcdir)/3rdparty -I\$(top_srcdir)/3rdparty/quesoglc"
+WZ_CPPFLAGS="${WZ_CPPFLAGS} -I\$(top_srcdir)/3rdparty"
 
 
 AC_SUBST([WZ_CPPFLAGS], [${WZ_CPPFLAGS}])
@@ -491,7 +503,6 @@ AC_CONFIG_FILES([Makefile
 		win32/Makefile
 		tests/Makefile
 		3rdparty/miniupnpc/Makefile
-		3rdparty/quesoglc/Makefile
 		lib/framework/Makefile
 		lib/exceptionhandler/Makefile
 		lib/gamelib/Makefile
